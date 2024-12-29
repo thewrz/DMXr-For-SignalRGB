@@ -27,8 +27,14 @@ A plug-in for SignalRGB that sends color data to a Node.js locally hosted server
 
 # Relevant links for further research and ideas:
 https://github.com/node-dmx/dmx
+
 https://github.com/OpenLightingProject/open-fixture-library
+
 https://github.com/mcallegari/qlcplus
+
 https://open-fixture-library.org/fixture-editor
+
 https://github.com/ASLS-org/studio
+
 https://github.com/aroffringa/glight
+

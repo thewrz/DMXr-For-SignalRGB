@@ -25,6 +25,16 @@ A plug-in for SignalRGB that sends color data to a Node.js locally hosted server
 ## What about other options
 - If there's a headless version of QLC+ that we can turn into a "Network Service" in SignalRGB that would provide a lot better functionality. I am learning that plug-ins in SignalRGB are very limited and that creating a Network Service may be the better approach.
 
+# Hardware
+This will initially be based off of using the Enttec PRO USB as our main hardware interface. 
+
+https://www.enttec.com/product/dmx-usb-interfaces/dmx-usb-pro-professional-1u-usb-to-dmx512-converter/
+
+![image](https://github.com/user-attachments/assets/c24e3d8e-5047-4887-8c07-d9f638178dc2)
+
+
+
+
 # Relevant links for further research and ideas:
 https://github.com/node-dmx/dmx
 

@@ -14,10 +14,21 @@ A plug-in for SignalRGB that sends color data to a Node.js locally hosted server
     - https://github.com/node-dmx/dmx
     - https://github.com/OpenLightingProject/open-fixture-library (although if there a way to make the SignalRGB plug-in use this and have a drop-down function that would simplify how to communicate with the DMX interface)
 
-## Other musings
+# Other musings
+## Node.js server really needed?
 - Do I really need to use Node.js server at all?
 - Can I somehow use the JSON definitions of the OFL directly within a signal RGB .js plug-in so that I can create drop-downs to select fixtures?
   - That would mean writing some code to directly interface with the Enttec USB device, as well as doing the DMX conversion directly within the SignalRGB plugin.
   - How would I "create" new devices in the the SignalRGB .js plug-in interface?
   - How would I control the DMX universe? Fixture "A" may have 9 channels. Fixture "B" may have 14 channels. And as you add them the plug-in will have to know how to use the next available channel in the DMX universe as you fill up fixtures.
 
+## What about other options
+- If there's a headless version of QLC+ that we can turn into a "Network Service" in SignalRGB that would provide a lot better functionality. I am learning that plug-ins in SignalRGB are very limited and that creating a Network Service may be the better approach.
+
+# Relevant links for further research and ideas:
+https://github.com/node-dmx/dmx
+https://github.com/OpenLightingProject/open-fixture-library
+https://github.com/mcallegari/qlcplus
+https://open-fixture-library.org/fixture-editor
+https://github.com/ASLS-org/studio
+https://github.com/aroffringa/glight

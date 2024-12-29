@@ -28,6 +28,11 @@ A plug-in for SignalRGB that sends color data to a Node.js locally hosted server
 ## Latency and timing
 DMX requires a constant rate of data in order for the receiving fixture to be happy and display the desired color. 30Hz is pretty common for most fixtures, but not all. One thing the solution will need to take into account the rate in which SignalRGB sends updated pixel color/brightness data and making sure that is in sync with what the DMX protocol is expecting to keep the fixtures working correctly (otherwise you'll get flickering, or no light output at all from the fixture).
 
+With this in mind.
+- Is Node.js server the best solution? How will we handle the signal conversion rate to be fast enough that the DMX stream gets enough data to continue outputting correctly.
+- Will we need to introduce some kind of loop that just copies the same received signal from SignalRGB as the next DMX frame if it doesn't receive a new signal from SignalRGB in a timely fashion? (this could be overthinking, computers are... fast these days)
+
+
 # Hardware
 This will initially be based off of using the Enttec PRO USB as our main hardware interface. 
 

@@ -48,3 +48,4 @@ https://github.com/ASLS-org/studio
 
 https://github.com/aroffringa/glight
 
+Initial conversation on SignalRGB discord: https://discord.com/channels/803347488190365737/841741611544346624/1322984821521383446

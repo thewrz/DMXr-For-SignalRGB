@@ -1,6 +1,10 @@
 # DMXr-For-SignalRGB
 A plug-in for SignalRGB that sends color data to a Node.js locally hosted server that runs dmx and open fixture libraries to translate the color data from SignalRGB into DMX serial data to send to fixtures using common USB to Serial DMX interfaces.
 
+# Miro board link to view progress/ideas:
+
+https://miro.com/app/board/uXjVLyC0vEI=/?share_link_id=676503878203
+
 ## Goals for MVP
 - Write a .js plug-in for SignalRGB that does the following:
   - Expects there to be a Node.js server running the DMX libraries running on the system and asks the user to specify the IP address (127.0.0.1) and port number. For testing this will be hard-coded to get MVP going.

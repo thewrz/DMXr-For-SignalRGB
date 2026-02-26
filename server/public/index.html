@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DMXr Fixture Manager</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script src="/js/app.js"></script>
+</head>
+<body x-data="dmxrApp()" x-init="init()">
+
+  <header>
+    <h1>DMXr Fixture Manager</h1>
+    <span class="status" :class="serverOnline ? 'online' : 'offline'"
+          x-text="serverOnline ? 'Connected' : 'Disconnected'"></span>
+  </header>
+
+  <div class="toolbar">
+    <button class="btn btn-primary" @click="showAddModal = true">+ Add Fixture</button>
+    <button class="btn btn-danger" @click="blackout()">Blackout All</button>
+    <button class="btn btn-warning" @click="whiteout()">Whiteout All</button>
+  </div>
+
+  <template x-if="fixtures.length === 0">
+    <div class="empty-state">
+      <p>No fixtures configured. Click <strong>+ Add Fixture</strong> to get started.</p>
+    </div>
+  </template>
+
+  <div class="fixture-list">
+    <template x-for="fixture in fixtures" :key="fixture.id">
+      <div class="fixture-card">
+        <div class="fixture-header">
+          <strong x-text="fixture.name"></strong>
+          <span class="fixture-meta">
+            <span x-text="fixture.oflFixtureName"></span> &middot;
+            <span x-text="fixture.mode"></span>
+          </span>
+        </div>
+        <div class="fixture-details">
+          <span class="dmx-range"
+                x-text="'DMX ' + fixture.dmxStartAddress + '-' + (fixture.dmxStartAddress + fixture.channelCount - 1)"></span>
+          <span class="channel-badges">
+            <template x-for="ch in fixture.channels" :key="ch.offset">
+              <span class="badge" :class="'badge-' + (ch.color || ch.type).toLowerCase()"
+                    x-text="ch.name"></span>
+            </template>
+          </span>
+        </div>
+        <div class="fixture-actions">
+          <button class="btn btn-sm" @click="flashFixture(fixture.id)">Flash</button>
+          <button class="btn btn-sm btn-danger" @click="removeFixture(fixture.id)">Remove</button>
+        </div>
+      </div>
+    </template>
+  </div>
+
+  <div class="universe-map" x-show="fixtures.length > 0">
+    <h3>DMX Universe</h3>
+    <div class="channel-grid">
+      <template x-for="ch in 512" :key="ch">
+        <div class="channel-cell"
+             :class="getChannelClass(ch)"
+             :title="getChannelTooltip(ch)"
+             x-text="ch"></div>
+      </template>
+    </div>
+  </div>
+
+  <!-- Add Fixture Modal -->
+  <div class="modal-overlay" x-show="showAddModal" x-cloak @click.self="closeAddModal()">
+    <div class="modal">
+      <h2>Add Fixture</h2>
+
+      <!-- Step 1: Select Manufacturer -->
+      <div x-show="addStep === 1">
+        <label>Manufacturer</label>
+        <input type="text" x-model="mfrSearch" placeholder="Search manufacturers..."
+               @input="filterManufacturers()" autofocus>
+        <div class="search-results">
+          <template x-for="mfr in filteredMfrs" :key="mfr.key">
+            <div class="result-item" @click="selectManufacturer(mfr)">
+              <strong x-text="mfr.name"></strong>
+              <span class="count" x-text="mfr.fixtureCount + ' fixtures'"></span>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- Step 2: Select Fixture -->
+      <div x-show="addStep === 2">
+        <label x-text="'Fixtures by ' + selectedMfr?.name"></label>
+        <input type="text" x-model="fixtureSearch" placeholder="Search fixtures..."
+               @input="filterFixtures()">
+        <div class="search-results">
+          <template x-for="f in filteredFixtures" :key="f.key">
+            <div class="result-item" @click="selectFixture(f)">
+              <strong x-text="f.name"></strong>
+              <span class="categories" x-text="f.categories.join(', ')"></span>
+            </div>
+          </template>
+        </div>
+        <button class="btn btn-sm" @click="addStep = 1">Back</button>
+      </div>
+
+      <!-- Step 3: Configure -->
+      <div x-show="addStep === 3">
+        <p class="selected-fixture" x-text="selectedFixtureDef?.name"></p>
+
+        <label>Mode</label>
+        <select x-model="selectedMode" @change="onModeChange()">
+          <template x-for="mode in selectedFixtureDef?.modes || []" :key="mode.name">
+            <option :value="mode.name"
+                    x-text="mode.name + ' (' + mode.channels.filter(c => c !== null).length + ' ch)'"></option>
+          </template>
+        </select>
+
+        <label x-text="channelCount + ' DMX channel' + (channelCount !== 1 ? 's' : '') + (channelNames.length > 0 ? ': ' + channelNames.join(', ') : '')"></label>
+
+        <label>DMX Start Address</label>
+        <input type="number" x-model.number="dmxStartAddress" min="1" max="512"
+               @input="validateAddress()">
+        <p class="validation-error" x-show="addressError" x-text="addressError"></p>
+
+        <label>Display Name</label>
+        <input type="text" x-model="fixtureName" placeholder="e.g. Stage Left PAR">
+
+        <div class="modal-actions">
+          <button class="btn btn-sm" @click="addStep = 2">Back</button>
+          <button class="btn btn-primary" @click="addFixture()"
+                  :disabled="!!addressError || !fixtureName">Add</button>
+        </div>
+      </div>
+
+      <button class="modal-close" @click="closeAddModal()">&times;</button>
+    </div>
+  </div>
+
+</body>
+</html>

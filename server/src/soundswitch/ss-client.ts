@@ -142,7 +142,11 @@ export function createSsClient(dbPath: string): SsClient {
         };
         channels.push(channel);
 
-        if (attr.fine_chan !== null && attr.fine_chan >= 0) {
+        if (
+          attr.fine_chan !== null &&
+          attr.fine_chan >= 0 &&
+          attr.fine_chan !== attr.coarse_chan
+        ) {
           const fineChannel: FixtureChannel = {
             offset: attr.fine_chan,
             name: attr.name + " Fine",

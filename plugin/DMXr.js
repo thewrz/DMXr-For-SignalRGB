@@ -1,11 +1,19 @@
 export function Name() { return "DMXr"; }
-export function Publisher() { return "DMXr Project"; }
+export function Version() { return "1.0.0"; }
 export function Type() { return "network"; }
+export function Publisher() { return "DMXr Project"; }
 export function Size() { return [1, 1]; }
 export function DefaultPosition() { return [0, 0]; }
 export function DefaultScale() { return 8.0; }
-export function LedNames() { return ["DMXr"]; }
-export function LedPositions() { return [[0, 0]]; }
+export function SubdeviceController() { return true; }
+export function DefaultComponentBrand() { return "DMXr"; }
+
+/* global
+controller:readonly
+discovery:readonly
+serverPort:readonly
+enableDebugLog:readonly
+*/
 
 export function ControllableParameters() {
 	return [
@@ -28,12 +36,149 @@ export function ControllableParameters() {
 	];
 }
 
-/** @type {string} */ var serverPort;
-/** @type {string} */ var enableDebugLog;
+// --------------------------------<( Per-Controller Lifecycle )>--------------------------------
+// SignalRGB calls these with the `controller` global set to the active DMXrBridge instance.
 
-/**
- * Tracks known fixtures from the server and creates/removes controllers to match.
- */
+export function Initialize() {
+	device.setName(controller.name);
+	device.SetLedLimit(1);
+	device.addChannel(controller.name, 1);
+
+	controller._lastR = -1;
+	controller._lastG = -1;
+	controller._lastB = -1;
+	controller._lastSendTime = 0;
+	controller._pendingXhr = null;
+
+	if (enableDebugLog === "true") {
+		device.log("DMXr: Initialized " + controller.name);
+	}
+}
+
+export function Render() {
+	// Capture controller reference for use in async callbacks
+	var ctrl = controller;
+	var componentChannel = device.channel(ctrl.name);
+
+	if (!componentChannel) {
+		return;
+	}
+
+	var colors = componentChannel.getColors("Inline");
+
+	if (!colors || colors.length < 3) {
+		return;
+	}
+
+	var r = colors[0];
+	var g = colors[1];
+	var b = colors[2];
+
+	// Throttle to ~60 Hz
+	var now = Date.now();
+
+	if (ctrl._lastSendTime && now - ctrl._lastSendTime < 16) {
+		return;
+	}
+
+	// Skip if unchanged
+	if (r === ctrl._lastR && g === ctrl._lastG && b === ctrl._lastB) {
+		return;
+	}
+
+	ctrl._lastR = r;
+	ctrl._lastG = g;
+	ctrl._lastB = b;
+	ctrl._lastSendTime = now;
+
+	var brightness = device.getBrightness();
+	var port = parseInt(serverPort, 10) || 8080;
+	var url = "http://127.0.0.1:" + port + "/update/colors";
+
+	var payload = JSON.stringify({
+		fixtures: [{
+			id: ctrl.id,
+			r: r,
+			g: g,
+			b: b,
+			brightness: brightness,
+		}],
+	});
+
+	// Abort pending request
+	if (ctrl._pendingXhr) {
+		try {
+			ctrl._pendingXhr.abort();
+		} catch (e) {
+			// ignore
+		}
+	}
+
+	try {
+		var xhr = new XMLHttpRequest();
+		xhr.open("POST", url, true);
+		xhr.setRequestHeader("Content-Type", "application/json");
+		ctrl._pendingXhr = xhr;
+
+		xhr.onreadystatechange = function () {
+			if (xhr.readyState === 4) {
+				ctrl._pendingXhr = null;
+
+				if (enableDebugLog === "true" && xhr.status !== 200) {
+					device.log("DMXr: HTTP " + xhr.status + " - " + xhr.responseText);
+				}
+			}
+		};
+
+		xhr.send(payload);
+
+		if (enableDebugLog === "true") {
+			device.log(
+				"DMXr: " + ctrl.name +
+				" R:" + r + " G:" + g + " B:" + b +
+				" Br:" + brightness.toFixed(2)
+			);
+		}
+	} catch (e) {
+		if (enableDebugLog === "true") {
+			device.log("DMXr: Send error - " + e);
+		}
+	}
+}
+
+export function Shutdown() {
+	var ctrl = controller;
+
+	if (ctrl._pendingXhr) {
+		try {
+			ctrl._pendingXhr.abort();
+		} catch (e) {
+			// ignore
+		}
+
+		ctrl._pendingXhr = null;
+	}
+
+	// Best-effort blackout
+	try {
+		var xhr = new XMLHttpRequest();
+		var port = parseInt(serverPort, 10) || 8080;
+		xhr.open("POST", "http://127.0.0.1:" + port + "/update/colors", false);
+		xhr.setRequestHeader("Content-Type", "application/json");
+		xhr.send(JSON.stringify({
+			fixtures: [{ id: ctrl.id, r: 0, g: 0, b: 0, brightness: 0 }],
+		}));
+	} catch (e) {
+		// Server may already be down
+	}
+
+	if (enableDebugLog === "true") {
+		device.log("DMXr: Shutdown " + ctrl.name);
+	}
+}
+
+// --------------------------------<( Discovery Service )>--------------------------------
+
 export function DiscoveryService() {
 	this.IconUrl = "";
 	this.knownFixtures = {};
@@ -45,10 +190,10 @@ export function DiscoveryService() {
 	};
 
 	this.removedDevices = function (deviceId) {
-		var controller = service.getController(deviceId);
+		var ctrl = service.getController(deviceId);
 
-		if (controller) {
-			service.removeController(controller);
+		if (ctrl) {
+			service.removeController(ctrl);
 			delete this.knownFixtures[deviceId];
 		}
 	};
@@ -77,18 +222,18 @@ export function DiscoveryService() {
 			var serverFixtures = JSON.parse(xhr.responseText);
 			var serverIds = {};
 
-			// Add new fixtures
 			for (var i = 0; i < serverFixtures.length; i++) {
 				var fixture = serverFixtures[i];
 				serverIds[fixture.id] = true;
 
 				if (!this.knownFixtures[fixture.id]) {
-					var controller = new DMXrController(fixture);
-					service.addController(controller);
+					var bridge = new DMXrBridge(fixture);
+					service.addController(bridge);
+					service.announceController(bridge);
 					this.knownFixtures[fixture.id] = fixture;
 
 					if (enableDebugLog === "true") {
-						device.log("DMXr: Added fixture " + fixture.name + " (id: " + fixture.id + ")");
+						service.log("DMXr: Discovered " + fixture.name + " (id: " + fixture.id + ")");
 					}
 				}
 			}
@@ -96,187 +241,44 @@ export function DiscoveryService() {
 			// Remove fixtures no longer on server
 			for (var id in this.knownFixtures) {
 				if (!serverIds[id]) {
-					var ctrl = service.getController(id);
+					var existing = service.getController(id);
 
-					if (ctrl) {
-						service.removeController(ctrl);
+					if (existing) {
+						service.removeController(existing);
 					}
 
 					delete this.knownFixtures[id];
 
 					if (enableDebugLog === "true") {
-						device.log("DMXr: Removed fixture " + id);
+						service.log("DMXr: Removed " + id);
 					}
 				}
 			}
 		} catch (e) {
 			if (enableDebugLog === "true") {
-				device.log("DMXr: Poll error - " + e);
+				service.log("DMXr: Poll error - " + e);
 			}
 		}
 	};
 }
 
-/**
- * One controller per fixture. Each becomes a draggable subdevice in SignalRGB.
- */
-function DMXrController(fixture) {
+// --------------------------------<( Bridge Data Class )>--------------------------------
+// Data-only object passed to service.addController(). Device operations happen in
+// the top-level Initialize/Render/Shutdown exports, not here.
+
+function DMXrBridge(fixture) {
 	this.id = fixture.id;
 	this.name = fixture.name;
 	this.width = 1;
 	this.height = 1;
 	this.ledNames = [fixture.name];
 	this.ledPositions = [[0, 0]];
-
 	this.fixtureConfig = fixture;
-	this.lastR = -1;
-	this.lastG = -1;
-	this.lastB = -1;
-	this.lastBrightness = -1;
-	this.pendingXhr = null;
-	this.lastSendTime = 0;
 
-	var MIN_SEND_INTERVAL_MS = 16; // ~60 Hz max
-
-	this.Initialize = function () {
-		this.lastR = -1;
-		this.lastG = -1;
-		this.lastB = -1;
-		this.lastBrightness = -1;
-		this.pendingXhr = null;
-		this.lastSendTime = 0;
-
-		device.createSubdevice(this.id);
-		device.setSubdeviceName(this.id, fixture.name);
-		device.setSubdeviceSize(this.id, 1, 1);
-		device.setSubdeviceLeds(this.id, [fixture.name], [[0, 0]]);
-
-		if (enableDebugLog === "true") {
-			device.log("DMXr: Initialized subdevice for " + fixture.name);
-		}
-	};
-
-	this.Render = function () {
-		var now = Date.now();
-
-		if (now - this.lastSendTime < MIN_SEND_INTERVAL_MS) {
-			return;
-		}
-
-		var color = device.subdeviceColor(this.id, 0, 0);
-		var r = color[0];
-		var g = color[1];
-		var b = color[2];
-		var brightness = device.getBrightness();
-
-		if (
-			r === this.lastR &&
-			g === this.lastG &&
-			b === this.lastB &&
-			brightness === this.lastBrightness
-		) {
-			return;
-		}
-
-		this.lastR = r;
-		this.lastG = g;
-		this.lastB = b;
-		this.lastBrightness = brightness;
-
-		var payload = JSON.stringify({
-			fixtures: [
-				{
-					id: this.id,
-					r: r,
-					g: g,
-					b: b,
-					brightness: brightness,
-				},
-			],
-		});
-
-		var port = parseInt(serverPort, 10) || 8080;
-		var url = "http://127.0.0.1:" + port + "/update/colors";
-
-		if (this.pendingXhr !== null) {
-			try {
-				this.pendingXhr.abort();
-			} catch (e) {
-				// ignore abort errors
-			}
-		}
-
-		try {
-			var xhr = new XMLHttpRequest();
-			xhr.open("POST", url, true);
-			xhr.setRequestHeader("Content-Type", "application/json");
-			this.pendingXhr = xhr;
-
-			var self = this;
-
-			xhr.onreadystatechange = function () {
-				if (xhr.readyState === 4) {
-					self.pendingXhr = null;
-
-					if (enableDebugLog === "true" && xhr.status !== 200) {
-						device.log(
-							"DMXr: HTTP " + xhr.status + " - " + xhr.responseText
-						);
-					}
-				}
-			};
-
-			xhr.send(payload);
-			this.lastSendTime = now;
-
-			if (enableDebugLog === "true") {
-				device.log(
-					"DMXr: " + this.name +
-					" R:" + r +
-					" G:" + g +
-					" B:" + b +
-					" Br:" + brightness.toFixed(2)
-				);
-			}
-		} catch (e) {
-			if (enableDebugLog === "true") {
-				device.log("DMXr: Send error - " + e);
-			}
-		}
-	};
-
-	this.Shutdown = function () {
-		if (this.pendingXhr !== null) {
-			try {
-				this.pendingXhr.abort();
-			} catch (e) {
-				// ignore
-			}
-
-			this.pendingXhr = null;
-		}
-
-		// Best-effort blackout for this fixture
-		try {
-			var xhr = new XMLHttpRequest();
-			var port = parseInt(serverPort, 10) || 8080;
-			xhr.open("POST", "http://127.0.0.1:" + port + "/update/colors", false);
-			xhr.setRequestHeader("Content-Type", "application/json");
-			xhr.send(JSON.stringify({
-				fixtures: [{ id: this.id, r: 0, g: 0, b: 0, brightness: 0 }],
-			}));
-		} catch (e) {
-			// Server may already be down
-		}
-
-		try {
-			device.removeSubdevice(this.id);
-		} catch (e) {
-			// ignore
-		}
-
-		if (enableDebugLog === "true") {
-			device.log("DMXr: Shutdown " + this.name);
-		}
-	};
+	// Runtime state (managed by top-level lifecycle exports)
+	this._lastR = -1;
+	this._lastG = -1;
+	this._lastB = -1;
+	this._lastSendTime = 0;
+	this._pendingXhr = null;
 }

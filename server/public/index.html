@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DMXr Fixture Manager</title>
   <link rel="stylesheet" href="/css/style.css">
-  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script defer src="/js/alpine.min.js"></script>
   <script src="/js/app.js"></script>
 </head>
 <body x-data="dmxrApp()" x-init="init()">
@@ -75,9 +75,11 @@
 
       <!-- Step 1: Select Manufacturer -->
       <div x-show="addStep === 1">
+        <p class="validation-error" x-show="oflError" x-text="oflError"></p>
         <label>Manufacturer</label>
         <input type="text" x-model="mfrSearch" placeholder="Search manufacturers..."
                @input="filterManufacturers()" autofocus>
+        <button class="btn btn-sm" x-show="oflError" @click="loadManufacturers()">Retry</button>
         <div class="search-results">
           <template x-for="mfr in filteredMfrs" :key="mfr.key">
             <div class="result-item" @click="selectManufacturer(mfr)">

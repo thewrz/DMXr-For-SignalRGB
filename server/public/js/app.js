@@ -9,6 +9,7 @@ function dmxrApp() {
     manufacturers: [],
     mfrSearch: "",
     filteredMfrs: [],
+    oflError: "",
 
     // Fixture search
     selectedMfr: null,
@@ -35,6 +36,10 @@ function dmxrApp() {
     async loadFixtures() {
       try {
         const res = await fetch("/fixtures");
+        if (!res.ok) {
+          this.serverOnline = false;
+          return;
+        }
         this.fixtures = await res.json();
         this.serverOnline = true;
       } catch {
@@ -47,8 +52,14 @@ function dmxrApp() {
     },
 
     async loadManufacturers() {
+      this.oflError = "";
       try {
         const res = await fetch("/ofl/manufacturers");
+        if (!res.ok) {
+          this.oflError = "Server returned " + res.status + " loading manufacturers";
+          this.manufacturers = [];
+          return;
+        }
         const data = await res.json();
         this.manufacturers = Object.entries(data).map(function(entry) {
           return {
@@ -61,6 +72,7 @@ function dmxrApp() {
         });
         this.filteredMfrs = this.manufacturers;
       } catch {
+        this.oflError = "Could not reach OFL API. Check server connectivity to open-fixture-library.org";
         this.manufacturers = [];
       }
     },
@@ -252,6 +264,7 @@ function dmxrApp() {
     },
 
     async removeFixture(id) {
+      if (!confirm("Remove this fixture? This cannot be undone.")) return;
       try {
         await fetch("/fixtures/" + id, { method: "DELETE" });
         await this.loadFixtures();

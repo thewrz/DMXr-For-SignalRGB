@@ -18,7 +18,7 @@ enableDebugLog:readonly
 
 var serverHost = "127.0.0.1";
 var serverPort = "8080";
-var enableDebugLog = "false";
+var enableDebugLog = "true";
 
 export function ControllableParameters() {
 	return [
@@ -43,7 +43,7 @@ export function ControllableParameters() {
 			group: "debug",
 			label: "Enable Debug Log",
 			type: "boolean",
-			default: "false",
+			default: "true",
 		},
 	];
 }
@@ -60,7 +60,6 @@ export function Initialize() {
 	controller._lastG = -1;
 	controller._lastB = -1;
 	controller._lastSendTime = 0;
-	controller._pendingXhr = null;
 
 	if (enableDebugLog === "true") {
 		device.log("DMXr: Initialized " + controller.name);
@@ -103,7 +102,7 @@ export function Render() {
 	ctrl._lastB = b;
 	ctrl._lastSendTime = now;
 
-	var brightness = device.getBrightness();
+	var brightness = device.getBrightness() / 100;
 	var url = getServerUrl("/update/colors");
 
 	var payload = JSON.stringify({
@@ -116,39 +115,22 @@ export function Render() {
 		}],
 	});
 
-	// Abort pending request
-	if (ctrl._pendingXhr) {
-		try {
-			ctrl._pendingXhr.abort();
-		} catch (e) {
-			// ignore
-		}
-	}
-
 	try {
 		var xhr = new XMLHttpRequest();
-		xhr.open("POST", url, true);
+		xhr.open("POST", url, false);
 		xhr.setRequestHeader("Content-Type", "application/json");
-		ctrl._pendingXhr = xhr;
-
-		xhr.onreadystatechange = function () {
-			if (xhr.readyState === 4) {
-				ctrl._pendingXhr = null;
-
-				if (enableDebugLog === "true" && xhr.status !== 200) {
-					device.log("DMXr: HTTP " + xhr.status + " - " + xhr.responseText);
-				}
-			}
-		};
-
 		xhr.send(payload);
 
 		if (enableDebugLog === "true") {
-			device.log(
-				"DMXr: " + ctrl.name +
-				" R:" + r + " G:" + g + " B:" + b +
-				" Br:" + brightness.toFixed(2)
-			);
+			if (xhr.status !== 200) {
+				device.log("DMXr: HTTP " + xhr.status + " - " + xhr.responseText);
+			} else {
+				device.log(
+					"DMXr: " + ctrl.name +
+					" R:" + r + " G:" + g + " B:" + b +
+					" Br:" + brightness.toFixed(2)
+				);
+			}
 		}
 	} catch (e) {
 		if (enableDebugLog === "true") {
@@ -159,16 +141,6 @@ export function Render() {
 
 export function Shutdown() {
 	var ctrl = controller;
-
-	if (ctrl._pendingXhr) {
-		try {
-			ctrl._pendingXhr.abort();
-		} catch (e) {
-			// ignore
-		}
-
-		ctrl._pendingXhr = null;
-	}
 
 	// Best-effort blackout
 	try {
@@ -328,5 +300,4 @@ function DMXrBridge(fixture) {
 	this._lastG = -1;
 	this._lastB = -1;
 	this._lastSendTime = 0;
-	this._pendingXhr = null;
 }

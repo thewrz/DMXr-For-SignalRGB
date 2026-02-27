@@ -265,3 +265,40 @@ header h1 { font-size: 1.4rem; }
   cursor: pointer;
 }
 .modal-close:hover { color: var(--text); }
+
+/* Source tabs */
+.source-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 1rem;
+  border-bottom: 2px solid var(--surface2);
+}
+
+.tab {
+  padding: 0.5rem 1rem;
+  border: none;
+  background: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 0.85rem;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.tab:hover { color: var(--text); }
+.tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* Channel preview */
+.channel-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.25rem;
+}
+
+.badge-pan, .badge-tilt { background: #8e44ad; color: #fff; }
+.badge-strobe { background: #f1c40f; color: #000; }
+.badge-generic { background: var(--surface2); color: var(--text-dim); }

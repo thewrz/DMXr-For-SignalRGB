@@ -44,8 +44,9 @@ export function createFixtureStore(filePath: string): FixtureStore {
       const fixture: FixtureConfig = {
         id: randomUUID(),
         name: request.name,
-        oflKey: request.oflKey,
-        oflFixtureName: request.oflFixtureName,
+        ...(request.oflKey ? { oflKey: request.oflKey } : {}),
+        ...(request.oflFixtureName ? { oflFixtureName: request.oflFixtureName } : {}),
+        ...(request.source ? { source: request.source } : {}),
         mode: request.mode,
         dmxStartAddress: request.dmxStartAddress,
         channelCount: request.channels.length,

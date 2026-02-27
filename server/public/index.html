@@ -34,7 +34,8 @@
         <div class="fixture-header">
           <strong x-text="fixture.name"></strong>
           <span class="fixture-meta">
-            <span x-text="fixture.oflFixtureName"></span> &middot;
+            <span x-text="fixture.oflFixtureName || fixture.source || ''"></span>
+            <template x-if="fixture.oflFixtureName || fixture.source"> &middot; </template>
             <span x-text="fixture.mode"></span>
           </span>
         </div>
@@ -73,67 +74,156 @@
     <div class="modal">
       <h2>Add Fixture</h2>
 
-      <!-- Step 1: Select Manufacturer -->
-      <div x-show="addStep === 1">
-        <p class="validation-error" x-show="oflError" x-text="oflError"></p>
-        <label>Manufacturer</label>
-        <input type="text" x-model="mfrSearch" placeholder="Search manufacturers..."
-               @input="filterManufacturers()" autofocus>
-        <button class="btn btn-sm" x-show="oflError" @click="loadManufacturers()">Retry</button>
-        <div class="search-results">
-          <template x-for="mfr in filteredMfrs" :key="mfr.key">
-            <div class="result-item" @click="selectManufacturer(mfr)">
-              <strong x-text="mfr.name"></strong>
-              <span class="count" x-text="mfr.fixtureCount + ' fixtures'"></span>
+      <!-- Source tabs -->
+      <div class="source-tabs">
+        <button class="tab" :class="{ active: fixtureSource === 'ofl' }"
+                @click="switchSource('ofl')">Open Fixture Library</button>
+        <button class="tab" :class="{ active: fixtureSource === 'soundswitch' }"
+                x-show="ssAvailable"
+                @click="switchSource('soundswitch')">SoundSwitch</button>
+      </div>
+
+      <!-- OFL Flow -->
+      <template x-if="fixtureSource === 'ofl'">
+        <div>
+          <!-- Step 1: Select Manufacturer -->
+          <div x-show="addStep === 1">
+            <p class="validation-error" x-show="oflError" x-text="oflError"></p>
+            <label>Manufacturer</label>
+            <input type="text" x-model="mfrSearch" placeholder="Search manufacturers..."
+                   @input="filterManufacturers()" autofocus>
+            <button class="btn btn-sm" x-show="oflError" @click="loadManufacturers()">Retry</button>
+            <div class="search-results">
+              <template x-for="mfr in filteredMfrs" :key="mfr.key">
+                <div class="result-item" @click="selectManufacturer(mfr)">
+                  <strong x-text="mfr.name"></strong>
+                  <span class="count" x-text="mfr.fixtureCount + ' fixtures'"></span>
+                </div>
+              </template>
             </div>
-          </template>
-        </div>
-      </div>
+          </div>
 
-      <!-- Step 2: Select Fixture -->
-      <div x-show="addStep === 2">
-        <label x-text="'Fixtures by ' + selectedMfr?.name"></label>
-        <input type="text" x-model="fixtureSearch" placeholder="Search fixtures..."
-               @input="filterFixtures()">
-        <div class="search-results">
-          <template x-for="f in filteredFixtures" :key="f.key">
-            <div class="result-item" @click="selectFixture(f)">
-              <strong x-text="f.name"></strong>
-              <span class="categories" x-text="f.categories.join(', ')"></span>
+          <!-- Step 2: Select Fixture -->
+          <div x-show="addStep === 2">
+            <label x-text="'Fixtures by ' + selectedMfr?.name"></label>
+            <input type="text" x-model="fixtureSearch" placeholder="Search fixtures..."
+                   @input="filterFixtures()">
+            <div class="search-results">
+              <template x-for="f in filteredFixtures" :key="f.key">
+                <div class="result-item" @click="selectFixture(f)">
+                  <strong x-text="f.name"></strong>
+                  <span class="categories" x-text="f.categories.join(', ')"></span>
+                </div>
+              </template>
             </div>
-          </template>
+            <button class="btn btn-sm" @click="addStep = 1">Back</button>
+          </div>
+
+          <!-- Step 3: Configure -->
+          <div x-show="addStep === 3">
+            <p class="selected-fixture" x-text="selectedFixtureDef?.name"></p>
+
+            <label>Mode</label>
+            <select x-model="selectedMode" @change="onModeChange()">
+              <template x-for="mode in selectedFixtureDef?.modes || []" :key="mode.name">
+                <option :value="mode.name"
+                        x-text="mode.name + ' (' + mode.channels.filter(c => c !== null).length + ' ch)'"></option>
+              </template>
+            </select>
+
+            <label x-text="channelCount + ' DMX channel' + (channelCount !== 1 ? 's' : '') + (channelNames.length > 0 ? ': ' + channelNames.join(', ') : '')"></label>
+
+            <label>DMX Start Address</label>
+            <input type="number" x-model.number="dmxStartAddress" min="1" max="512"
+                   @input="validateAddress()">
+            <p class="validation-error" x-show="addressError" x-text="addressError"></p>
+
+            <label>Display Name</label>
+            <input type="text" x-model="fixtureName" placeholder="e.g. Stage Left PAR">
+
+            <div class="modal-actions">
+              <button class="btn btn-sm" @click="addStep = 2">Back</button>
+              <button class="btn btn-primary" @click="addFixture()"
+                      :disabled="!!addressError || !fixtureName">Add</button>
+            </div>
+          </div>
         </div>
-        <button class="btn btn-sm" @click="addStep = 1">Back</button>
-      </div>
+      </template>
 
-      <!-- Step 3: Configure -->
-      <div x-show="addStep === 3">
-        <p class="selected-fixture" x-text="selectedFixtureDef?.name"></p>
+      <!-- SoundSwitch Flow -->
+      <template x-if="fixtureSource === 'soundswitch'">
+        <div>
+          <!-- SS Step 1: Select Manufacturer -->
+          <div x-show="ssStep === 1">
+            <label>Manufacturer</label>
+            <input type="text" x-model="ssMfrSearch" placeholder="Search manufacturers..."
+                   @input="filterSsMfrs()">
+            <div class="search-results">
+              <template x-for="mfr in ssFilteredMfrs" :key="mfr.id">
+                <div class="result-item" @click="selectSsMfr(mfr)">
+                  <strong x-text="mfr.name"></strong>
+                  <span class="count" x-text="mfr.fixtureCount + ' fixtures'"></span>
+                </div>
+              </template>
+            </div>
+          </div>
 
-        <label>Mode</label>
-        <select x-model="selectedMode" @change="onModeChange()">
-          <template x-for="mode in selectedFixtureDef?.modes || []" :key="mode.name">
-            <option :value="mode.name"
-                    x-text="mode.name + ' (' + mode.channels.filter(c => c !== null).length + ' ch)'"></option>
-          </template>
-        </select>
+          <!-- SS Step 2: Select Fixture -->
+          <div x-show="ssStep === 2">
+            <label x-text="'Fixtures by ' + ssSelectedMfr?.name"></label>
+            <input type="text" x-model="ssFixtureSearch" placeholder="Search fixtures..."
+                   @input="filterSsFixtures()">
+            <div class="search-results">
+              <template x-for="f in ssFilteredFixtures" :key="f.id">
+                <div class="result-item" @click="selectSsFixture(f)">
+                  <strong x-text="f.name"></strong>
+                  <span class="count" x-text="f.modeCount + ' mode' + (f.modeCount !== 1 ? 's' : '')"></span>
+                </div>
+              </template>
+            </div>
+            <button class="btn btn-sm" @click="ssStep = 1">Back</button>
+          </div>
 
-        <label x-text="channelCount + ' DMX channel' + (channelCount !== 1 ? 's' : '') + (channelNames.length > 0 ? ': ' + channelNames.join(', ') : '')"></label>
+          <!-- SS Step 3: Select Mode + Configure -->
+          <div x-show="ssStep === 3">
+            <p class="selected-fixture" x-text="ssSelectedFixture?.name"></p>
 
-        <label>DMX Start Address</label>
-        <input type="number" x-model.number="dmxStartAddress" min="1" max="512"
-               @input="validateAddress()">
-        <p class="validation-error" x-show="addressError" x-text="addressError"></p>
+            <label>Mode</label>
+            <select x-model="ssSelectedModeId" @change="onSsModeChange()">
+              <template x-for="mode in ssModes" :key="mode.id">
+                <option :value="mode.id"
+                        x-text="mode.name + ' (' + mode.channelCount + ' ch)'"></option>
+              </template>
+            </select>
 
-        <label>Display Name</label>
-        <input type="text" x-model="fixtureName" placeholder="e.g. Stage Left PAR">
+            <template x-if="ssChannels.length > 0">
+              <div>
+                <label x-text="ssChannels.length + ' DMX channel' + (ssChannels.length !== 1 ? 's' : '')"></label>
+                <div class="channel-preview">
+                  <template x-for="ch in ssChannels" :key="ch.offset">
+                    <span class="badge" :class="'badge-' + (ch.color || ch.type).toLowerCase()"
+                          x-text="ch.name + ' (' + ch.type + ')'"></span>
+                  </template>
+                </div>
+              </div>
+            </template>
 
-        <div class="modal-actions">
-          <button class="btn btn-sm" @click="addStep = 2">Back</button>
-          <button class="btn btn-primary" @click="addFixture()"
-                  :disabled="!!addressError || !fixtureName">Add</button>
+            <label>DMX Start Address</label>
+            <input type="number" x-model.number="dmxStartAddress" min="1" max="512"
+                   @input="validateAddress()">
+            <p class="validation-error" x-show="addressError" x-text="addressError"></p>
+
+            <label>Display Name</label>
+            <input type="text" x-model="fixtureName">
+
+            <div class="modal-actions">
+              <button class="btn btn-sm" @click="ssStep = 2">Back</button>
+              <button class="btn btn-primary" @click="importSsFixture()"
+                      :disabled="!!addressError || !fixtureName || !ssSelectedModeId">Import</button>
+            </div>
+          </div>
         </div>
-      </div>
+      </template>
 
       <button class="modal-close" @click="closeAddModal()">&times;</button>
     </div>

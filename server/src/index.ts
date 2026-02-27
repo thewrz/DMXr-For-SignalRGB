@@ -7,6 +7,7 @@ import {
   type MdnsAdvertiser,
 } from "./mdns/advertiser.js";
 import { createOflClient } from "./ofl/ofl-client.js";
+import { createSsClientIfConfigured } from "./soundswitch/ss-client.js";
 import { buildServer } from "./server.js";
 
 async function main() {
@@ -20,6 +21,7 @@ async function main() {
   await fixtureStore.load();
 
   const oflClient = createOflClient();
+  const ssClient = createSsClientIfConfigured(config.soundswitchDbPath);
 
   const app = await buildServer({
     config,
@@ -28,6 +30,7 @@ async function main() {
     startTime,
     fixtureStore,
     oflClient,
+    ssClient,
   });
 
   let mdnsAdvertiser: MdnsAdvertiser | undefined;
@@ -35,6 +38,7 @@ async function main() {
   const shutdown = async (signal: string) => {
     app.log.info(`Received ${signal}, shutting down...`);
     mdnsAdvertiser?.unpublishAll();
+    ssClient?.close();
     manager.blackout();
     await app.close();
     await connection.close();
@@ -54,6 +58,9 @@ async function main() {
   app.log.info(`DMXr server running on ${config.host}:${boundPort}`);
   app.log.info(`DMX driver: ${connection.driver}`);
   app.log.info(`Fixtures loaded: ${fixtureStore.getAll().length}`);
+  if (ssClient) {
+    app.log.info(`SoundSwitch DB: ${config.soundswitchDbPath}`);
+  }
 }
 
 async function listenWithRetry(

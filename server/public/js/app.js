@@ -3,21 +3,22 @@ function dmxrApp() {
     fixtures: [],
     serverOnline: false,
     showAddModal: false,
+    fixtureSource: "ofl",
     addStep: 1,
 
-    // Manufacturer search
+    // OFL: Manufacturer search
     manufacturers: [],
     mfrSearch: "",
     filteredMfrs: [],
     oflError: "",
 
-    // Fixture search
+    // OFL: Fixture search
     selectedMfr: null,
     mfrFixtures: [],
     fixtureSearch: "",
     filteredFixtures: [],
 
-    // Fixture config
+    // OFL: Fixture config
     selectedFixtureKey: null,
     selectedFixtureDef: null,
     selectedMode: "",
@@ -27,9 +28,25 @@ function dmxrApp() {
     fixtureName: "",
     addressError: "",
 
+    // SoundSwitch state
+    ssAvailable: false,
+    ssStep: 1,
+    ssMfrs: [],
+    ssMfrSearch: "",
+    ssFilteredMfrs: [],
+    ssSelectedMfr: null,
+    ssFixtures: [],
+    ssFixtureSearch: "",
+    ssFilteredFixtures: [],
+    ssSelectedFixture: null,
+    ssModes: [],
+    ssSelectedModeId: null,
+    ssChannels: [],
+
     async init() {
       await this.loadFixtures();
       await this.loadManufacturers();
+      await this.checkSsAvailable();
       this.pollFixtures();
     },
 
@@ -325,6 +342,7 @@ function dmxrApp() {
 
     closeAddModal() {
       this.showAddModal = false;
+      this.fixtureSource = "ofl";
       this.addStep = 1;
       this.mfrSearch = "";
       this.fixtureSearch = "";
@@ -339,6 +357,157 @@ function dmxrApp() {
       this.addressError = "";
       this.filteredMfrs = this.manufacturers;
       this.filteredFixtures = [];
+      this.ssStep = 1;
+      this.ssMfrSearch = "";
+      this.ssFilteredMfrs = this.ssMfrs;
+      this.ssSelectedMfr = null;
+      this.ssFixtures = [];
+      this.ssFixtureSearch = "";
+      this.ssFilteredFixtures = [];
+      this.ssSelectedFixture = null;
+      this.ssModes = [];
+      this.ssSelectedModeId = null;
+      this.ssChannels = [];
+    },
+
+    switchSource(source) {
+      this.fixtureSource = source;
+      this.addStep = 1;
+      this.ssStep = 1;
+      this.addressError = "";
+      this.dmxStartAddress = 1;
+      this.fixtureName = "";
+      if (source === "soundswitch" && this.ssMfrs.length === 0) {
+        this.loadSsMfrs();
+      }
+    },
+
+    async checkSsAvailable() {
+      try {
+        var res = await fetch("/soundswitch/manufacturers");
+        this.ssAvailable = res.ok;
+      } catch {
+        this.ssAvailable = false;
+      }
+    },
+
+    async loadSsMfrs() {
+      try {
+        var res = await fetch("/soundswitch/manufacturers");
+        if (!res.ok) return;
+        this.ssMfrs = await res.json();
+        this.ssFilteredMfrs = this.ssMfrs;
+      } catch {
+        this.ssMfrs = [];
+        this.ssFilteredMfrs = [];
+      }
+    },
+
+    filterSsMfrs() {
+      var search = this.ssMfrSearch.toLowerCase();
+      if (!search) {
+        this.ssFilteredMfrs = this.ssMfrs;
+        return;
+      }
+      this.ssFilteredMfrs = this.ssMfrs.filter(function(m) {
+        return m.name.toLowerCase().includes(search);
+      });
+    },
+
+    async selectSsMfr(mfr) {
+      this.ssSelectedMfr = mfr;
+      this.ssStep = 2;
+      this.ssFixtureSearch = "";
+      try {
+        var res = await fetch("/soundswitch/manufacturers/" + mfr.id + "/fixtures");
+        this.ssFixtures = await res.json();
+        this.ssFilteredFixtures = this.ssFixtures;
+      } catch {
+        this.ssFixtures = [];
+        this.ssFilteredFixtures = [];
+      }
+    },
+
+    filterSsFixtures() {
+      var search = this.ssFixtureSearch.toLowerCase();
+      if (!search) {
+        this.ssFilteredFixtures = this.ssFixtures;
+        return;
+      }
+      this.ssFilteredFixtures = this.ssFixtures.filter(function(f) {
+        return f.name.toLowerCase().includes(search);
+      });
+    },
+
+    async selectSsFixture(fixture) {
+      this.ssSelectedFixture = fixture;
+      this.ssStep = 3;
+      this.fixtureName = fixture.name;
+      try {
+        var res = await fetch("/soundswitch/fixtures/" + fixture.id);
+        var data = await res.json();
+        this.ssModes = data.modes || [];
+        if (this.ssModes.length > 0) {
+          this.ssSelectedModeId = this.ssModes[0].id;
+          this.channelCount = this.ssModes[0].channelCount;
+          await this.loadSsChannels();
+        }
+        this.validateAddress();
+      } catch {
+        this.ssModes = [];
+      }
+    },
+
+    async onSsModeChange() {
+      var mode = this.ssModes.find(function(m) { return m.id == this.ssSelectedModeId; }.bind(this));
+      if (mode) {
+        this.channelCount = mode.channelCount;
+      }
+      await this.loadSsChannels();
+      this.validateAddress();
+    },
+
+    async loadSsChannels() {
+      if (!this.ssSelectedFixture || !this.ssSelectedModeId) return;
+      try {
+        var res = await fetch(
+          "/soundswitch/fixtures/" + this.ssSelectedFixture.id +
+          "/modes/" + this.ssSelectedModeId + "/channels"
+        );
+        this.ssChannels = await res.json();
+        this.channelCount = this.ssChannels.length;
+      } catch {
+        this.ssChannels = [];
+      }
+    },
+
+    async importSsFixture() {
+      if (this.addressError || !this.fixtureName || !this.ssSelectedModeId) return;
+
+      try {
+        var res = await fetch(
+          "/soundswitch/fixtures/" + this.ssSelectedFixture.id +
+          "/modes/" + this.ssSelectedModeId + "/import",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: this.fixtureName,
+              dmxStartAddress: this.dmxStartAddress,
+            }),
+          }
+        );
+
+        if (res.ok) {
+          await this.loadFixtures();
+          this.closeAddModal();
+        } else {
+          var err = await res.json();
+          this.addressError = err.message || err.error || "Failed to import fixture";
+        }
+      } catch {
+        this.addressError = "Network error";
+      }
     },
   };
 }

@@ -33,12 +33,16 @@ export interface FixtureChannel {
   readonly defaultValue: number;
 }
 
+/** Fixture data source */
+export type FixtureSource = "ofl" | "soundswitch" | "custom";
+
 /** Stored fixture configuration */
 export interface FixtureConfig {
   readonly id: string;
   readonly name: string;
-  readonly oflKey: string;
-  readonly oflFixtureName: string;
+  readonly oflKey?: string;
+  readonly oflFixtureName?: string;
+  readonly source?: FixtureSource;
   readonly mode: string;
   readonly dmxStartAddress: number;
   readonly channelCount: number;
@@ -48,8 +52,9 @@ export interface FixtureConfig {
 /** POST /fixtures request body */
 export interface AddFixtureRequest {
   readonly name: string;
-  readonly oflKey: string;
-  readonly oflFixtureName: string;
+  readonly oflKey?: string;
+  readonly oflFixtureName?: string;
+  readonly source?: FixtureSource;
   readonly mode: string;
   readonly dmxStartAddress: number;
   readonly channelCount: number;

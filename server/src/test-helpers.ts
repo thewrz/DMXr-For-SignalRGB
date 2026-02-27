@@ -31,6 +31,8 @@ export function createTestConfig(overrides: Partial<ServerConfig> = {}): ServerC
     dmxDevicePath: "",
     logLevel: "silent",
     fixturesPath: "/tmp/dmxr-test-fixtures.json",
+    mdnsEnabled: false,
+    portRangeSize: 10,
     ...overrides,
   };
 }

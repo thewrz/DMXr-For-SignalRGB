@@ -5,6 +5,8 @@ export interface ServerConfig {
   readonly dmxDevicePath: string;
   readonly logLevel: string;
   readonly fixturesPath: string;
+  readonly mdnsEnabled: boolean;
+  readonly portRangeSize: number;
 }
 
 const VALID_DRIVERS = ["null", "enttec-usb-dmx-pro"];
@@ -26,6 +28,21 @@ export function loadConfig(): ServerConfig {
     );
   }
 
+  const rawPortRangeSize = parseInt(
+    process.env["PORT_RANGE_SIZE"] ?? "10",
+    10,
+  );
+
+  if (
+    !Number.isFinite(rawPortRangeSize) ||
+    rawPortRangeSize < 1 ||
+    rawPortRangeSize > 100
+  ) {
+    throw new Error(
+      `Invalid PORT_RANGE_SIZE: "${process.env["PORT_RANGE_SIZE"]}". Must be a number between 1 and 100.`,
+    );
+  }
+
   return {
     port: rawPort,
     host: process.env["HOST"] ?? "127.0.0.1",
@@ -33,5 +50,7 @@ export function loadConfig(): ServerConfig {
     dmxDevicePath: process.env["DMX_DEVICE_PATH"] ?? "/dev/ttyUSB0",
     logLevel: process.env["LOG_LEVEL"] ?? "info",
     fixturesPath: process.env["FIXTURES_PATH"] ?? "./config/fixtures.json",
+    mdnsEnabled: process.env["MDNS_ENABLED"] !== "false",
+    portRangeSize: rawPortRangeSize,
   };
 }

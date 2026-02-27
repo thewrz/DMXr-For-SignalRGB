@@ -11,16 +11,28 @@ export function DefaultComponentBrand() { return "DMXr"; }
 /* global
 controller:readonly
 discovery:readonly
+serverHost:readonly
 serverPort:readonly
 enableDebugLog:readonly
 */
 
+var serverHost = "127.0.0.1";
+var serverPort = "8080";
+var enableDebugLog = "false";
+
 export function ControllableParameters() {
 	return [
 		{
+			property: "serverHost",
+			group: "server",
+			label: "Server Host (manual fallback)",
+			type: "textfield",
+			default: "127.0.0.1",
+		},
+		{
 			property: "serverPort",
 			group: "server",
-			label: "Server Port",
+			label: "Server Port (manual fallback)",
 			type: "number",
 			min: "1024",
 			max: "65535",
@@ -92,8 +104,7 @@ export function Render() {
 	ctrl._lastSendTime = now;
 
 	var brightness = device.getBrightness();
-	var port = parseInt(serverPort, 10) || 8080;
-	var url = "http://127.0.0.1:" + port + "/update/colors";
+	var url = getServerUrl("/update/colors");
 
 	var payload = JSON.stringify({
 		fixtures: [{
@@ -162,8 +173,7 @@ export function Shutdown() {
 	// Best-effort blackout
 	try {
 		var xhr = new XMLHttpRequest();
-		var port = parseInt(serverPort, 10) || 8080;
-		xhr.open("POST", "http://127.0.0.1:" + port + "/update/colors", false);
+		xhr.open("POST", getServerUrl("/update/colors"), false);
 		xhr.setRequestHeader("Content-Type", "application/json");
 		xhr.send(JSON.stringify({
 			fixtures: [{ id: ctrl.id, r: 0, g: 0, b: 0, brightness: 0 }],
@@ -177,16 +187,55 @@ export function Shutdown() {
 	}
 }
 
+// --------------------------------<( Server URL Helper )>--------------------------------
+
+var discoveredHost = null;
+var discoveredPort = null;
+
+function getServerUrl(path) {
+	if (discoveredHost && discoveredPort) {
+		return "http://" + discoveredHost + ":" + discoveredPort + path;
+	}
+
+	var host = serverHost || "127.0.0.1";
+	var port = parseInt(serverPort, 10) || 8080;
+
+	return "http://" + host + ":" + port + path;
+}
+
 // --------------------------------<( Discovery Service )>--------------------------------
 
 export function DiscoveryService() {
 	this.IconUrl = "";
+	this.MDns = ["_dmxr._tcp.local."];
 	this.knownFixtures = {};
 	this.pollInterval = 2000;
 	this.lastPollTime = 0;
 
-	this.connect = function () {
-		// Initial poll happens in Update()
+	this.connect = function (devices) {
+		for (var i = 0; i < devices.length; i++) {
+			var dev = devices[i];
+
+			if (dev.ip && dev.port) {
+				discoveredHost = dev.ip;
+				discoveredPort = dev.port;
+
+				if (enableDebugLog === "true") {
+					service.log("DMXr: mDNS discovered server at " + dev.ip + ":" + dev.port);
+				}
+
+				break;
+			}
+		}
+	};
+
+	this.forceDiscover = function (ipaddress) {
+		discoveredHost = ipaddress;
+		discoveredPort = parseInt(serverPort, 10) || 8080;
+
+		if (enableDebugLog === "true") {
+			service.log("DMXr: Manual discover " + ipaddress + ":" + discoveredPort);
+		}
 	};
 
 	this.removedDevices = function (deviceId) {
@@ -207,8 +256,7 @@ export function DiscoveryService() {
 
 		this.lastPollTime = now;
 
-		var port = parseInt(serverPort, 10) || 8080;
-		var url = "http://127.0.0.1:" + port + "/fixtures";
+		var url = getServerUrl("/fixtures");
 
 		try {
 			var xhr = new XMLHttpRequest();

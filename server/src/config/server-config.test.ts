@@ -22,6 +22,30 @@ describe("loadConfig", () => {
     expect(config.dmxDriver).toBe("null");
     expect(config.dmxDevicePath).toBe("/dev/ttyUSB0");
     expect(config.logLevel).toBe("info");
+    expect(config.mdnsEnabled).toBe(true);
+    expect(config.portRangeSize).toBe(10);
+  });
+
+  it("reads MDNS_ENABLED from environment", () => {
+    process.env["MDNS_ENABLED"] = "false";
+
+    const config = loadConfig();
+
+    expect(config.mdnsEnabled).toBe(false);
+  });
+
+  it("reads PORT_RANGE_SIZE from environment", () => {
+    process.env["PORT_RANGE_SIZE"] = "5";
+
+    const config = loadConfig();
+
+    expect(config.portRangeSize).toBe(5);
+  });
+
+  it("throws on invalid PORT_RANGE_SIZE", () => {
+    process.env["PORT_RANGE_SIZE"] = "0";
+
+    expect(() => loadConfig()).toThrow("Invalid PORT_RANGE_SIZE");
   });
 
   it("reads PORT from environment", () => {

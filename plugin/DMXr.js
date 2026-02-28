@@ -6,7 +6,6 @@ export function Size() { return [10, 10]; }
 export function DefaultPosition() { return [0, 0]; }
 export function DefaultScale() { return 8.0; }
 export function SubdeviceController() { return true; }
-export function DefaultComponentBrand() { return "DMXr"; }
 
 /* global
 controller:readonly
@@ -53,8 +52,6 @@ export function ControllableParameters() {
 
 export function Initialize() {
 	device.setName(controller.name);
-	device.SetLedLimit(100);
-	device.addChannel(controller.name, 100);
 
 	controller._lastR = -1;
 	controller._lastG = -1;
@@ -67,32 +64,23 @@ export function Initialize() {
 }
 
 export function Render() {
-	// Capture controller reference for use in async callbacks
 	var ctrl = controller;
-	var componentChannel = device.channel(ctrl.name);
 
-	if (!componentChannel) {
-		return;
-	}
-
-	var colors = componentChannel.getColors("Inline");
-
-	if (!colors || colors.length < 3) {
-		return;
-	}
-
-	var ledCount = colors.length / 3;
+	// Sample 10x10 canvas grid and average into one RGB color
 	var sumR = 0, sumG = 0, sumB = 0;
 
-	for (var i = 0; i < ledCount; i++) {
-		sumR += colors[i * 3];
-		sumG += colors[i * 3 + 1];
-		sumB += colors[i * 3 + 2];
+	for (var y = 0; y < 10; y++) {
+		for (var x = 0; x < 10; x++) {
+			var color = device.color(x, y);
+			sumR += color[0];
+			sumG += color[1];
+			sumB += color[2];
+		}
 	}
 
-	var r = Math.round(sumR / ledCount);
-	var g = Math.round(sumG / ledCount);
-	var b = Math.round(sumB / ledCount);
+	var r = Math.round(sumR / 100);
+	var g = Math.round(sumG / 100);
+	var b = Math.round(sumB / 100);
 
 	// Throttle to ~60 Hz
 	var now = Date.now();

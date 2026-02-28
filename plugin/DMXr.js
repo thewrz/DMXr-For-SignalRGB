@@ -2,10 +2,11 @@ export function Name() { return "DMXr"; }
 export function Version() { return "1.0.0"; }
 export function Type() { return "network"; }
 export function Publisher() { return "DMXr Project"; }
-export function Size() { return [10, 10]; }
+export function Size() { return [4, 4]; }
 export function DefaultPosition() { return [0, 0]; }
 export function DefaultScale() { return 8.0; }
 export function SubdeviceController() { return true; }
+export function DefaultComponentBrand() { return "CompGen"; }
 
 /* global
 controller:readonly
@@ -53,6 +54,11 @@ export function ControllableParameters() {
 export function Initialize() {
 	device.setName(controller.name);
 
+	// CompGen requires a channel to create the visual tile on the canvas.
+	// Color reading uses device.color(x,y) which samples the tile area directly.
+	device.SetLedLimit(16);
+	device.addChannel(controller.name, 16);
+
 	controller._lastR = -1;
 	controller._lastG = -1;
 	controller._lastB = -1;
@@ -66,11 +72,12 @@ export function Initialize() {
 export function Render() {
 	var ctrl = controller;
 
-	// Sample 10x10 canvas grid and average into one RGB color
+	// Sample 4x4 canvas grid and average into one RGB color.
+	// Uses device.color() for correct 2D sampling (CompGen channel provides the tile).
 	var sumR = 0, sumG = 0, sumB = 0;
 
-	for (var y = 0; y < 10; y++) {
-		for (var x = 0; x < 10; x++) {
+	for (var y = 0; y < 4; y++) {
+		for (var x = 0; x < 4; x++) {
 			var color = device.color(x, y);
 			sumR += color[0];
 			sumG += color[1];
@@ -78,9 +85,9 @@ export function Render() {
 		}
 	}
 
-	var r = Math.round(sumR / 100);
-	var g = Math.round(sumG / 100);
-	var b = Math.round(sumB / 100);
+	var r = Math.round(sumR / 16);
+	var g = Math.round(sumG / 16);
+	var b = Math.round(sumB / 16);
 
 	// Throttle to ~60 Hz
 	var now = Date.now();
@@ -286,15 +293,15 @@ export function DiscoveryService() {
 function DMXrBridge(fixture) {
 	this.id = fixture.id;
 	this.name = fixture.name;
-	this.width = 10;
-	this.height = 10;
+	this.width = 4;
+	this.height = 4;
 
 	this.ledNames = [];
 	this.ledPositions = [];
 
-	for (var y = 0; y < 10; y++) {
-		for (var x = 0; x < 10; x++) {
-			this.ledNames.push(fixture.name + " " + (y * 10 + x));
+	for (var y = 0; y < 4; y++) {
+		for (var x = 0; x < 4; x++) {
+			this.ledNames.push(fixture.name + " " + (y * 4 + x));
 			this.ledPositions.push([x, y]);
 		}
 	}

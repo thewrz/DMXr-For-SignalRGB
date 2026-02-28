@@ -47,9 +47,19 @@ async function main() {
   });
 
   let mdnsAdvertiser: MdnsAdvertiser | undefined;
+  let exitBlackoutDone = false;
+
+  // Last-resort synchronous blackout for unexpected exits
+  process.on("exit", () => {
+    if (!exitBlackoutDone) {
+      exitBlackoutDone = true;
+      manager.blackout();
+    }
+  });
 
   const shutdown = async (signal: string) => {
     app.log.info(`Received ${signal}, shutting down...`);
+    exitBlackoutDone = true;
     mdnsAdvertiser?.unpublishAll();
     ssClient?.close();
     manager.blackout();
@@ -60,6 +70,7 @@ async function main() {
 
   process.on("SIGINT", () => shutdown("SIGINT"));
   process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGHUP", () => shutdown("SIGHUP"));
 
   const boundPort = await listenWithRetry(app, config);
 

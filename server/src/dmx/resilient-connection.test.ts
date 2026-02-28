@@ -159,6 +159,98 @@ describe("createResilientConnection", () => {
     });
   });
 
+  describe("initial connection failure", () => {
+    it("starts in disconnected state and enters reconnect loop when device is missing", async () => {
+      mockedCreateDmxConnection.mockReset();
+      mockedCreateDmxConnection.mockRejectedValueOnce(
+        new Error("Opening COM3: File not found"),
+      );
+
+      const stateChanges: ConnectionStatus[] = [];
+      const conn = await createResilientConnection({
+        config: createTestConfig(),
+        logger,
+        getChannelSnapshot: () => ({}),
+        onStateChange: (s) => stateChanges.push(s),
+      });
+
+      // Should NOT have crashed — should be in reconnecting state
+      const lastState = stateChanges[stateChanges.length - 1];
+      expect(lastState?.state).toBe("reconnecting");
+      expect(lastState?.lastError).toBe("Opening COM3: File not found");
+
+      expect(logger.error).toHaveBeenCalledWith(
+        expect.stringContaining("Initial DMX connection failed"),
+      );
+
+      // Now simulate device appearing — reconnect succeeds
+      const newMock = createMockConnection();
+      mockedCreateDmxConnection.mockResolvedValueOnce(newMock);
+      await vi.advanceTimersByTimeAsync(1_000);
+
+      expect(conn.getStatus().state).toBe("connected");
+      expect(conn.getStatus().lastError).toBeNull();
+      await conn.close();
+    });
+
+    it("keeps retrying with backoff when device stays missing", async () => {
+      mockedCreateDmxConnection.mockReset();
+      mockedCreateDmxConnection.mockRejectedValueOnce(
+        new Error("Opening COM3: File not found"),
+      );
+
+      const conn = await createResilientConnection({
+        config: createTestConfig(),
+        logger,
+        getChannelSnapshot: () => ({}),
+      });
+
+      // First reconnect attempt also fails
+      mockedCreateDmxConnection.mockRejectedValueOnce(
+        new Error("Still no COM3"),
+      );
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(conn.getStatus().reconnectAttempts).toBe(1);
+
+      // Second attempt also fails (2s delay)
+      mockedCreateDmxConnection.mockRejectedValueOnce(
+        new Error("Nope"),
+      );
+      await vi.advanceTimersByTimeAsync(2_000);
+      expect(conn.getStatus().reconnectAttempts).toBe(2);
+
+      // Third attempt succeeds (4s delay)
+      const newMock = createMockConnection();
+      mockedCreateDmxConnection.mockResolvedValueOnce(newMock);
+      await vi.advanceTimersByTimeAsync(4_000);
+
+      expect(conn.getStatus().state).toBe("connected");
+      await conn.close();
+    });
+
+    it("proxy universe drops updates while waiting for initial connection", async () => {
+      mockedCreateDmxConnection.mockReset();
+      mockedCreateDmxConnection.mockRejectedValueOnce(
+        new Error("No device"),
+      );
+
+      const conn = await createResilientConnection({
+        config: createTestConfig(),
+        logger,
+        getChannelSnapshot: () => ({}),
+      });
+
+      // Should not throw — just silently drops
+      conn.universe.update({ 1: 255 });
+      conn.universe.updateAll(0);
+
+      expect(logger.warn).toHaveBeenCalledWith(
+        expect.stringContaining("DMX update dropped"),
+      );
+      await conn.close();
+    });
+  });
+
   describe("initial connection", () => {
     it("starts in connected state", async () => {
       const conn = await createResilientConnection({

@@ -137,12 +137,21 @@ export async function createResilientConnection(
     }
   }
 
-  // Establish initial connection
-  const initialConnection = await createDmxConnection(config);
-  currentConnection = initialConnection;
-  attachDisconnectListener(initialConnection);
-  status = { ...createInitialStatus("connected") };
-  onStateChange?.(snapshotStatus());
+  // Establish initial connection — if device is missing, start in
+  // disconnected state and begin the reconnect loop instead of crashing
+  try {
+    const initialConnection = await createDmxConnection(config);
+    currentConnection = initialConnection;
+    attachDisconnectListener(initialConnection);
+    status = { ...createInitialStatus("connected") };
+    onStateChange?.(snapshotStatus());
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.error(`Initial DMX connection failed: ${msg}`);
+    status.lastError = msg;
+    onStateChange?.(snapshotStatus());
+    scheduleReconnect();
+  }
 
   // Proxy universe — delegates to current connection or drops silently
   const universe: DmxUniverse = {

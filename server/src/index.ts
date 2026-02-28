@@ -1,6 +1,6 @@
 import { loadConfig } from "./config/server-config.js";
-import { createDmxConnection } from "./dmx/driver-factory.js";
 import { createUniverseManager } from "./dmx/universe-manager.js";
+import { createResilientConnection } from "./dmx/resilient-connection.js";
 import { createFixtureStore } from "./fixtures/fixture-store.js";
 import {
   createMdnsAdvertiser,
@@ -14,18 +14,33 @@ async function main() {
   const config = loadConfig();
   const startTime = Date.now();
 
-  const connection = await createDmxConnection(config);
-
   const consoleLogger = {
     info: (msg: string) => process.stdout.write(`[DMX] ${msg}\n`),
     warn: (msg: string) => process.stderr.write(`[DMX] WARN: ${msg}\n`),
     error: (msg: string) => process.stderr.write(`[DMX] ERROR: ${msg}\n`),
   };
 
+  // Late-binding: manager reference filled after creation
+  let managerRef: ReturnType<typeof createUniverseManager> | null = null;
+
+  const connection = await createResilientConnection({
+    config,
+    logger: consoleLogger,
+    getChannelSnapshot: () => managerRef?.getFullSnapshot() ?? {},
+    onStateChange: (status) => {
+      consoleLogger.info(
+        `Connection state: ${status.state}` +
+        (status.reconnectAttempts > 0 ? ` (attempt ${status.reconnectAttempts})` : "") +
+        (status.lastError ? ` — ${status.lastError}` : ""),
+      );
+    },
+  });
+
   const manager = createUniverseManager(connection.universe, {
     logger: consoleLogger,
     onDmxError: (err) => process.stderr.write(`[DMX] Send error: ${err}\n`),
   });
+  managerRef = manager;
 
   const fixtureStore = createFixtureStore(config.fixturesPath);
   await fixtureStore.load();
@@ -38,16 +53,18 @@ async function main() {
   const app = await buildServer({
     config,
     manager,
-    driver: connection.driver,
+    driver: config.dmxDriver,
     startTime,
     fixtureStore,
     oflClient,
     ssClient,
     ssStatus,
+    getConnectionStatus: () => connection.getStatus(),
   });
 
   let mdnsAdvertiser: MdnsAdvertiser | undefined;
   let exitBlackoutDone = false;
+  let shuttingDown = false;
 
   // Last-resort synchronous blackout for unexpected exits
   process.on("exit", () => {
@@ -58,6 +75,9 @@ async function main() {
   });
 
   const shutdown = async (signal: string) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+
     app.log.info(`Received ${signal}, shutting down...`);
     exitBlackoutDone = true;
     mdnsAdvertiser?.unpublishAll();
@@ -72,6 +92,16 @@ async function main() {
   process.on("SIGTERM", () => shutdown("SIGTERM"));
   process.on("SIGHUP", () => shutdown("SIGHUP"));
 
+  process.on("uncaughtException", (err) => {
+    process.stderr.write(`[DMXr] FATAL uncaughtException: ${err?.stack ?? err}\n`);
+    shutdown("uncaughtException").catch(() => process.exit(1));
+  });
+
+  process.on("unhandledRejection", (reason) => {
+    process.stderr.write(`[DMXr] FATAL unhandledRejection: ${reason}\n`);
+    shutdown("unhandledRejection").catch(() => process.exit(1));
+  });
+
   const boundPort = await listenWithRetry(app, config);
 
   if (config.mdnsEnabled) {
@@ -80,7 +110,7 @@ async function main() {
   }
 
   app.log.info(`DMXr server running on ${config.host}:${boundPort}`);
-  app.log.info(`DMX driver: ${connection.driver}`);
+  app.log.info(`DMX driver: ${config.dmxDriver}`);
   app.log.info(`Fixtures loaded: ${fixtureStore.getAll().length}`);
   if (ssStatus.available) {
     app.log.info(`SoundSwitch DB: ${ssStatus.path} (${ssStatus.fixtureCount} fixtures)`);

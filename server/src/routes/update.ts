@@ -113,22 +113,24 @@ export function registerUpdateRoute(
         totalChannels += Object.keys(channels).length;
       }
 
+      let channelsUpdated = 0;
+
       if (totalChannels > 0) {
-        deps.manager.applyFixtureUpdate({
+        channelsUpdated = deps.manager.applyFixtureUpdate({
           fixture: "color-batch",
           channels: allUpdates,
         });
       }
 
       request.log.info(
-        { fixturesMatched, totalChannels },
-        `color update: ${fixturesMatched} fixtures, ${totalChannels} channels`,
+        { fixturesMatched, channelsUpdated },
+        `color update: ${fixturesMatched} fixtures, ${channelsUpdated} channels`,
       );
 
       return {
-        success: totalChannels > 0,
+        success: channelsUpdated > 0,
         fixturesUpdated: fixturesMatched,
-        channelsUpdated: totalChannels,
+        channelsUpdated,
       };
     },
   );

@@ -26,8 +26,11 @@ export interface UniverseManager {
   readonly applyFixtureUpdate: (payload: FixtureUpdatePayload) => number;
   readonly blackout: () => void;
   readonly whiteout: () => void;
+  readonly resumeNormal: () => void;
+  readonly isBlackoutActive: () => boolean;
   readonly getActiveChannelCount: () => number;
   readonly getChannelSnapshot: (start: number, count: number) => Record<number, number>;
+  readonly getFullSnapshot: () => Record<number, number>;
   readonly applyRawUpdate: (channels: Record<number, number>) => void;
   readonly getDmxSendStatus: () => DmxSendStatus;
 }
@@ -68,6 +71,7 @@ export function createUniverseManager(
   const log = options.logger;
   let lastSendTime: number | null = null;
   let lastSendError: string | null = null;
+  let blackoutActive = false;
 
   function safeSend(label: string, fn: () => void): void {
     try {
@@ -83,6 +87,10 @@ export function createUniverseManager(
 
   return {
     applyFixtureUpdate(payload: FixtureUpdatePayload): number {
+      if (blackoutActive) {
+        return 0;
+      }
+
       const dmxUpdate = buildDmxUpdate(payload.channels);
 
       if (dmxUpdate === null) {
@@ -106,17 +114,28 @@ export function createUniverseManager(
     },
 
     blackout(): void {
+      blackoutActive = true;
       safeSend("blackout", () => universe.updateAll(0));
       activeChannels.clear();
-      log?.info("DMX blackout: all 512 channels → 0");
+      log?.info("DMX blackout: all 512 channels → 0 (override active)");
     },
 
     whiteout(): void {
+      blackoutActive = true;
       safeSend("whiteout", () => universe.updateAll(MAX_VALUE));
       for (let ch = MIN_CHANNEL; ch <= MAX_CHANNEL; ch++) {
         activeChannels.set(ch, MAX_VALUE);
       }
-      log?.info("DMX whiteout: all 512 channels → 255");
+      log?.info("DMX whiteout: all 512 channels → 255 (override active)");
+    },
+
+    resumeNormal(): void {
+      blackoutActive = false;
+      log?.info("DMX override cleared: resuming normal updates");
+    },
+
+    isBlackoutActive(): boolean {
+      return blackoutActive;
     },
 
     getActiveChannelCount(): number {
@@ -127,6 +146,14 @@ export function createUniverseManager(
       const snapshot: Record<number, number> = {};
       for (let ch = start; ch < start + count; ch++) {
         snapshot[ch] = activeChannels.get(ch) ?? 0;
+      }
+      return snapshot;
+    },
+
+    getFullSnapshot(): Record<number, number> {
+      const snapshot: Record<number, number> = {};
+      for (const [ch, val] of activeChannels) {
+        snapshot[ch] = val;
       }
       return snapshot;
     },

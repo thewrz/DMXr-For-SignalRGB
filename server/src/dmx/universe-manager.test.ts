@@ -145,6 +145,72 @@ describe("createUniverseManager", () => {
       manager.blackout();
       expect(manager.getActiveChannelCount()).toBe(0);
     });
+
+    it("activates blackout override flag", () => {
+      expect(manager.isBlackoutActive()).toBe(false);
+      manager.blackout();
+      expect(manager.isBlackoutActive()).toBe(true);
+    });
+
+    it("suppresses subsequent fixture updates", () => {
+      manager.blackout();
+
+      const count = manager.applyFixtureUpdate({
+        fixture: "test",
+        channels: { "1": 255 },
+      });
+
+      expect(count).toBe(0);
+      expect(mock.updateCalls).toHaveLength(0);
+    });
+  });
+
+  describe("whiteout", () => {
+    it("calls updateAll(255) on the universe", () => {
+      manager.whiteout();
+
+      expect(mock.updateAllCalls).toEqual([255]);
+    });
+
+    it("activates blackout override flag", () => {
+      manager.whiteout();
+      expect(manager.isBlackoutActive()).toBe(true);
+    });
+
+    it("suppresses subsequent fixture updates", () => {
+      manager.whiteout();
+
+      const count = manager.applyFixtureUpdate({
+        fixture: "test",
+        channels: { "1": 128 },
+      });
+
+      expect(count).toBe(0);
+      expect(mock.updateCalls).toHaveLength(0);
+    });
+  });
+
+  describe("resumeNormal", () => {
+    it("clears the blackout override flag", () => {
+      manager.blackout();
+      expect(manager.isBlackoutActive()).toBe(true);
+
+      manager.resumeNormal();
+      expect(manager.isBlackoutActive()).toBe(false);
+    });
+
+    it("allows fixture updates after resume", () => {
+      manager.blackout();
+      manager.resumeNormal();
+
+      const count = manager.applyFixtureUpdate({
+        fixture: "test",
+        channels: { "1": 255 },
+      });
+
+      expect(count).toBe(1);
+      expect(mock.updateCalls).toHaveLength(1);
+    });
   });
 
   describe("getActiveChannelCount", () => {
@@ -177,6 +243,68 @@ describe("createUniverseManager", () => {
         channels: { "2": 0 },
       });
       expect(manager.getActiveChannelCount()).toBe(2);
+    });
+  });
+
+  describe("getFullSnapshot", () => {
+    it("returns empty object when no channels are active", () => {
+      expect(manager.getFullSnapshot()).toEqual({});
+    });
+
+    it("returns all active channels with their values", () => {
+      manager.applyFixtureUpdate({
+        fixture: "a",
+        channels: { "1": 255, "10": 128, "100": 64 },
+      });
+
+      expect(manager.getFullSnapshot()).toEqual({
+        1: 255,
+        10: 128,
+        100: 64,
+      });
+    });
+
+    it("excludes channels that have been set to 0", () => {
+      manager.applyFixtureUpdate({
+        fixture: "a",
+        channels: { "1": 255, "2": 128, "3": 64 },
+      });
+      manager.applyFixtureUpdate({
+        fixture: "a",
+        channels: { "2": 0 },
+      });
+
+      expect(manager.getFullSnapshot()).toEqual({
+        1: 255,
+        3: 64,
+      });
+    });
+
+    it("returns empty object after blackout", () => {
+      manager.applyFixtureUpdate({
+        fixture: "a",
+        channels: { "1": 255, "2": 128 },
+      });
+      manager.blackout();
+
+      expect(manager.getFullSnapshot()).toEqual({});
+    });
+
+    it("reflects latest values across multiple fixtures", () => {
+      manager.applyFixtureUpdate({
+        fixture: "a",
+        channels: { "1": 100, "2": 200 },
+      });
+      manager.applyFixtureUpdate({
+        fixture: "b",
+        channels: { "2": 150, "3": 50 },
+      });
+
+      expect(manager.getFullSnapshot()).toEqual({
+        1: 100,
+        2: 150,
+        3: 50,
+      });
     });
   });
 

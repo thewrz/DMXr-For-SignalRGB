@@ -2,6 +2,7 @@ function dmxrApp() {
   return {
     fixtures: [],
     serverOnline: false,
+    overrideActive: false,
     showAddModal: false,
     fixtureSource: "ofl",
     addStep: 1,
@@ -306,6 +307,7 @@ function dmxrApp() {
     async blackout() {
       try {
         await fetch("/control/blackout", { method: "POST" });
+        this.overrideActive = true;
       } catch {
         // ignore
       }
@@ -314,6 +316,16 @@ function dmxrApp() {
     async whiteout() {
       try {
         await fetch("/control/whiteout", { method: "POST" });
+        this.overrideActive = true;
+      } catch {
+        // ignore
+      }
+    },
+
+    async resume() {
+      try {
+        await fetch("/control/resume", { method: "POST" });
+        this.overrideActive = false;
       } catch {
         // ignore
       }

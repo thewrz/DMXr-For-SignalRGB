@@ -61,6 +61,7 @@ export function Initialize() {
 	controller._lastG = -1;
 	controller._lastB = -1;
 	controller._lastSendTime = 0;
+	controller._diagDone = false;
 
 	if (enableDebugLog === "true") {
 		device.log("DMXr: Initialized " + controller.name);
@@ -72,6 +73,24 @@ export function Render() {
 
 	// Single pixel color sample from the canvas tile
 	var color = device.color(0, 0);
+
+	if (!color || color.length < 3) {
+		return;
+	}
+
+	// One-time diagnostic: dump raw color data to determine channel order
+	if (!ctrl._diagDone && enableDebugLog === "true") {
+		ctrl._diagDone = true;
+		device.log("DIAG " + ctrl.name + " typeof=" + typeof color + " length=" + color.length);
+		device.log("DIAG " + ctrl.name + " indices [0]=" + color[0] + " [1]=" + color[1] + " [2]=" + color[2]);
+
+		if (color.r !== undefined) {
+			device.log("DIAG " + ctrl.name + " named .r=" + color.r + " .g=" + color.g + " .b=" + color.b);
+		} else {
+			device.log("DIAG " + ctrl.name + " no named .r/.g/.b properties");
+		}
+	}
+
 	var r = color[0];
 	var g = color[1];
 	var b = color[2];
@@ -81,6 +100,11 @@ export function Render() {
 
 	if (ctrl._lastSendTime && now - ctrl._lastSendTime < 16) {
 		return;
+	}
+
+	// Force re-send every 5 seconds to resync after blackout/resume/server restart
+	if (ctrl._lastSendTime && now - ctrl._lastSendTime > 5000) {
+		ctrl._lastR = -1;
 	}
 
 	// Skip if unchanged
@@ -133,7 +157,7 @@ export function Render() {
 export function Shutdown() {
 	var ctrl = controller;
 
-	// Best-effort blackout
+	// Best-effort per-fixture blackout
 	try {
 		var xhr = new XMLHttpRequest();
 		xhr.open("POST", getServerUrl("/update/colors"), false);
@@ -141,6 +165,15 @@ export function Shutdown() {
 		xhr.send(JSON.stringify({
 			fixtures: [{ id: ctrl.id, r: 0, g: 0, b: 0, brightness: 0 }],
 		}));
+	} catch (e) {
+		// Server may already be down
+	}
+
+	// Fallback: full blackout (all 512 channels → 0) regardless of fixture store
+	try {
+		var xhrBlackout = new XMLHttpRequest();
+		xhrBlackout.open("POST", getServerUrl("/control/blackout"), false);
+		xhrBlackout.send();
 	} catch (e) {
 		// Server may already be down
 	}
@@ -293,4 +326,5 @@ function DMXrBridge(fixture) {
 	this._lastG = -1;
 	this._lastB = -1;
 	this._lastSendTime = 0;
+	this._diagDone = false;
 }

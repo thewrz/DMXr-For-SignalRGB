@@ -55,14 +55,14 @@ Item {
 					spacing: 3
 					Text {
 						color: theme.primarytextcolor
-						text: modelData.name
+						text: modelData.name || ""
 						font.pixelSize: 14
 						font.family: "Poppins"
 						font.bold: true
 					}
 					Text {
 						color: theme.primarytextcolor
-						text: "ID: " + modelData.id
+						text: modelData.id ? "ID: " + modelData.id : ""
 						font.pixelSize: 11
 						font.family: "Poppins"
 					}

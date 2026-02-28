@@ -2,7 +2,7 @@ export function Name() { return "DMXr"; }
 export function Version() { return "1.0.0"; }
 export function Type() { return "network"; }
 export function Publisher() { return "DMXr Project"; }
-export function Size() { return [1, 1]; }
+export function Size() { return [10, 10]; }
 export function DefaultPosition() { return [0, 0]; }
 export function DefaultScale() { return 8.0; }
 export function SubdeviceController() { return true; }
@@ -53,8 +53,8 @@ export function ControllableParameters() {
 
 export function Initialize() {
 	device.setName(controller.name);
-	device.SetLedLimit(1);
-	device.addChannel(controller.name, 1);
+	device.SetLedLimit(100);
+	device.addChannel(controller.name, 100);
 
 	controller._lastR = -1;
 	controller._lastG = -1;
@@ -81,9 +81,18 @@ export function Render() {
 		return;
 	}
 
-	var r = colors[0];
-	var g = colors[1];
-	var b = colors[2];
+	var ledCount = colors.length / 3;
+	var sumR = 0, sumG = 0, sumB = 0;
+
+	for (var i = 0; i < ledCount; i++) {
+		sumR += colors[i * 3];
+		sumG += colors[i * 3 + 1];
+		sumB += colors[i * 3 + 2];
+	}
+
+	var r = Math.round(sumR / ledCount);
+	var g = Math.round(sumG / ledCount);
+	var b = Math.round(sumB / ledCount);
 
 	// Throttle to ~60 Hz
 	var now = Date.now();
@@ -289,10 +298,19 @@ export function DiscoveryService() {
 function DMXrBridge(fixture) {
 	this.id = fixture.id;
 	this.name = fixture.name;
-	this.width = 1;
-	this.height = 1;
-	this.ledNames = [fixture.name];
-	this.ledPositions = [[0, 0]];
+	this.width = 10;
+	this.height = 10;
+
+	this.ledNames = [];
+	this.ledPositions = [];
+
+	for (var y = 0; y < 10; y++) {
+		for (var x = 0; x < 10; x++) {
+			this.ledNames.push(fixture.name + " " + (y * 10 + x));
+			this.ledPositions.push([x, y]);
+		}
+	}
+
 	this.fixtureConfig = fixture;
 
 	// Runtime state (managed by top-level lifecycle exports)

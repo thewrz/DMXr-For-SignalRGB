@@ -46,6 +46,7 @@ export async function buildServer(
     manager: deps.manager,
     driver: deps.driver,
     startTime: deps.startTime,
+    fixtureStore: deps.fixtureStore,
   });
 
   registerUpdateRoute(app, {

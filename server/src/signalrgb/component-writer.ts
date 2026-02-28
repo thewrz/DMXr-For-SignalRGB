@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import type { FixtureConfig } from "../types/protocol.js";
 
-const GRID_SIZE = 4;
+const GRID_SIZE = 1;
 const LED_COUNT = GRID_SIZE * GRID_SIZE;
 
 interface SignalRgbComponent {

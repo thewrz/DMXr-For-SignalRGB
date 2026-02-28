@@ -2,7 +2,7 @@ export function Name() { return "DMXr"; }
 export function Version() { return "1.0.0"; }
 export function Type() { return "network"; }
 export function Publisher() { return "DMXr Project"; }
-export function Size() { return [4, 4]; }
+export function Size() { return [1, 1]; }
 export function DefaultPosition() { return [0, 0]; }
 export function DefaultScale() { return 8.0; }
 export function SubdeviceController() { return true; }
@@ -54,9 +54,8 @@ export function ControllableParameters() {
 export function Initialize() {
 	device.setName(controller.name);
 
-	device.SetLedLimit(16);
-	device.addChannel(controller.name, 16);
-	controller._channelName = controller.name;
+	device.SetLedLimit(1);
+	device.addChannel(controller.name, 1);
 
 	controller._lastR = -1;
 	controller._lastG = -1;
@@ -71,47 +70,11 @@ export function Initialize() {
 export function Render() {
 	var ctrl = controller;
 
-	// Read colors via the documented channel API instead of device.color().
-	// "Separate" format returns [R[], G[], B[]] arrays.
-	var ch = device.channel(ctrl._channelName || ctrl.name);
-
-	if (!ch) {
-		if (enableDebugLog === "true") {
-			device.log("DMXr: No channel for " + ctrl.name);
-		}
-
-		return;
-	}
-
-	var rgbData = ch.getColors("Separate");
-
-	if (!rgbData || !rgbData[0] || !rgbData[1] || !rgbData[2] || rgbData[0].length === 0) {
-		return;
-	}
-
-	// Log format once per controller for diagnostics
-	if (!ctrl._loggedFormat) {
-		ctrl._loggedFormat = true;
-		device.log(
-			"DMXr: getColors format — keys: " + Object.keys(rgbData) +
-			" length: " + rgbData.length +
-			" [0] type: " + typeof rgbData[0] +
-			" [0] len: " + (rgbData[0] ? rgbData[0].length : "null")
-		);
-	}
-
-	var count = rgbData[0].length;
-	var sumR = 0, sumG = 0, sumB = 0;
-
-	for (var i = 0; i < count; i++) {
-		sumR += rgbData[0][i];
-		sumG += rgbData[1][i];
-		sumB += rgbData[2][i];
-	}
-
-	var r = Math.round(sumR / count);
-	var g = Math.round(sumG / count);
-	var b = Math.round(sumB / count);
+	// Single pixel color sample from the canvas tile
+	var color = device.color(0, 0);
+	var r = color[0];
+	var g = color[1];
+	var b = color[2];
 
 	// Throttle to ~60 Hz
 	var now = Date.now();
@@ -317,18 +280,11 @@ export function DiscoveryService() {
 function DMXrBridge(fixture) {
 	this.id = fixture.id;
 	this.name = fixture.name;
-	this.width = 4;
-	this.height = 4;
+	this.width = 1;
+	this.height = 1;
 
-	this.ledNames = [];
-	this.ledPositions = [];
-
-	for (var y = 0; y < 4; y++) {
-		for (var x = 0; x < 4; x++) {
-			this.ledNames.push(fixture.name + " " + (y * 4 + x));
-			this.ledPositions.push([x, y]);
-		}
-	}
+	this.ledNames = [fixture.name];
+	this.ledPositions = [[0, 0]];
 
 	this.fixtureConfig = fixture;
 

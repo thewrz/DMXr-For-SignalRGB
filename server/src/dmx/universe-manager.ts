@@ -6,6 +6,15 @@ const MAX_CHANNEL = 512;
 const MIN_VALUE = 0;
 const MAX_VALUE = 255;
 
+export interface DmxSendStatus {
+  readonly lastSendTime: number | null;
+  readonly lastSendError: string | null;
+}
+
+export interface UniverseManagerOptions {
+  readonly onDmxError?: (error: unknown) => void;
+}
+
 export interface UniverseManager {
   readonly applyFixtureUpdate: (payload: FixtureUpdatePayload) => number;
   readonly blackout: () => void;
@@ -13,6 +22,7 @@ export interface UniverseManager {
   readonly getActiveChannelCount: () => number;
   readonly getChannelSnapshot: (start: number, count: number) => Record<number, number>;
   readonly applyRawUpdate: (channels: Record<number, number>) => void;
+  readonly getDmxSendStatus: () => DmxSendStatus;
 }
 
 function clampValue(value: number): number {
@@ -43,8 +53,24 @@ function buildDmxUpdate(channels: ChannelMap): Record<number, number> | null {
   return count === 0 ? null : result;
 }
 
-export function createUniverseManager(universe: DmxUniverse): UniverseManager {
+export function createUniverseManager(
+  universe: DmxUniverse,
+  options: UniverseManagerOptions = {},
+): UniverseManager {
   const activeChannels = new Map<number, number>();
+  let lastSendTime: number | null = null;
+  let lastSendError: string | null = null;
+
+  function safeSend(fn: () => void): void {
+    try {
+      fn();
+      lastSendTime = Date.now();
+      lastSendError = null;
+    } catch (error: unknown) {
+      lastSendError = error instanceof Error ? error.message : String(error);
+      options.onDmxError?.(error);
+    }
+  }
 
   return {
     applyFixtureUpdate(payload: FixtureUpdatePayload): number {
@@ -63,18 +89,18 @@ export function createUniverseManager(universe: DmxUniverse): UniverseManager {
         }
       }
 
-      universe.update(dmxUpdate);
+      safeSend(() => universe.update(dmxUpdate));
 
       return Object.keys(dmxUpdate).length;
     },
 
     blackout(): void {
-      universe.updateAll(0);
+      safeSend(() => universe.updateAll(0));
       activeChannels.clear();
     },
 
     whiteout(): void {
-      universe.updateAll(MAX_VALUE);
+      safeSend(() => universe.updateAll(MAX_VALUE));
       for (let ch = MIN_CHANNEL; ch <= MAX_CHANNEL; ch++) {
         activeChannels.set(ch, MAX_VALUE);
       }
@@ -101,7 +127,11 @@ export function createUniverseManager(universe: DmxUniverse): UniverseManager {
           activeChannels.delete(chNum);
         }
       }
-      universe.update(channels);
+      safeSend(() => universe.update(channels));
+    },
+
+    getDmxSendStatus(): DmxSendStatus {
+      return { lastSendTime, lastSendError };
     },
   };
 }

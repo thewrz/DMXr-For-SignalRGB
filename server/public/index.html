@@ -79,7 +79,6 @@
         <button class="tab" :class="{ active: fixtureSource === 'ofl' }"
                 @click="switchSource('ofl')">Open Fixture Library</button>
         <button class="tab" :class="{ active: fixtureSource === 'soundswitch' }"
-                x-show="ssAvailable"
                 @click="switchSource('soundswitch')">SoundSwitch</button>
       </div>
 
@@ -153,8 +152,29 @@
       <!-- SoundSwitch Flow -->
       <template x-if="fixtureSource === 'soundswitch'">
         <div>
+          <!-- SS Unavailable Message -->
+          <template x-if="!ssAvailable && ssStatus">
+            <div class="ss-status-message">
+              <template x-if="ssStatus.state === 'not_configured'">
+                <p>SoundSwitch database not found. Set the <code>SOUNDSWITCH_DB_PATH</code> environment variable or install SoundSwitch to a standard location.</p>
+              </template>
+              <template x-if="ssStatus.state === 'not_found'">
+                <p>Database not found at <code x-text="ssStatus.path"></code>. Check that the file exists.</p>
+              </template>
+              <template x-if="ssStatus.state === 'permission_denied'">
+                <p>Cannot read database at <code x-text="ssStatus.path"></code>. Check file permissions.</p>
+              </template>
+              <template x-if="ssStatus.state === 'corrupt'">
+                <p>Database appears corrupt: <span x-text="ssStatus.error"></span></p>
+              </template>
+              <template x-if="ssStatus.state === 'error'">
+                <p>Database error: <span x-text="ssStatus.error"></span></p>
+              </template>
+            </div>
+          </template>
+
           <!-- SS Step 1: Select Manufacturer -->
-          <div x-show="ssStep === 1">
+          <div x-show="ssAvailable && ssStep === 1">
             <label>Manufacturer</label>
             <input type="text" x-model="ssMfrSearch" placeholder="Search manufacturers..."
                    @input="filterSsMfrs()">
@@ -169,7 +189,7 @@
           </div>
 
           <!-- SS Step 2: Select Fixture -->
-          <div x-show="ssStep === 2">
+          <div x-show="ssAvailable && ssStep === 2">
             <label x-text="'Fixtures by ' + ssSelectedMfr?.name"></label>
             <input type="text" x-model="ssFixtureSearch" placeholder="Search fixtures..."
                    @input="filterSsFixtures()">
@@ -185,7 +205,7 @@
           </div>
 
           <!-- SS Step 3: Select Mode + Configure -->
-          <div x-show="ssStep === 3">
+          <div x-show="ssAvailable && ssStep === 3">
             <p class="selected-fixture" x-text="ssSelectedFixture?.name"></p>
 
             <label>Mode</label>

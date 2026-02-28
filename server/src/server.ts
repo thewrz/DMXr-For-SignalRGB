@@ -6,7 +6,7 @@ import type { ServerConfig } from "./config/server-config.js";
 import type { UniverseManager } from "./dmx/universe-manager.js";
 import type { FixtureStore } from "./fixtures/fixture-store.js";
 import type { OflClient } from "./ofl/ofl-client.js";
-import type { SsClient } from "./soundswitch/ss-client.js";
+import type { SsClient, SsStatus } from "./soundswitch/ss-client.js";
 import { registerHealthRoute } from "./routes/health.js";
 import { registerUpdateRoute } from "./routes/update.js";
 import { registerFixtureRoutes } from "./routes/fixtures.js";
@@ -24,6 +24,7 @@ interface BuildServerDeps {
   readonly fixtureStore: FixtureStore;
   readonly oflClient: OflClient;
   readonly ssClient?: SsClient | null;
+  readonly ssStatus?: SsStatus;
 }
 
 export async function buildServer(
@@ -65,12 +66,11 @@ export async function buildServer(
     store: deps.fixtureStore,
   });
 
-  if (deps.ssClient) {
-    registerSoundswitchRoutes(app, {
-      ssClient: deps.ssClient,
-      store: deps.fixtureStore,
-    });
-  }
+  registerSoundswitchRoutes(app, {
+    ssClient: deps.ssClient ?? null,
+    ssStatus: deps.ssStatus ?? { available: false, state: "not_configured" },
+    store: deps.fixtureStore,
+  });
 
   return app;
 }

@@ -30,6 +30,7 @@ function dmxrApp() {
 
     // SoundSwitch state
     ssAvailable: false,
+    ssStatus: null,
     ssStep: 1,
     ssMfrs: [],
     ssMfrSearch: "",
@@ -384,10 +385,17 @@ function dmxrApp() {
 
     async checkSsAvailable() {
       try {
-        var res = await fetch("/soundswitch/manufacturers");
-        this.ssAvailable = res.ok;
+        var res = await fetch("/soundswitch/status");
+        if (res.ok) {
+          this.ssStatus = await res.json();
+          this.ssAvailable = this.ssStatus.available;
+        } else {
+          this.ssAvailable = false;
+          this.ssStatus = null;
+        }
       } catch {
         this.ssAvailable = false;
+        this.ssStatus = null;
       }
     },
 

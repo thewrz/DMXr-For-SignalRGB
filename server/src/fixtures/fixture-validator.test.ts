@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { validateFixtureAddress } from "./fixture-validator.js";
-import type { FixtureConfig } from "../types/protocol.js";
+import { validateFixtureAddress, validateFixtureChannels } from "./fixture-validator.js";
+import type { FixtureConfig, FixtureChannel } from "../types/protocol.js";
 
 function makeFixture(overrides: Partial<FixtureConfig> = {}): FixtureConfig {
   return {
@@ -96,5 +96,69 @@ describe("validateFixtureAddress", () => {
     const result = validateFixtureAddress(2, 3, existing);
     expect(result.valid).toBe(false);
     expect(result.error).toContain("Stage Left");
+  });
+});
+
+describe("validateFixtureChannels", () => {
+  const rgb: FixtureChannel[] = [
+    { offset: 0, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
+    { offset: 1, name: "Green", type: "ColorIntensity", color: "Green", defaultValue: 0 },
+    { offset: 2, name: "Blue", type: "ColorIntensity", color: "Blue", defaultValue: 0 },
+  ];
+
+  it("accepts valid channels matching expected count", () => {
+    const result = validateFixtureChannels(rgb, 3);
+    expect(result.valid).toBe(true);
+    expect(result.warnings).toBeUndefined();
+  });
+
+  it("rejects mismatched channel count", () => {
+    const result = validateFixtureChannels(rgb, 5);
+    expect(result.valid).toBe(false);
+    expect(result.error).toContain("channelCount");
+    expect(result.error).toContain("5");
+    expect(result.error).toContain("3");
+  });
+
+  it("rejects defaultValue below 0", () => {
+    const channels: FixtureChannel[] = [
+      { offset: 0, name: "Bad", type: "Intensity", defaultValue: -1 },
+    ];
+    const result = validateFixtureChannels(channels, 1);
+    expect(result.valid).toBe(false);
+    expect(result.error).toContain("defaultValue");
+    expect(result.error).toContain("-1");
+  });
+
+  it("rejects defaultValue above 255", () => {
+    const channels: FixtureChannel[] = [
+      { offset: 0, name: "Bad", type: "Intensity", defaultValue: 300 },
+    ];
+    const result = validateFixtureChannels(channels, 1);
+    expect(result.valid).toBe(false);
+    expect(result.error).toContain("defaultValue");
+    expect(result.error).toContain("300");
+  });
+
+  it("warns on unknown channel type but still valid", () => {
+    const channels: FixtureChannel[] = [
+      { offset: 0, name: "Mystery", type: "LaserBeam", defaultValue: 0 },
+    ];
+    const result = validateFixtureChannels(channels, 1);
+    expect(result.valid).toBe(true);
+    expect(result.warnings).toHaveLength(1);
+    expect(result.warnings![0]).toContain("LaserBeam");
+  });
+
+  it("returns no warnings for all known types", () => {
+    const channels: FixtureChannel[] = [
+      { offset: 0, name: "Dimmer", type: "Intensity", defaultValue: 0 },
+      { offset: 1, name: "Pan", type: "Pan", defaultValue: 128 },
+      { offset: 2, name: "Strobe", type: "Strobe", defaultValue: 255 },
+      { offset: 3, name: "Gobo", type: "Gobo", defaultValue: 0 },
+    ];
+    const result = validateFixtureChannels(channels, 4);
+    expect(result.valid).toBe(true);
+    expect(result.warnings).toBeUndefined();
   });
 });

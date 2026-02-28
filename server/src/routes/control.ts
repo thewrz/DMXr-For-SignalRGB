@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import type { UniverseManager } from "../dmx/universe-manager.js";
 import type { FixtureStore } from "../fixtures/fixture-store.js";
+import type { FixtureConfig } from "../types/protocol.js";
 
 interface ControlRouteDeps {
   readonly manager: UniverseManager;
@@ -61,10 +62,7 @@ export function registerControlRoutes(
 
       const snapshot = deps.manager.getChannelSnapshot(start, count);
 
-      const flashValues: Record<number, number> = {};
-      for (let ch = start; ch < start + count; ch++) {
-        flashValues[ch] = 255;
-      }
+      const flashValues = buildFlashValues(fixture, snapshot);
       deps.manager.applyRawUpdate(flashValues);
 
       const timer = setTimeout(() => {
@@ -83,4 +81,23 @@ export function registerControlRoutes(
       };
     },
   );
+}
+
+const FLASHABLE_TYPES = new Set(["ColorIntensity", "Intensity", "Strobe", "ShutterStrobe"]);
+
+function buildFlashValues(
+  fixture: FixtureConfig,
+  snapshot: Record<number, number>,
+): Record<number, number> {
+  const start = fixture.dmxStartAddress;
+  const result: Record<number, number> = {};
+
+  for (const channel of fixture.channels) {
+    const addr = start + channel.offset;
+    result[addr] = FLASHABLE_TYPES.has(channel.type)
+      ? 255
+      : (snapshot[addr] ?? channel.defaultValue);
+  }
+
+  return result;
 }

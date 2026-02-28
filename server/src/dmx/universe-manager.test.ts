@@ -179,4 +179,72 @@ describe("createUniverseManager", () => {
       expect(manager.getActiveChannelCount()).toBe(2);
     });
   });
+
+  describe("getDmxSendStatus", () => {
+    it("returns null lastSendTime and lastSendError initially", () => {
+      const status = manager.getDmxSendStatus();
+      expect(status.lastSendTime).toBeNull();
+      expect(status.lastSendError).toBeNull();
+    });
+
+    it("updates lastSendTime after successful send", () => {
+      const before = Date.now();
+      manager.applyFixtureUpdate({
+        fixture: "test",
+        channels: { "1": 255 },
+      });
+      const status = manager.getDmxSendStatus();
+      expect(status.lastSendTime).toBeGreaterThanOrEqual(before);
+      expect(status.lastSendError).toBeNull();
+    });
+
+    it("tracks error when universe.update throws", () => {
+      const errorCallback = vi.fn();
+      const failingUniverse: DmxUniverse = {
+        update: () => { throw new Error("USB disconnected"); },
+        updateAll: () => {},
+      };
+      const mgr = createUniverseManager(failingUniverse, { onDmxError: errorCallback });
+
+      mgr.applyFixtureUpdate({
+        fixture: "test",
+        channels: { "1": 255 },
+      });
+
+      const status = mgr.getDmxSendStatus();
+      expect(status.lastSendError).toBe("USB disconnected");
+      expect(errorCallback).toHaveBeenCalledOnce();
+    });
+
+    it("tracks error when universe.updateAll throws", () => {
+      const failingUniverse: DmxUniverse = {
+        update: () => {},
+        updateAll: () => { throw new Error("Device removed"); },
+      };
+      const mgr = createUniverseManager(failingUniverse);
+
+      mgr.blackout();
+
+      const status = mgr.getDmxSendStatus();
+      expect(status.lastSendError).toBe("Device removed");
+    });
+
+    it("clears error after successful send", () => {
+      const failingUpdate = vi.fn()
+        .mockImplementationOnce(() => { throw new Error("Temporary failure"); })
+        .mockImplementation(() => {});
+
+      const universe: DmxUniverse = {
+        update: failingUpdate,
+        updateAll: () => {},
+      };
+      const mgr = createUniverseManager(universe);
+
+      mgr.applyFixtureUpdate({ fixture: "test", channels: { "1": 255 } });
+      expect(mgr.getDmxSendStatus().lastSendError).toBe("Temporary failure");
+
+      mgr.applyFixtureUpdate({ fixture: "test", channels: { "1": 128 } });
+      expect(mgr.getDmxSendStatus().lastSendError).toBeNull();
+    });
+  });
 });

@@ -96,7 +96,7 @@ describe("mapColor", () => {
     expect(result[3]).toBe(0);         // B - white
   });
 
-  it("sets ShutterStrobe channels to 255 (shutter open)", () => {
+  it("sets strobe to 255 (shutter open) when fixture has NO dimmer", () => {
     const fixture = makeFixture([
       { offset: 0, name: "Strobe", type: "ShutterStrobe", defaultValue: 0 },
       { offset: 1, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
@@ -106,20 +106,34 @@ describe("mapColor", () => {
 
     const result = mapColor(fixture, 255, 128, 64, 1.0);
 
-    expect(result[1]).toBe(255); // shutter open regardless of defaultValue
+    expect(result[1]).toBe(255); // no dimmer → shutter must open for light
   });
 
-  it("sets Strobe channels to 255 (shutter open)", () => {
+  it("sets strobe to 0 (no strobe effect) when fixture HAS dimmer", () => {
+    // PAR can: dimmer controls brightness, strobe is just an effect
     const fixture = makeFixture([
-      { offset: 0, name: "Strobe", type: "Strobe", defaultValue: 0 },
+      { offset: 0, name: "Dimmer", type: "Intensity", defaultValue: 0 },
       { offset: 1, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
       { offset: 2, name: "Green", type: "ColorIntensity", color: "Green", defaultValue: 0 },
       { offset: 3, name: "Blue", type: "ColorIntensity", color: "Blue", defaultValue: 0 },
+      { offset: 4, name: "Strobe", type: "Strobe", defaultValue: 0 },
     ]);
 
     const result = mapColor(fixture, 255, 128, 64, 1.0);
 
-    expect(result[1]).toBe(255); // shutter open
+    expect(result[5]).toBe(0); // has dimmer → strobe is effect only, 0 = no strobe
+  });
+
+  it("sets ShutterStrobe to 0 when fixture HAS dimmer", () => {
+    const fixture = makeFixture([
+      { offset: 0, name: "Dimmer", type: "Intensity", defaultValue: 0 },
+      { offset: 1, name: "Shutter", type: "ShutterStrobe", defaultValue: 0 },
+      { offset: 2, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
+    ]);
+
+    const result = mapColor(fixture, 255, 0, 0, 1.0);
+
+    expect(result[2]).toBe(0); // has dimmer → no strobe
   });
 
   it("uses defaultValue for non-color generic channels", () => {
@@ -176,7 +190,7 @@ describe("mapColor", () => {
     expect(result[3]).toBe(0);
   });
 
-  it("uses strobe defaultValue when > 0", () => {
+  it("uses strobe defaultValue when > 0 (no dimmer fixture)", () => {
     const fixture = makeFixture([
       { offset: 0, name: "Strobe", type: "Strobe", defaultValue: 32 },
       { offset: 1, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
@@ -184,10 +198,10 @@ describe("mapColor", () => {
 
     const result = mapColor(fixture, 255, 0, 0, 1.0);
 
-    expect(result[1]).toBe(32);
+    expect(result[1]).toBe(32); // no dimmer, explicit defaultValue honored
   });
 
-  it("falls back to 255 for strobe when defaultValue is 0", () => {
+  it("falls back to 255 for strobe when defaultValue is 0 (no dimmer fixture)", () => {
     const fixture = makeFixture([
       { offset: 0, name: "Strobe", type: "ShutterStrobe", defaultValue: 0 },
       { offset: 1, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
@@ -195,7 +209,7 @@ describe("mapColor", () => {
 
     const result = mapColor(fixture, 255, 0, 0, 1.0);
 
-    expect(result[1]).toBe(255);
+    expect(result[1]).toBe(255); // no dimmer, defaultValue=0 → open shutter (255)
   });
 
   it("defaults Pan to 128 (center) when defaultValue is 0", () => {

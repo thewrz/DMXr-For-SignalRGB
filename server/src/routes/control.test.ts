@@ -48,7 +48,26 @@ describe("Control routes", () => {
   });
 
   describe("POST /control/whiteout", () => {
-    it("sends whiteout and returns success", async () => {
+    it("blackouts first then sets fixture channels via mapColor", async () => {
+      // Add a fixture so whiteout has something to light up
+      await app.inject({
+        method: "POST",
+        url: "/fixtures",
+        payload: {
+          name: "Test PAR",
+          oflKey: "test/test",
+          oflFixtureName: "Test",
+          mode: "3-channel",
+          dmxStartAddress: 1,
+          channelCount: 3,
+          channels: [
+            { offset: 0, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
+            { offset: 1, name: "Green", type: "ColorIntensity", color: "Green", defaultValue: 0 },
+            { offset: 2, name: "Blue", type: "ColorIntensity", color: "Blue", defaultValue: 0 },
+          ],
+        },
+      });
+
       const res = await app.inject({
         method: "POST",
         url: "/control/whiteout",
@@ -57,7 +76,30 @@ describe("Control routes", () => {
       expect(res.statusCode).toBe(200);
       expect(res.json().success).toBe(true);
       expect(res.json().action).toBe("whiteout");
-      expect(mockUniverse.updateAllCalls).toContain(255);
+      expect(res.json().fixturesUpdated).toBe(1);
+
+      // Blackout (updateAll(0)) should have been called first
+      expect(mockUniverse.updateAllCalls).toContain(0);
+
+      // Then mapColor(fixture, 255, 255, 255, 1.0) applied via update()
+      const whiteUpdate = mockUniverse.updateCalls.find(
+        (call) => call[1] === 255 && call[2] === 255 && call[3] === 255,
+      );
+      expect(whiteUpdate).toBeDefined();
+    });
+
+    it("returns success with no fixtures configured", async () => {
+      const res = await app.inject({
+        method: "POST",
+        url: "/control/whiteout",
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json().success).toBe(true);
+      expect(res.json().fixturesUpdated).toBe(0);
+
+      // Still blackouts even with no fixtures
+      expect(mockUniverse.updateAllCalls).toContain(0);
     });
   });
 

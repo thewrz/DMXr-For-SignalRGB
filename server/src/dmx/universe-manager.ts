@@ -11,8 +11,15 @@ export interface DmxSendStatus {
   readonly lastSendError: string | null;
 }
 
+export interface DmxLogger {
+  readonly info: (msg: string) => void;
+  readonly warn: (msg: string) => void;
+  readonly error: (msg: string) => void;
+}
+
 export interface UniverseManagerOptions {
   readonly onDmxError?: (error: unknown) => void;
+  readonly logger?: DmxLogger;
 }
 
 export interface UniverseManager {
@@ -58,16 +65,18 @@ export function createUniverseManager(
   options: UniverseManagerOptions = {},
 ): UniverseManager {
   const activeChannels = new Map<number, number>();
+  const log = options.logger;
   let lastSendTime: number | null = null;
   let lastSendError: string | null = null;
 
-  function safeSend(fn: () => void): void {
+  function safeSend(label: string, fn: () => void): void {
     try {
       fn();
       lastSendTime = Date.now();
       lastSendError = null;
     } catch (error: unknown) {
       lastSendError = error instanceof Error ? error.message : String(error);
+      log?.error(`DMX send failed (${label}): ${lastSendError}`);
       options.onDmxError?.(error);
     }
   }
@@ -89,21 +98,25 @@ export function createUniverseManager(
         }
       }
 
-      safeSend(() => universe.update(dmxUpdate));
+      const channelCount = Object.keys(dmxUpdate).length;
+      safeSend(`fixture-update ${channelCount}ch`, () => universe.update(dmxUpdate));
+      log?.info(`DMX update: ${channelCount} channels sent`);
 
-      return Object.keys(dmxUpdate).length;
+      return channelCount;
     },
 
     blackout(): void {
-      safeSend(() => universe.updateAll(0));
+      safeSend("blackout", () => universe.updateAll(0));
       activeChannels.clear();
+      log?.info("DMX blackout: all 512 channels → 0");
     },
 
     whiteout(): void {
-      safeSend(() => universe.updateAll(MAX_VALUE));
+      safeSend("whiteout", () => universe.updateAll(MAX_VALUE));
       for (let ch = MIN_CHANNEL; ch <= MAX_CHANNEL; ch++) {
         activeChannels.set(ch, MAX_VALUE);
       }
+      log?.info("DMX whiteout: all 512 channels → 255");
     },
 
     getActiveChannelCount(): number {
@@ -127,7 +140,8 @@ export function createUniverseManager(
           activeChannels.delete(chNum);
         }
       }
-      safeSend(() => universe.update(channels));
+      const count = Object.keys(channels).length;
+      safeSend(`raw-update ${count}ch`, () => universe.update(channels));
     },
 
     getDmxSendStatus(): DmxSendStatus {

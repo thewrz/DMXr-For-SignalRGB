@@ -64,6 +64,11 @@ export function registerUpdateRoute(
         channels,
       });
 
+      request.log.info(
+        { fixture, channelsUpdated },
+        `raw update: "${fixture}" ${channelsUpdated} channels`,
+      );
+
       return {
         success: channelsUpdated > 0,
         fixture,
@@ -114,6 +119,11 @@ export function registerUpdateRoute(
           channels: allUpdates,
         });
       }
+
+      request.log.info(
+        { fixturesMatched, totalChannels },
+        `color update: ${fixturesMatched} fixtures, ${totalChannels} channels`,
+      );
 
       return {
         success: totalChannels > 0,

@@ -1,4 +1,5 @@
 import type { FixtureConfig } from "../types/protocol.js";
+import { analyzeFixture } from "./fixture-capabilities.js";
 
 /**
  * Maps RGB + brightness to DMX channel values for a fixture,
@@ -15,26 +16,21 @@ export function mapColor(
 ): Record<number, number> {
   const result: Record<number, number> = {};
   const base = fixture.dmxStartAddress;
-
-  const hasDimmer = fixture.channels.some((ch) => ch.type === "Intensity");
+  const caps = analyzeFixture(fixture.channels);
 
   let scaledR = r;
   let scaledG = g;
   let scaledB = b;
 
-  if (!hasDimmer) {
+  if (!caps.hasDimmer) {
     scaledR = Math.round(r * brightness);
     scaledG = Math.round(g * brightness);
     scaledB = Math.round(b * brightness);
   }
 
-  const hasWhite = fixture.channels.some(
-    (ch) => ch.type === "ColorIntensity" && ch.color === "White",
-  );
-
   let white = 0;
 
-  if (hasWhite) {
+  if (caps.colors.hasWhite) {
     white = Math.min(scaledR, scaledG, scaledB);
     scaledR = scaledR - white;
     scaledG = scaledG - white;
@@ -82,7 +78,12 @@ export function mapColor(
       channel.type === "Strobe" ||
       channel.type === "ShutterStrobe"
     ) {
-      result[addr] = channel.defaultValue > 0 ? channel.defaultValue : 255;
+      result[addr] =
+        caps.strobeMode === "effect"
+          ? 0
+          : channel.defaultValue > 0
+            ? channel.defaultValue
+            : 255;
     } else if (channel.type === "Pan" || channel.type === "Tilt") {
       result[addr] = channel.defaultValue > 0 ? channel.defaultValue : 128;
     } else {

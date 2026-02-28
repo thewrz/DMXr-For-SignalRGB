@@ -2,6 +2,8 @@ import type { FastifyInstance } from "fastify";
 import type { UniverseManager } from "../dmx/universe-manager.js";
 import type { FixtureStore } from "../fixtures/fixture-store.js";
 import type { FixtureConfig } from "../types/protocol.js";
+import { mapColor } from "../fixtures/channel-mapper.js";
+import { analyzeFixture } from "../fixtures/fixture-capabilities.js";
 
 interface ControlRouteDeps {
   readonly manager: UniverseManager;
@@ -30,14 +32,50 @@ export function registerControlRoutes(
 ): void {
   const activeTimers = new Map<string, NodeJS.Timeout>();
 
-  app.post("/control/blackout", async () => {
+  app.post("/control/blackout", async (request) => {
     deps.manager.blackout();
+    const fixtures = deps.store.getAll();
+    request.log.info(
+      { action: "blackout", fixtureCount: fixtures.length },
+      "blackout: all 512 channels → 0",
+    );
     return { success: true, action: "blackout" };
   });
 
-  app.post("/control/whiteout", async () => {
-    deps.manager.whiteout();
-    return { success: true, action: "whiteout" };
+  app.post("/control/whiteout", async (request) => {
+    const fixtures = deps.store.getAll();
+
+    // Start from blackout to clear any stale values
+    deps.manager.blackout();
+
+    // Set each fixture to full white using the channel mapper,
+    // which respects channel types (pan/tilt center, strobe open, etc.)
+    const allUpdates: Record<number, number> = {};
+    for (const fixture of fixtures) {
+      const channels = mapColor(fixture, 255, 255, 255, 1.0);
+      for (const [addr, val] of Object.entries(channels)) {
+        allUpdates[Number(addr)] = val;
+      }
+    }
+
+    if (Object.keys(allUpdates).length > 0) {
+      deps.manager.applyRawUpdate(allUpdates);
+    }
+
+    request.log.info(
+      {
+        action: "whiteout",
+        fixtureCount: fixtures.length,
+        channelsSet: Object.keys(allUpdates).length,
+      },
+      `whiteout: ${fixtures.length} fixtures, ${Object.keys(allUpdates).length} channels set via mapColor`,
+    );
+
+    return {
+      success: true,
+      action: "whiteout",
+      fixturesUpdated: fixtures.length,
+    };
   });
 
   app.post<{ Params: { id: string }; Body: TestBody }>(
@@ -47,6 +85,7 @@ export function registerControlRoutes(
       const fixture = deps.store.getById(request.params.id);
 
       if (fixture === undefined) {
+        request.log.warn({ fixtureId: request.params.id }, "flash: fixture not found");
         return reply.status(404).send({ error: "Fixture not found" });
       }
 
@@ -65,8 +104,24 @@ export function registerControlRoutes(
       const flashValues = buildFlashValues(fixture, snapshot);
       deps.manager.applyRawUpdate(flashValues);
 
+      request.log.info(
+        {
+          action,
+          fixtureId: fixture.id,
+          fixtureName: fixture.name,
+          dmxRange: `${start}-${start + count - 1}`,
+          durationMs,
+          channelValues: flashValues,
+        },
+        `flash: "${fixture.name}" DMX ${start}-${start + count - 1} for ${durationMs}ms`,
+      );
+
       const timer = setTimeout(() => {
         deps.manager.applyRawUpdate(snapshot);
+        request.log.info(
+          { action: "flash-restore", fixtureId: fixture.id },
+          `flash-restore: "${fixture.name}" restored to snapshot`,
+        );
         activeTimers.delete(fixture.id);
       }, durationMs);
       timer.unref();
@@ -83,20 +138,26 @@ export function registerControlRoutes(
   );
 }
 
-const FLASHABLE_TYPES = new Set(["ColorIntensity", "Intensity", "Strobe", "ShutterStrobe"]);
-
 function buildFlashValues(
   fixture: FixtureConfig,
   snapshot: Record<number, number>,
 ): Record<number, number> {
   const start = fixture.dmxStartAddress;
   const result: Record<number, number> = {};
+  const caps = analyzeFixture(fixture.channels);
 
   for (const channel of fixture.channels) {
     const addr = start + channel.offset;
-    result[addr] = FLASHABLE_TYPES.has(channel.type)
-      ? 255
-      : (snapshot[addr] ?? channel.defaultValue);
+
+    if (channel.type === "ColorIntensity" || channel.type === "Intensity") {
+      result[addr] = 255;
+    } else if (channel.type === "Strobe" || channel.type === "ShutterStrobe") {
+      // Flash always forces shutter fully open (255) for maximum output,
+      // unlike mapColor which respects channel.defaultValue when > 0.
+      result[addr] = caps.strobeMode === "effect" ? 0 : 255;
+    } else {
+      result[addr] = snapshot[addr] ?? channel.defaultValue;
+    }
   }
 
   return result;

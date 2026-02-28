@@ -1,5 +1,9 @@
 import Database from "better-sqlite3";
 import type { FixtureChannel } from "../types/protocol.js";
+import {
+  analyzeFixture,
+  defaultValueForChannel,
+} from "../fixtures/fixture-capabilities.js";
 
 export interface SsManufacturer {
   readonly id: number;
@@ -98,13 +102,6 @@ export function mapSsType(typeCode: number): { type: string; color?: string } {
   }
 }
 
-/** Sensible default values for channel types at import time */
-function ssDefaultValue(type: string): number {
-  if (type === "Strobe" || type === "ShutterStrobe") return 255;
-  if (type === "Pan" || type === "Tilt") return 128;
-  return 0;
-}
-
 export function createSsClient(dbPath: string): SsClient {
   let db: Database.Database | null = null;
 
@@ -170,34 +167,43 @@ export function createSsClient(dbPath: string): SsClient {
 
     mapToFixtureChannels(modeId: number): readonly FixtureChannel[] {
       const attrs = this.getModeChannels(modeId);
-      const channels: FixtureChannel[] = [];
+
+      // Pass 1: build raw channels with placeholder defaultValue
+      const rawChannels: FixtureChannel[] = [];
 
       for (const attr of attrs) {
         const mapped = mapSsType(attr.type);
-        const channel: FixtureChannel = {
+        rawChannels.push({
           offset: attr.coarse_chan,
           name: attr.name,
           type: mapped.type,
           ...(mapped.color ? { color: mapped.color } : {}),
-          defaultValue: ssDefaultValue(mapped.type),
-        };
-        channels.push(channel);
+          defaultValue: 0,
+        });
 
         if (
           attr.fine_chan !== null &&
           attr.fine_chan >= 0 &&
           attr.fine_chan !== attr.coarse_chan
         ) {
-          const fineChannel: FixtureChannel = {
+          rawChannels.push({
             offset: attr.fine_chan,
             name: attr.name + " Fine",
             type: mapped.type,
             ...(mapped.color ? { color: mapped.color } : {}),
             defaultValue: 0,
-          };
-          channels.push(fineChannel);
+          });
         }
       }
+
+      // Pass 2: analyze capabilities to determine strobe mode
+      const caps = analyzeFixture(rawChannels);
+
+      // Pass 3: apply correct defaults based on fixture capabilities
+      const channels = rawChannels.map((ch) => ({
+        ...ch,
+        defaultValue: defaultValueForChannel(ch.type, caps.strobeMode),
+      }));
 
       return channels.sort((a, b) => a.offset - b.offset);
     },

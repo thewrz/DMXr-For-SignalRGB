@@ -15,7 +15,17 @@ async function main() {
   const startTime = Date.now();
 
   const connection = await createDmxConnection(config);
-  const manager = createUniverseManager(connection.universe);
+
+  const consoleLogger = {
+    info: (msg: string) => process.stdout.write(`[DMX] ${msg}\n`),
+    warn: (msg: string) => process.stderr.write(`[DMX] WARN: ${msg}\n`),
+    error: (msg: string) => process.stderr.write(`[DMX] ERROR: ${msg}\n`),
+  };
+
+  const manager = createUniverseManager(connection.universe, {
+    logger: consoleLogger,
+    onDmxError: (err) => process.stderr.write(`[DMX] Send error: ${err}\n`),
+  });
 
   const fixtureStore = createFixtureStore(config.fixturesPath);
   await fixtureStore.load();

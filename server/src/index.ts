@@ -20,8 +20,10 @@ async function main() {
   const fixtureStore = createFixtureStore(config.fixturesPath);
   await fixtureStore.load();
 
+  manager.blackout();
+
   const oflClient = createOflClient();
-  const ssClient = createSsClientIfConfigured(config.soundswitchDbPath);
+  const { client: ssClient, status: ssStatus } = createSsClientIfConfigured(config.soundswitchDbPath);
 
   const app = await buildServer({
     config,
@@ -31,6 +33,7 @@ async function main() {
     fixtureStore,
     oflClient,
     ssClient,
+    ssStatus,
   });
 
   let mdnsAdvertiser: MdnsAdvertiser | undefined;
@@ -58,8 +61,10 @@ async function main() {
   app.log.info(`DMXr server running on ${config.host}:${boundPort}`);
   app.log.info(`DMX driver: ${connection.driver}`);
   app.log.info(`Fixtures loaded: ${fixtureStore.getAll().length}`);
-  if (ssClient) {
-    app.log.info(`SoundSwitch DB: ${config.soundswitchDbPath}`);
+  if (ssStatus.available) {
+    app.log.info(`SoundSwitch DB: ${ssStatus.path} (${ssStatus.fixtureCount} fixtures)`);
+  } else {
+    app.log.info(`SoundSwitch: ${ssStatus.state}${ssStatus.error ? ` — ${ssStatus.error}` : ""}`);
   }
 }
 

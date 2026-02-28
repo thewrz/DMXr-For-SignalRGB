@@ -13,11 +13,14 @@ export function registerHealthRoute(
   deps: HealthDeps,
 ): void {
   app.get("/health", async (): Promise<HealthResponse> => {
+    const dmxStatus = deps.manager.getDmxSendStatus();
     return {
-      status: "ok",
+      status: dmxStatus.lastSendError !== null ? "degraded" : "ok",
       driver: deps.driver,
       activeChannels: deps.manager.getActiveChannelCount(),
       uptime: Math.round((Date.now() - deps.startTime) / 1000),
+      lastDmxSendTime: dmxStatus.lastSendTime,
+      lastDmxSendError: dmxStatus.lastSendError,
     };
   });
 }

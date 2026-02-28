@@ -1,4 +1,4 @@
-import type { FixtureConfig } from "../types/protocol.js";
+import type { FixtureConfig, FixtureChannel } from "../types/protocol.js";
 
 const MIN_ADDRESS = 1;
 const MAX_ADDRESS = 512;
@@ -6,6 +6,57 @@ const MAX_ADDRESS = 512;
 export interface ValidationResult {
   readonly valid: boolean;
   readonly error?: string;
+  readonly warnings?: readonly string[];
+}
+
+const KNOWN_CHANNEL_TYPES = new Set([
+  "ColorIntensity",
+  "Intensity",
+  "Strobe",
+  "ShutterStrobe",
+  "Pan",
+  "Tilt",
+  "Focus",
+  "Zoom",
+  "Gobo",
+  "Iris",
+  "Prism",
+  "ColorWheel",
+  "NoFunction",
+  "Generic",
+]);
+
+export function validateFixtureChannels(
+  channels: readonly FixtureChannel[],
+  expectedCount: number,
+): ValidationResult {
+  if (channels.length !== expectedCount) {
+    return {
+      valid: false,
+      error: `channelCount (${expectedCount}) does not match channels array length (${channels.length})`,
+    };
+  }
+
+  for (const ch of channels) {
+    if (ch.defaultValue < 0 || ch.defaultValue > 255) {
+      return {
+        valid: false,
+        error: `Channel "${ch.name}" has defaultValue ${ch.defaultValue} outside 0-255`,
+      };
+    }
+  }
+
+  const warnings: string[] = [];
+  for (const ch of channels) {
+    if (!KNOWN_CHANNEL_TYPES.has(ch.type)) {
+      warnings.push(`Unknown channel type "${ch.type}" on channel "${ch.name}"`);
+    }
+  }
+
+  return {
+    valid: true,
+    ...(warnings.length > 0 ? { warnings } : {}),
+  };
 }
 
 export function validateFixtureAddress(

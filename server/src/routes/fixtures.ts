@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import type { FixtureStore } from "../fixtures/fixture-store.js";
 import type { AddFixtureRequest } from "../types/protocol.js";
-import { validateFixtureAddress } from "../fixtures/fixture-validator.js";
+import { validateFixtureAddress, validateFixtureChannels } from "../fixtures/fixture-validator.js";
 
 interface FixtureRouteDeps {
   readonly store: FixtureStore;
@@ -58,10 +58,11 @@ export function registerFixtureRoutes(
       const body = request.body;
       const channelCount = body.channels.length;
 
-      if (body.channelCount !== channelCount) {
+      const channelValidation = validateFixtureChannels(body.channels, body.channelCount);
+      if (!channelValidation.valid) {
         return reply.status(400).send({
           success: false,
-          error: `channelCount (${body.channelCount}) does not match channels array length (${channelCount})`,
+          error: channelValidation.error,
         });
       }
 

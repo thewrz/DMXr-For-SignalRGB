@@ -45,23 +45,64 @@ export function mapSsType(typeCode: number): { type: string; color?: string } {
   switch (typeCode) {
     case 1:
       return { type: "Intensity" };
+    case 2:
+      return { type: "ColorWheel" };
     case 3:
       return { type: "Pan" };
     case 4:
       return { type: "Tilt" };
+    case 5:
+      return { type: "Iris" };
+    case 6:
+      return { type: "Focus" };
+    case 7:
+      return { type: "Prism" };
+    case 8:  // Static Gobo
+    case 9:  // Rotating Gobo
+      return { type: "Gobo" };
+    case 11:
+      return { type: "ColorIntensity", color: "Cyan" };
+    case 12:
+      return { type: "ColorIntensity", color: "Magenta" };
+    case 13:
+      return { type: "ColorIntensity", color: "Yellow" };
     case 14:
       return { type: "ColorIntensity", color: "Red" };
     case 15:
       return { type: "ColorIntensity", color: "Green" };
     case 16:
       return { type: "ColorIntensity", color: "Blue" };
+    case 17: // Pan/Tilt Speed
+    case 20: // Lamp Control
+    case 21: // Reset
+    case 82: // Macro
+    case 83: // Effect
+    case 84: // Effect Speed
+    case 85: // Effect Rate
+    case 88: // Mode/Effect Select
+      return { type: "Generic" };
     case 41:
       return { type: "Strobe" };
+    case 53:
+      return { type: "Zoom" };
+    case 64:
+      return { type: "ShutterStrobe" };
     case 87:
       return { type: "ColorIntensity", color: "White" };
+    case 105:
+      return { type: "ColorIntensity", color: "Amber" };
+    case 106:
+      return { type: "ColorIntensity", color: "UV" };
     default:
       return { type: "Generic" };
   }
+}
+
+/** Sensible default values for channel types at import time */
+function ssDefaultValue(type: string): number {
+  if (type === "Strobe" || type === "ShutterStrobe") return 255;
+  if (type === "Pan" || type === "Tilt") return 128;
+  return 0;
 }
 
 export function createSsClient(dbPath: string): SsClient {
@@ -138,7 +179,7 @@ export function createSsClient(dbPath: string): SsClient {
           name: attr.name,
           type: mapped.type,
           ...(mapped.color ? { color: mapped.color } : {}),
-          defaultValue: 0,
+          defaultValue: ssDefaultValue(mapped.type),
         };
         channels.push(channel);
 
@@ -170,10 +211,63 @@ export function createSsClient(dbPath: string): SsClient {
   };
 }
 
-/** Returns null if dbPath is not provided (feature disabled) */
+export interface SsStatus {
+  readonly available: boolean;
+  readonly state: "connected" | "not_configured" | "not_found" | "permission_denied" | "corrupt" | "error";
+  readonly path?: string;
+  readonly error?: string;
+  readonly fixtureCount?: number;
+}
+
+export interface SsClientResult {
+  readonly client: SsClient | null;
+  readonly status: SsStatus;
+}
+
+/** Attempt to create an SsClient, returning status regardless of success */
 export function createSsClientIfConfigured(
   dbPath: string | undefined,
-): SsClient | null {
-  if (!dbPath) return null;
-  return createSsClient(dbPath);
+): SsClientResult {
+  if (!dbPath) {
+    return {
+      client: null,
+      status: { available: false, state: "not_configured" },
+    };
+  }
+
+  try {
+    const client = createSsClient(dbPath);
+    // Probe the DB to ensure it's readable
+    const manufacturers = client.getManufacturers();
+    const fixtureCount = manufacturers.reduce((sum, m) => sum + m.fixtureCount, 0);
+    return {
+      client,
+      status: {
+        available: true,
+        state: "connected",
+        path: dbPath,
+        fixtureCount,
+      },
+    };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    const state = classifySsError(message);
+    return {
+      client: null,
+      status: {
+        available: false,
+        state,
+        path: dbPath,
+        error: message,
+      },
+    };
+  }
+}
+
+function classifySsError(message: string): SsStatus["state"] {
+  const lower = message.toLowerCase();
+  if (lower.includes("enoent") || lower.includes("no such file")) return "not_found";
+  if (lower.includes("eacces") || lower.includes("permission denied")) return "permission_denied";
+  if (lower.includes("malformed") || lower.includes("corrupt") || lower.includes("not a database")) return "corrupt";
+  return "error";
 }

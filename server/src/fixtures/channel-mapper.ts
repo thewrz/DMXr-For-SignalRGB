@@ -59,13 +59,32 @@ export function mapColor(
           result[addr] = clamp(white);
           break;
         case "Amber":
-          result[addr] = clamp(Math.round((scaledR * 0.8 + scaledG * 0.2)));
+          result[addr] = clamp(Math.round(scaledR * 0.8 + scaledG * 0.2));
+          break;
+        case "Cyan":
+          result[addr] = clamp(255 - scaledR);
+          break;
+        case "Magenta":
+          result[addr] = clamp(255 - scaledG);
+          break;
+        case "Yellow":
+          result[addr] = clamp(255 - scaledB);
+          break;
+        case "UV":
+          result[addr] = 0;
           break;
         default:
           result[addr] = channel.defaultValue;
       }
     } else if (channel.type === "Intensity") {
       result[addr] = clamp(Math.round(brightness * 255));
+    } else if (
+      channel.type === "Strobe" ||
+      channel.type === "ShutterStrobe"
+    ) {
+      result[addr] = channel.defaultValue > 0 ? channel.defaultValue : 255;
+    } else if (channel.type === "Pan" || channel.type === "Tilt") {
+      result[addr] = channel.defaultValue > 0 ? channel.defaultValue : 128;
     } else {
       result[addr] = channel.defaultValue;
     }

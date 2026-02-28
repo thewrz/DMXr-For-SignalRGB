@@ -18,10 +18,12 @@ export interface FixtureUpdateResponse {
 
 /** GET /health response */
 export interface HealthResponse {
-  readonly status: "ok";
+  readonly status: "ok" | "degraded";
   readonly driver: string;
   readonly activeChannels: number;
   readonly uptime: number;
+  readonly lastDmxSendTime: number | null;
+  readonly lastDmxSendError: string | null;
 }
 
 /** A single DMX channel within a fixture (derived from OFL definition) */

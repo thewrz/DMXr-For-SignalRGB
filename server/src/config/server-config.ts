@@ -1,3 +1,5 @@
+import { findSoundswitchDb } from "../soundswitch/ss-db-finder.js";
+
 export interface ServerConfig {
   readonly port: number;
   readonly host: string;
@@ -53,6 +55,14 @@ export function loadConfig(): ServerConfig {
     fixturesPath: process.env["FIXTURES_PATH"] ?? "./config/fixtures.json",
     mdnsEnabled: process.env["MDNS_ENABLED"] !== "false",
     portRangeSize: rawPortRangeSize,
-    soundswitchDbPath: process.env["SOUNDSWITCH_DB_PATH"],
+    soundswitchDbPath: resolveSoundswitchDbPath(),
   };
+}
+
+function resolveSoundswitchDbPath(): string | undefined {
+  const envPath = process.env["SOUNDSWITCH_DB_PATH"];
+  if (envPath) return envPath;
+
+  const { path } = findSoundswitchDb();
+  return path ?? undefined;
 }

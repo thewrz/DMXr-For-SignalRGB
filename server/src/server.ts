@@ -13,6 +13,7 @@ import { registerFixtureRoutes } from "./routes/fixtures.js";
 import { registerOflRoutes } from "./routes/ofl.js";
 import { registerControlRoutes } from "./routes/control.js";
 import { registerSoundswitchRoutes } from "./routes/soundswitch.js";
+import { registerSignalRgbRoutes } from "./routes/signalrgb.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -70,6 +71,10 @@ export async function buildServer(
   registerSoundswitchRoutes(app, {
     ssClient: deps.ssClient ?? null,
     ssStatus: deps.ssStatus ?? { available: false, state: "not_configured" },
+    store: deps.fixtureStore,
+  });
+
+  registerSignalRgbRoutes(app, {
     store: deps.fixtureStore,
   });
 

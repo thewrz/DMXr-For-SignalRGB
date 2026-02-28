@@ -7,6 +7,7 @@ import type { UniverseManager } from "./dmx/universe-manager.js";
 import type { FixtureStore } from "./fixtures/fixture-store.js";
 import type { OflClient } from "./ofl/ofl-client.js";
 import type { SsClient, SsStatus } from "./soundswitch/ss-client.js";
+import type { ConnectionStatus } from "./dmx/connection-state.js";
 import { registerHealthRoute } from "./routes/health.js";
 import { registerUpdateRoute } from "./routes/update.js";
 import { registerFixtureRoutes } from "./routes/fixtures.js";
@@ -26,6 +27,7 @@ interface BuildServerDeps {
   readonly oflClient: OflClient;
   readonly ssClient?: SsClient | null;
   readonly ssStatus?: SsStatus;
+  readonly getConnectionStatus?: () => ConnectionStatus;
 }
 
 export async function buildServer(
@@ -48,6 +50,7 @@ export async function buildServer(
     driver: deps.driver,
     startTime: deps.startTime,
     fixtureStore: deps.fixtureStore,
+    getConnectionStatus: deps.getConnectionStatus,
   });
 
   registerUpdateRoute(app, {

@@ -1,0 +1,45 @@
+[Unit]
+Description=DMXr — SignalRGB to DMX bridge server
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=dmxr
+Group=dialout
+
+WorkingDirectory=/opt/dmxr/server
+ExecStart=/usr/bin/node dist/index.js
+
+# Environment defaults (override via /etc/dmxr/dmxr.env)
+Environment=PORT=8080
+Environment=HOST=0.0.0.0
+Environment=DMX_DRIVER=enttec-usb-dmx-pro
+Environment=DMX_DEVICE_PATH=/dev/ttyUSB0
+Environment=LOG_LEVEL=info
+EnvironmentFile=-/etc/dmxr/dmxr.env
+
+# Restart on failure with 5s delay
+Restart=on-failure
+RestartSec=5
+
+# Rate-limit restarts: max 5 restarts in 5 minutes
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+# Graceful shutdown: 10s for blackout frame + serial drain
+TimeoutStopSec=10
+KillSignal=SIGTERM
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/dmxr/server/config /opt/dmxr/server/logs
+
+# Serial port access (via dialout group)
+SupplementaryGroups=dialout
+
+[Install]
+WantedBy=multi-user.target

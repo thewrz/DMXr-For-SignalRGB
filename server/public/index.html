@@ -20,6 +20,7 @@
     <button class="btn btn-primary" @click="showAddModal = true">+ Add Fixture</button>
     <button class="btn btn-danger" @click="blackout()">Blackout All</button>
     <button class="btn btn-warning" @click="whiteout()">Whiteout All</button>
+    <button class="btn btn-success" x-show="overrideActive" @click="resume()">Resume</button>
   </div>
 
   <template x-if="fixtures.length === 0">

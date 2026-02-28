@@ -45,11 +45,11 @@ export function registerControlRoutes(
   app.post("/control/whiteout", async (request) => {
     const fixtures = deps.store.getAll();
 
-    // Start from blackout to clear any stale values
-    deps.manager.blackout();
+    // All 512 channels to 255 — works even with no fixtures in store
+    deps.manager.whiteout();
 
-    // Set each fixture to full white using the channel mapper,
-    // which respects channel types (pan/tilt center, strobe open, etc.)
+    // Overlay fixture-specific values via mapColor for correct
+    // non-color channels (pan center, strobe open, dimmer full, etc.)
     const allUpdates: Record<number, number> = {};
     for (const fixture of fixtures) {
       const channels = mapColor(fixture, 255, 255, 255, 1.0);
@@ -78,10 +78,23 @@ export function registerControlRoutes(
     };
   });
 
+  app.post("/control/resume", async (request) => {
+    deps.manager.resumeNormal();
+    request.log.info(
+      { action: "resume" },
+      "resume: blackout/whiteout override cleared",
+    );
+    return { success: true, action: "resume" };
+  });
+
   app.post<{ Params: { id: string }; Body: TestBody }>(
     "/fixtures/:id/test",
     { schema: testSchema },
     async (request, reply) => {
+      if (deps.manager.isBlackoutActive()) {
+        return reply.status(409).send({ error: "Cannot flash during blackout/whiteout override" });
+      }
+
       const fixture = deps.store.getById(request.params.id);
 
       if (fixture === undefined) {

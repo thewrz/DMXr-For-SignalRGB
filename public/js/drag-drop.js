@@ -13,6 +13,9 @@ function dmxrDragDrop() {
     // Tooltip state
     tooltip: { visible: false, x: 0, y: 0, content: "" },
 
+    // Fixture card hover → grid highlight
+    highlightedFixtureId: null,
+
     // Grid error toast
     gridError: "",
     gridErrorTimer: null,
@@ -56,16 +59,14 @@ function dmxrDragDrop() {
       if (info.offset === 0) classes.push("fixture-start");
       if (info.offset === info.fixture.channelCount - 1) classes.push("fixture-end");
 
+      if (this.highlightedFixtureId && info.fixture.id === this.highlightedFixtureId) {
+        classes.push("fixture-highlight");
+      }
+
       return classes.join(" ");
     },
 
     getChannelLabel: function(ch) {
-      var info = this.getFixtureAtChannel(ch);
-      if (!info) return ch;
-
-      if (info.offset === 0) {
-        return info.fixture.name.substring(0, 4);
-      }
       return ch;
     },
 
@@ -107,6 +108,10 @@ function dmxrDragDrop() {
     },
 
     // --- Drag and Drop ---
+
+    onDragEnd: function() {
+      this.clearDragPreview();
+    },
 
     onStagedDragStart: function(event) {
       if (!this.stagedFixture) return;
@@ -155,7 +160,8 @@ function dmxrDragDrop() {
       var related = event.relatedTarget;
       if (related && grid.contains(related)) return;
 
-      this.clearDragPreview();
+      this.dragTargetAddress = null;
+      this.dragPreviewValid = false;
     },
 
     onGridDrop: function(event) {

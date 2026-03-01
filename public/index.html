@@ -6,18 +6,29 @@
   <title>DMXr Fixture Manager</title>
   <link rel="stylesheet" href="/css/style.css">
   <script defer src="/js/alpine.min.js"></script>
+  <script src="/js/channel-label.js"></script>
   <script src="/js/drag-drop.js"></script>
   <script src="/js/app.js"></script>
 </head>
 <body x-data="dmxrApp()" x-init="init()">
 
   <header>
-    <h1>DMXr Fixture Manager</h1>
+    <div class="header-left">
+      <button class="sidebar-toggle" :class="{ 'sidebar-toggle-glow': !sidebarOpen }"
+              @click="sidebarOpen = !sidebarOpen"
+              :title="sidebarOpen ? 'Hide sidebar' : 'Show sidebar'">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <rect x="1" y="2" width="16" height="14" rx="2" stroke="currentColor" stroke-width="1.5" fill="none"/>
+          <line x1="6" y1="2" x2="6" y2="16" stroke="currentColor" stroke-width="1.5"/>
+        </svg>
+      </button>
+      <h1>DMXr Fixture Manager</h1>
+    </div>
     <span class="status" :class="serverOnline ? 'online' : 'offline'"
           x-text="serverOnline ? 'Connected' : 'Disconnected'"></span>
   </header>
 
-  <div class="app-layout">
+  <div class="app-layout" :class="{ 'sidebar-collapsed': !sidebarOpen }">
     <!-- Sidebar: Search / Browse / Stage -->
     <aside class="sidebar">
       <div class="sidebar-tabs">
@@ -212,7 +223,8 @@
       <!-- Staged Fixture -->
       <div class="staged-card" x-show="stagedFixture" x-cloak
            draggable="true"
-           @dragstart="onStagedDragStart($event)">
+           @dragstart="onStagedDragStart($event)"
+           @dragend="onDragEnd()">
         <div class="staged-header">
           <strong x-text="stagedFixture?.name"></strong>
           <button class="btn btn-sm btn-danger" @click="stagedFixture = null">&times;</button>
@@ -264,6 +276,7 @@
                  :data-address="ch"
                  :draggable="isFixtureStart(ch) ? 'true' : 'false'"
                  @dragstart="onFixtureDragStart($event, ch)"
+                 @dragend="onDragEnd()"
                  @mouseenter="showTooltip($event, ch)"
                  @mouseleave="hideTooltip()"
                  x-text="getChannelLabel(ch)"></div>
@@ -282,15 +295,23 @@
       </template>
 
       <div class="fixture-list">
-        <template x-for="fixture in fixtures" :key="fixture.id">
-          <div class="fixture-card">
-            <div class="fixture-header">
-              <strong x-text="fixture.name"></strong>
-              <span class="fixture-meta">
-                <span x-text="fixture.oflFixtureName || fixture.source || ''"></span>
-                <template x-if="fixture.oflFixtureName || fixture.source"> &middot; </template>
-                <span x-text="fixture.mode"></span>
-              </span>
+        <template x-for="(fixture, fIndex) in fixtures" :key="fixture.id">
+          <div class="fixture-card" :class="'fixture-color-' + (fIndex % 8)"
+               @mouseenter="highlightedFixtureId = fixture.id"
+               @mouseleave="highlightedFixtureId = null">
+            <div class="fixture-card-top">
+              <div class="fixture-header">
+                <strong x-text="fixture.name"></strong>
+                <span class="fixture-meta">
+                  <span x-text="fixture.oflFixtureName || fixture.source || ''"></span>
+                  <template x-if="fixture.oflFixtureName || fixture.source"> &middot; </template>
+                  <span x-text="fixture.mode"></span>
+                </span>
+              </div>
+              <div class="fixture-actions">
+                <button class="btn btn-sm" @click="flashFixture(fixture.id)">Flash</button>
+                <button class="btn btn-sm btn-danger" @click="removeFixture(fixture.id)">Remove</button>
+              </div>
             </div>
             <div class="fixture-details">
               <span class="dmx-range"
@@ -301,10 +322,6 @@
                         x-text="ch.name"></span>
                 </template>
               </span>
-            </div>
-            <div class="fixture-actions">
-              <button class="btn btn-sm" @click="flashFixture(fixture.id)">Flash</button>
-              <button class="btn btn-sm btn-danger" @click="removeFixture(fixture.id)">Remove</button>
             </div>
           </div>
         </template>

@@ -1,21 +1,21 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg: #0d0d1a;
-  --surface: #161625;
-  --surface2: #1e1e35;
-  --accent: #6c5ce7;
-  --accent2: #533483;
-  --border: #2a2a45;
-  --text: #eee;
-  --text-dim: #8a8aaa;
+  --bg: #0f1119;
+  --surface: #13141e;
+  --surface2: #1a1b26;
+  --accent: #00b8d4;
+  --accent2: #00838f;
+  --border: #1e1f2e;
+  --text: #e0e0e4;
+  --text-dim: #6b6e7f;
   --success: #2ecc71;
   --danger: #e74c3c;
   --warning: #f39c12;
 }
 
 body {
-  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, "Inter", Roboto, sans-serif;
   background: var(--bg);
   color: var(--text);
   padding: 0;
@@ -57,19 +57,12 @@ header h1 { font-size: 1.4rem; }
 .sidebar-toggle-glow {
   border-color: var(--accent);
   color: var(--accent);
-  box-shadow: 0 0 8px var(--accent), 0 0 20px rgba(108, 92, 231, 0.3);
-  animation: togglePulse 2s ease-in-out infinite;
-}
-
-@keyframes togglePulse {
-  0%, 100% { box-shadow: 0 0 8px var(--accent), 0 0 20px rgba(108, 92, 231, 0.3); }
-  50% { box-shadow: 0 0 12px var(--accent), 0 0 30px rgba(108, 92, 231, 0.5); }
 }
 
 .status {
   font-size: 0.85rem;
   padding: 0.25rem 0.75rem;
-  border-radius: 12px;
+  border-radius: 10px;
 }
 .status.online { background: var(--success); color: #000; }
 .status.offline { background: var(--danger); color: #fff; }
@@ -103,7 +96,7 @@ header h1 { font-size: 1.4rem; }
 
 .sidebar-tabs {
   display: flex;
-  border-bottom: 2px solid var(--border);
+  border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
 
@@ -204,7 +197,7 @@ header h1 { font-size: 1.4rem; }
 /* Main content */
 .main-content {
   overflow-y: auto;
-  padding: 1rem;
+  padding: 1.25rem;
 }
 
 .toolbar {
@@ -217,7 +210,7 @@ header h1 { font-size: 1.4rem; }
 .btn {
   padding: 0.5rem 1rem;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: 4px;
   cursor: pointer;
   font-size: 0.9rem;
   font-weight: 500;
@@ -227,7 +220,7 @@ header h1 { font-size: 1.4rem; }
 }
 .btn:hover { opacity: 0.85; border-color: var(--border); }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary { background: var(--accent); color: #000; }
 .btn-danger { background: var(--danger); color: #fff; }
 .btn-warning { background: var(--warning); color: #000; }
 .btn-sm { padding: 0.3rem 0.7rem; font-size: 0.8rem; }
@@ -265,14 +258,14 @@ header h1 { font-size: 1.4rem; }
   padding: 3rem;
   color: var(--text-dim);
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  border: none;
+  border-radius: 6px;
 }
 
 .fixture-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
-  gap: 0.5rem;
+  gap: 0.75rem;
   margin-top: 1rem;
 }
 
@@ -280,16 +273,15 @@ header h1 { font-size: 1.4rem; }
   --card-color: var(--border);
   background: var(--surface);
   border: 1px solid var(--border);
-  border-left: 5px solid var(--card-color);
-  border-radius: 10px;
+  border-top: 2px solid var(--card-color);
+  border-radius: 6px;
   padding: 0.75rem 0.75rem 0.75rem 0.75rem;
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
-  transition: border-color 0.15s, box-shadow 0.15s;
-  box-shadow: inset 3px 0 12px -4px var(--card-color);
+  transition: border-color 0.15s, background 0.15s;
 }
-.fixture-card:hover { border-color: var(--card-color); box-shadow: inset 5px 0 18px -4px var(--card-color); }
+.fixture-card:hover { border-color: var(--card-color); background: var(--surface2); }
 
 .fixture-card-top {
   display: flex;
@@ -360,8 +352,8 @@ header h1 { font-size: 1.4rem; }
 .universe-map {
   padding: 1rem;
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  border: none;
+  border-radius: 6px;
   position: relative;
 }
 
@@ -398,14 +390,14 @@ header h1 { font-size: 1.4rem; }
 
 /* 8 cycling fixture colors — CSS vars for DRY reuse in grid + cards */
 :root {
-  --fixture-color-0: #9b59b6;
-  --fixture-color-1: #3498db;
-  --fixture-color-2: #2ecc71;
-  --fixture-color-3: #e67e22;
-  --fixture-color-4: #e74c3c;
-  --fixture-color-5: #1abc9c;
-  --fixture-color-6: #34495e;
-  --fixture-color-7: #f1c40f;
+  --fixture-color-0: #8e6aaf;
+  --fixture-color-1: #2d8bc9;
+  --fixture-color-2: #27b560;
+  --fixture-color-3: #d4721f;
+  --fixture-color-4: #d44536;
+  --fixture-color-5: #18a98c;
+  --fixture-color-6: #3a4a5c;
+  --fixture-color-7: #e0b50e;
 }
 
 .channel-cell.fixture-0 { background: var(--fixture-color-0); color: #fff; }
@@ -429,10 +421,10 @@ header h1 { font-size: 1.4rem; }
 
 /* Fixture highlight on card hover */
 .channel-cell.fixture-highlight {
-  box-shadow: 0 0 6px 2px currentColor, inset 0 0 4px 1px rgba(255,255,255,0.3);
+  outline: 1px solid rgba(255,255,255,0.5);
   z-index: 1;
   position: relative;
-  filter: brightness(1.4);
+  filter: brightness(1.15);
 }
 
 /* Fixture block edge rounding */
@@ -454,7 +446,7 @@ header h1 { font-size: 1.4rem; }
   position: fixed;
   background: var(--surface2);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 6px;
   padding: 0.5rem 0.75rem;
   font-size: 0.8rem;
   z-index: 50;
@@ -482,7 +474,7 @@ header h1 { font-size: 1.4rem; }
 .modal {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 1.5rem;
   width: 90%;
   max-width: 480px;
@@ -611,7 +603,7 @@ header h1 { font-size: 1.4rem; }
   display: flex;
   gap: 0;
   margin-bottom: 0.5rem;
-  border-bottom: 2px solid var(--border);
+  border-bottom: 1px solid var(--border);
 }
 
 .tab {

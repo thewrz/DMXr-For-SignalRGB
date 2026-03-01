@@ -3,6 +3,7 @@ function dmxrApp() {
     fixtures: [],
     serverOnline: false,
     overrideActive: false,
+    sidebarOpen: false,
     showAddModal: false,
     fixtureSource: "ofl",
     addStep: 1,

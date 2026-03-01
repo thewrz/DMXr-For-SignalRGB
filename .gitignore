@@ -5,6 +5,7 @@ logs/
 config/fixtures.json
 sscloud.db
 screenshots/
+tools/
 query-attrs.js
 query-attrs.ts
 trace-whiteout.ts

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { buildServer } from "../server.js";
 import { createUniverseManager } from "../dmx/universe-manager.js";
-import { createMockUniverse, createTestConfig, createTestFixtureStore, createMockOflClient } from "../test-helpers.js";
+import { createMockUniverse, createTestConfig, createTestFixtureStore, createMockOflClient, createMockRegistry } from "../test-helpers.js";
 import type { FastifyInstance } from "fastify";
 
 describe("GET /health", () => {
@@ -16,6 +16,7 @@ describe("GET /health", () => {
       startTime: Date.now(),
       fixtureStore: createTestFixtureStore(),
       oflClient: createMockOflClient(),
+      registry: createMockRegistry(),
     });
   });
 
@@ -43,6 +44,7 @@ describe("GET /health", () => {
       startTime: Date.now(),
       fixtureStore: createTestFixtureStore(),
       oflClient: createMockOflClient(),
+      registry: createMockRegistry(),
     });
 
     const res = await customApp.inject({ method: "GET", url: "/health" });
@@ -60,6 +62,7 @@ describe("GET /health", () => {
       startTime: Date.now(),
       fixtureStore: createTestFixtureStore(),
       oflClient: createMockOflClient(),
+      registry: createMockRegistry(),
     });
 
     await testApp.inject({

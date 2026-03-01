@@ -1,17 +1,17 @@
 import type { FastifyInstance } from "fastify";
 import type { OflClient } from "../ofl/ofl-client.js";
-import type { SsClient } from "../soundswitch/ss-client.js";
+import type { LibraryRegistry } from "../libraries/types.js";
 
 interface SearchRouteDeps {
   readonly oflClient: OflClient;
-  readonly ssClient: SsClient | null;
+  readonly registry: LibraryRegistry;
 }
 
 interface SearchResult {
   readonly type: "fixture" | "manufacturer";
   readonly name: string;
   readonly manufacturer?: string;
-  readonly source: "ofl" | "soundswitch";
+  readonly source: string;
   readonly score: number;
   readonly fixtureId?: number;
   readonly mfrId?: number;
@@ -102,12 +102,13 @@ export function registerSearchRoutes(
       const results: SearchResult[] = [];
       const seen = new Set<string>();
 
-      // SoundSwitch fixture search
-      if (deps.ssClient) {
+      // Library provider fixture search (local-db, etc.)
+      for (const provider of deps.registry.getAvailable()) {
+        if (provider.id === "ofl") continue; // OFL handled separately below
         try {
-          const ssFixtures = deps.ssClient.searchFixtures(raw);
-          for (const f of ssFixtures) {
-            const key = `ss-fix-${f.fixtureId}`;
+          const libFixtures = provider.searchFixtures(raw);
+          for (const f of libFixtures) {
+            const key = `${provider.id}-fix-${f.fixtureId}`;
             if (seen.has(key)) continue;
             seen.add(key);
             const categories = f.category ? [f.category] : [];
@@ -115,7 +116,7 @@ export function registerSearchRoutes(
               type: "fixture",
               name: f.fixtureName,
               manufacturer: f.mfrName,
-              source: "soundswitch",
+              source: provider.id,
               score: scoreResult(tokens, f.fixtureName, f.mfrName, categories),
               fixtureId: f.fixtureId,
               mfrId: f.mfrId,
@@ -124,26 +125,26 @@ export function registerSearchRoutes(
             });
           }
 
-          // SoundSwitch manufacturer search
-          const ssMfrs = deps.ssClient.getManufacturers();
-          for (const m of ssMfrs) {
+          // Library manufacturer search
+          const libMfrs = provider.getManufacturers();
+          for (const m of libMfrs) {
             const mfrLower = m.name.toLowerCase();
             const matches = tokens.every((t) => mfrLower.includes(t));
             if (!matches) continue;
-            const key = `ss-mfr-${m.id}`;
+            const key = `${provider.id}-mfr-${m.id}`;
             if (seen.has(key)) continue;
             seen.add(key);
             results.push({
               type: "manufacturer",
               name: m.name,
-              source: "soundswitch",
+              source: provider.id,
               score: scoreMfrResult(tokens, m.name),
               mfrId: m.id,
               fixtureCount: m.fixtureCount,
             });
           }
         } catch {
-          // SoundSwitch unavailable, continue with OFL only
+          // Library unavailable, continue with other sources
         }
       }
 

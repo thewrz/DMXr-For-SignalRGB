@@ -6,13 +6,19 @@ import {
   createTestConfig,
   createTestFixtureStore,
   createMockOflClient,
+  createMockRegistry,
 } from "../test-helpers.js";
 import type { FastifyInstance } from "fastify";
 import { scoreResult } from "./search.js";
-import type { SsClient } from "../soundswitch/ss-client.js";
+import type { FixtureLibraryProvider } from "../libraries/types.js";
 
-function createMockSsClient(): SsClient {
+function createMockLocalDbProvider(): FixtureLibraryProvider {
   return {
+    id: "local-db",
+    displayName: "Local Fixture Database",
+    description: "Auto-detected fixture database on this machine",
+    type: "local-db",
+    status: () => ({ available: true, state: "connected" }),
     getManufacturers() {
       return [
         { id: 1, name: "Shehds", fixtureCount: 5 },
@@ -32,9 +38,6 @@ function createMockSsClient(): SsClient {
       return [];
     },
     getModeChannels() {
-      return [];
-    },
-    mapToFixtureChannels() {
       return [];
     },
     searchFixtures(query: string) {
@@ -67,7 +70,7 @@ describe("GET /search", () => {
       startTime: Date.now(),
       fixtureStore: createTestFixtureStore(),
       oflClient: createMockOflClient(),
-      ssClient: createMockSsClient(),
+      registry: createMockRegistry(createMockLocalDbProvider()),
     });
   });
 
@@ -94,7 +97,7 @@ describe("GET /search", () => {
     const fixture = body.find((r: { name: string }) => r.name === "SLM70S Moving Head");
     expect(fixture).toBeDefined();
     expect(fixture.type).toBe("fixture");
-    expect(fixture.source).toBe("soundswitch");
+    expect(fixture.source).toBe("local-db");
     expect(fixture.manufacturer).toBe("Shehds");
   });
 
@@ -104,7 +107,7 @@ describe("GET /search", () => {
     const body = res.json();
     const mfr = body.find((r: { type: string; name: string }) => r.type === "manufacturer" && r.name === "Missyee");
     expect(mfr).toBeDefined();
-    expect(mfr.source).toBe("soundswitch");
+    expect(mfr.source).toBe("local-db");
   });
 
   it("multi-token query ranks combined matches higher", async () => {
@@ -126,7 +129,7 @@ describe("GET /search", () => {
     }
   });
 
-  it("includes categories in SS fixture results", async () => {
+  it("includes categories in local-db fixture results", async () => {
     const res = await app.inject({ method: "GET", url: "/search?q=SLM70" });
     const body = res.json();
     const fixture = body.find((r: { name: string }) => r.name === "SLM70S Moving Head");
@@ -142,7 +145,7 @@ describe("GET /search", () => {
     expect(fixture.categories).toEqual(["Color Changer"]);
   });
 
-  it("handles missing ssClient gracefully (OFL-only)", async () => {
+  it("handles missing local-db gracefully (OFL-only)", async () => {
     const manager = createUniverseManager(createMockUniverse());
     const oflOnlyApp = await buildServer({
       config: createTestConfig(),
@@ -151,7 +154,7 @@ describe("GET /search", () => {
       startTime: Date.now(),
       fixtureStore: createTestFixtureStore(),
       oflClient: createMockOflClient(),
-      ssClient: null,
+      registry: createMockRegistry(),
     });
 
     const res = await oflOnlyApp.inject({ method: "GET", url: "/search?q=Cameo" });

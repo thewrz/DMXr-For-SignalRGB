@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { buildServer } from "../server.js";
 import { createUniverseManager } from "../dmx/universe-manager.js";
-import { createMockUniverse, createTestConfig, createTestFixtureStore, createMockOflClient } from "../test-helpers.js";
+import { createMockUniverse, createTestConfig, createTestFixtureStore, createMockOflClient, createMockRegistry } from "../test-helpers.js";
 import type { FixtureStore } from "../fixtures/fixture-store.js";
 import type { FastifyInstance } from "fastify";
 
@@ -33,6 +33,7 @@ describe("Fixture routes", () => {
       startTime: Date.now(),
       fixtureStore: store,
       oflClient: createMockOflClient(),
+      registry: createMockRegistry(),
     });
   });
 

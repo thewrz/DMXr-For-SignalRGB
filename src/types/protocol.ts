@@ -38,7 +38,7 @@ export interface FixtureChannel {
 }
 
 /** Fixture data source */
-export type FixtureSource = "ofl" | "soundswitch" | "custom";
+export type FixtureSource = "ofl" | "local-db" | "custom";
 
 /** Stored fixture configuration */
 export interface FixtureConfig {

@@ -552,7 +552,7 @@ header h1 { font-size: 1.4rem; }
   flex-shrink: 0;
 }
 .source-badge.badge-ofl { background: #2d7d46; color: #fff; }
-.source-badge.badge-soundswitch { background: #7d5c2d; color: #fff; }
+.source-badge.badge-local-db { background: #7d5c2d; color: #fff; }
 .result-type-badge {
   font-size: 0.6rem;
   padding: 0.1rem 0.3rem;
@@ -635,7 +635,7 @@ header h1 { font-size: 1.4rem; }
 .badge-strobe { background: #f1c40f; color: #000; }
 .badge-generic { background: var(--surface2); color: var(--text-dim); }
 
-.ss-status-message {
+.library-status-message {
   padding: 0.75rem;
   font-size: 0.85rem;
   color: var(--text-dim);

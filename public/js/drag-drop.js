@@ -220,11 +220,12 @@ function dmxrDragDrop() {
 
       var staged = this.stagedFixture;
 
-      if (staged.source === "soundswitch") {
+      if (staged.libraryId && staged.libraryId !== "ofl") {
         try {
           var res = await fetch(
-            "/soundswitch/fixtures/" + staged.ssFixtureId +
-            "/modes/" + staged.ssModeId + "/import",
+            "/libraries/" + staged.libraryId +
+            "/fixtures/" + staged.libFixtureId +
+            "/modes/" + staged.libModeId + "/import",
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },

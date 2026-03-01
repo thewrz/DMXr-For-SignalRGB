@@ -8,6 +8,9 @@ import {
 } from "./mdns/advertiser.js";
 import { createOflClient } from "./ofl/ofl-client.js";
 import { createSsClientIfConfigured } from "./soundswitch/ss-client.js";
+import { createLocalDbProvider } from "./libraries/local-db-provider.js";
+import { createOflProvider } from "./libraries/ofl-provider.js";
+import { createLibraryRegistry } from "./libraries/registry.js";
 import { buildServer } from "./server.js";
 
 async function main() {
@@ -48,7 +51,11 @@ async function main() {
   manager.blackout();
 
   const oflClient = createOflClient();
-  const { client: ssClient, status: ssStatus } = createSsClientIfConfigured(config.soundswitchDbPath);
+  const { client: ssClient, status: ssStatus } = createSsClientIfConfigured(config.localDbPath);
+
+  const oflProvider = createOflProvider(oflClient);
+  const localDbProvider = createLocalDbProvider(ssClient, ssStatus);
+  const registry = createLibraryRegistry([oflProvider, localDbProvider]);
 
   const app = await buildServer({
     config,
@@ -57,8 +64,7 @@ async function main() {
     startTime,
     fixtureStore,
     oflClient,
-    ssClient,
-    ssStatus,
+    registry,
     getConnectionStatus: () => connection.getStatus(),
   });
 
@@ -81,7 +87,9 @@ async function main() {
     app.log.info(`Received ${signal}, shutting down...`);
     exitBlackoutDone = true;
     mdnsAdvertiser?.unpublishAll();
-    ssClient?.close();
+    for (const provider of registry.getAll()) {
+      provider.close?.();
+    }
     manager.blackout();
     await app.close();
     await connection.close();
@@ -112,10 +120,13 @@ async function main() {
   app.log.info(`DMXr server running on ${config.host}:${boundPort}`);
   app.log.info(`DMX driver: ${config.dmxDriver}`);
   app.log.info(`Fixtures loaded: ${fixtureStore.getAll().length}`);
-  if (ssStatus.available) {
-    app.log.info(`SoundSwitch DB: ${ssStatus.path} (${ssStatus.fixtureCount} fixtures)`);
-  } else {
-    app.log.info(`SoundSwitch: ${ssStatus.state}${ssStatus.error ? ` — ${ssStatus.error}` : ""}`);
+  for (const provider of registry.getAll()) {
+    const s = provider.status();
+    if (s.available) {
+      app.log.info(`Library "${provider.displayName}": available${s.fixtureCount ? ` (${s.fixtureCount} fixtures)` : ""}`);
+    } else {
+      app.log.info(`Library "${provider.displayName}": ${s.state}${s.error ? ` — ${s.error}` : ""}`);
+    }
   }
 }
 

@@ -3,6 +3,8 @@ import type { ServerConfig } from "./config/server-config.js";
 import type { OflClient, OflSearchResult } from "./ofl/ofl-client.js";
 import { createFixtureStore } from "./fixtures/fixture-store.js";
 import type { FixtureStore } from "./fixtures/fixture-store.js";
+import type { LibraryRegistry } from "./libraries/types.js";
+import { createLibraryRegistry } from "./libraries/registry.js";
 
 export function createMockUniverse(): DmxUniverse & {
   updateCalls: Array<Record<number, number>>;
@@ -91,4 +93,24 @@ export function createMockOflClient(): OflClient {
       });
     },
   };
+}
+
+export function createMockRegistry(
+  ...extras: import("./libraries/types.js").FixtureLibraryProvider[]
+): LibraryRegistry {
+  return createLibraryRegistry([
+    {
+      id: "ofl",
+      displayName: "Open Fixture Library",
+      description: "Community-maintained open fixture database",
+      type: "api",
+      status: () => ({ available: true, state: "connected" }),
+      getManufacturers: () => [],
+      getFixtures: () => [],
+      getFixtureModes: () => [],
+      getModeChannels: () => [],
+      searchFixtures: () => [],
+    },
+    ...extras,
+  ]);
 }

@@ -16,6 +16,9 @@ function dmxrApp() {
     unifiedSearchResults: [],
     stagedFixture: null,
 
+    // Libraries (dynamic)
+    libraries: [],
+
     // OFL: Manufacturer search
     manufacturers: [],
     mfrSearch: "",
@@ -38,21 +41,19 @@ function dmxrApp() {
     fixtureName: "",
     addressError: "",
 
-    // SoundSwitch state
-    ssAvailable: false,
-    ssStatus: null,
-    ssStep: 1,
-    ssMfrs: [],
-    ssMfrSearch: "",
-    ssFilteredMfrs: [],
-    ssSelectedMfr: null,
-    ssFixtures: [],
-    ssFixtureSearch: "",
-    ssFilteredFixtures: [],
-    ssSelectedFixture: null,
-    ssModes: [],
-    ssSelectedModeId: null,
-    ssChannels: [],
+    // Library (non-OFL) state
+    libStep: 1,
+    libMfrs: [],
+    libMfrSearch: "",
+    libFilteredMfrs: [],
+    libSelectedMfr: null,
+    libFixtures: [],
+    libFixtureSearch: "",
+    libFilteredFixtures: [],
+    libSelectedFixture: null,
+    libModes: [],
+    libSelectedModeId: null,
+    libChannels: [],
 
     // Unified search debounce
     searchTimer: null,
@@ -63,7 +64,7 @@ function dmxrApp() {
     async init() {
       await this.loadFixtures();
       await this.loadManufacturers();
-      await this.checkSsAvailable();
+      await this.loadLibraries();
       this.pollFixtures();
     },
 
@@ -113,6 +114,26 @@ function dmxrApp() {
         this.oflError = "Could not reach OFL API. Check server connectivity to open-fixture-library.org";
         this.manufacturers = [];
       }
+    },
+
+    async loadLibraries() {
+      try {
+        var res = await fetch("/libraries");
+        if (res.ok) {
+          this.libraries = await res.json();
+        }
+      } catch {
+        this.libraries = [];
+      }
+    },
+
+    getLibraryDisplayName(sourceId) {
+      var lib = this.libraries.find(function(l) { return l.id === sourceId; });
+      return lib ? lib.displayName : sourceId;
+    },
+
+    getNonOflLibraries() {
+      return this.libraries.filter(function(l) { return l.id !== "ofl"; });
     },
 
     filterManufacturers() {
@@ -403,6 +424,7 @@ function dmxrApp() {
           this.unifiedSearchResults = [];
           return;
         }
+        var self = this;
         var results = await res.json();
         this.unifiedSearchResults = results.map(function(r, i) {
           var key = r.type + "-" + r.source + "-" + (r.fixtureId || r.mfrId || r.mfrKey || i);
@@ -418,6 +440,7 @@ function dmxrApp() {
             type: r.type,
             detail: detail,
             source: r.source,
+            sourceLabel: self.getLibraryDisplayName(r.source),
             manufacturer: r.manufacturer,
             fixtureId: r.fixtureId,
             mfrId: r.mfrId,
@@ -437,14 +460,14 @@ function dmxrApp() {
 
     selectSearchResult(result) {
       this.sidebarTab = "browse";
-      if (result.type === "fixture" && result.source === "soundswitch") {
-        this.browseSource = "soundswitch";
-        this.selectSsMfr({ id: result.mfrId, name: result.manufacturer, fixtureCount: 0 });
+      if (result.type === "fixture" && result.source !== "ofl") {
+        this.browseSource = result.source;
+        this.selectLibMfr({ id: result.mfrId, name: result.manufacturer, fixtureCount: 0 });
         var fixtureId = result.fixtureId;
         var self = this;
         setTimeout(function() {
-          var match = self.ssFixtures.find(function(f) { return f.id === fixtureId; });
-          if (match) self.selectSsFixture(match);
+          var match = self.libFixtures.find(function(f) { return f.id === fixtureId; });
+          if (match) self.selectLibFixture(match);
         }, 500);
       } else if (result.type === "fixture" && result.source === "ofl") {
         this.browseSource = "ofl";
@@ -458,18 +481,18 @@ function dmxrApp() {
       } else if (result.type === "manufacturer" && result.source === "ofl") {
         this.browseSource = "ofl";
         this.selectManufacturer({ key: result.mfrKey, name: result.name, fixtureCount: result.fixtureCount || 0 });
-      } else if (result.type === "manufacturer" && result.source === "soundswitch") {
-        this.browseSource = "soundswitch";
-        this.selectSsMfr({ id: result.mfrId, name: result.name, fixtureCount: result.fixtureCount || 0 });
+      } else if (result.type === "manufacturer" && result.source !== "ofl") {
+        this.browseSource = result.source;
+        this.selectLibMfr({ id: result.mfrId, name: result.name, fixtureCount: result.fixtureCount || 0 });
       }
     },
 
     switchBrowseSource(source) {
       this.browseSource = source;
       this.browseStep = 1;
-      this.ssStep = 1;
-      if (source === "soundswitch" && this.ssMfrs.length === 0) {
-        this.loadSsMfrs();
+      this.libStep = 1;
+      if (source !== "ofl" && this.libMfrs.length === 0) {
+        this.loadLibMfrs(source);
       }
     },
 
@@ -492,17 +515,18 @@ function dmxrApp() {
       };
     },
 
-    stageSsFixture() {
-      if (!this.fixtureName || !this.ssSelectedModeId || this.ssChannels.length === 0) return;
+    stageLibFixture() {
+      if (!this.fixtureName || !this.libSelectedModeId || this.libChannels.length === 0) return;
 
       this.stagedFixture = {
         name: this.fixtureName,
-        source: "soundswitch",
-        ssFixtureId: this.ssSelectedFixture.id,
-        ssModeId: this.ssSelectedModeId,
-        mode: this.ssModes.find(function(m) { return m.id == this.ssSelectedModeId; }.bind(this))?.name || "",
-        channelCount: this.ssChannels.length,
-        channels: this.ssChannels,
+        source: this.browseSource,
+        libraryId: this.browseSource,
+        libFixtureId: this.libSelectedFixture.id,
+        libModeId: this.libSelectedModeId,
+        mode: this.libModes.find(function(m) { return m.id == this.libSelectedModeId; }.bind(this))?.name || "",
+        channelCount: this.libChannels.length,
+        channels: this.libChannels,
       };
     },
 
@@ -523,144 +547,142 @@ function dmxrApp() {
       this.addressError = "";
       this.filteredMfrs = this.manufacturers;
       this.filteredFixtures = [];
-      this.ssStep = 1;
-      this.ssMfrSearch = "";
-      this.ssFilteredMfrs = this.ssMfrs;
-      this.ssSelectedMfr = null;
-      this.ssFixtures = [];
-      this.ssFixtureSearch = "";
-      this.ssFilteredFixtures = [];
-      this.ssSelectedFixture = null;
-      this.ssModes = [];
-      this.ssSelectedModeId = null;
-      this.ssChannels = [];
+      this.libStep = 1;
+      this.libMfrSearch = "";
+      this.libFilteredMfrs = this.libMfrs;
+      this.libSelectedMfr = null;
+      this.libFixtures = [];
+      this.libFixtureSearch = "";
+      this.libFilteredFixtures = [];
+      this.libSelectedFixture = null;
+      this.libModes = [];
+      this.libSelectedModeId = null;
+      this.libChannels = [];
     },
 
     switchSource(source) {
       this.fixtureSource = source;
       this.addStep = 1;
-      this.ssStep = 1;
+      this.libStep = 1;
       this.addressError = "";
       this.dmxStartAddress = 1;
       this.fixtureName = "";
-      if (source === "soundswitch" && this.ssMfrs.length === 0) {
-        this.loadSsMfrs();
+      if (source !== "ofl" && this.libMfrs.length === 0) {
+        this.loadLibMfrs(source);
       }
     },
 
-    async checkSsAvailable() {
-      try {
-        var res = await fetch("/soundswitch/status");
-        if (res.ok) {
-          this.ssStatus = await res.json();
-          this.ssAvailable = this.ssStatus.available;
-        } else {
-          this.ssAvailable = false;
-          this.ssStatus = null;
-        }
-      } catch {
-        this.ssAvailable = false;
-        this.ssStatus = null;
-      }
+    // --- Library (non-OFL) methods ---
+
+    isLibAvailable(libId) {
+      var lib = this.libraries.find(function(l) { return l.id === libId; });
+      return lib && lib.status && lib.status.available;
     },
 
-    async loadSsMfrs() {
+    getLibStatus(libId) {
+      var lib = this.libraries.find(function(l) { return l.id === libId; });
+      return lib ? lib.status : null;
+    },
+
+    async loadLibMfrs(libId) {
       try {
-        var res = await fetch("/soundswitch/manufacturers");
+        var res = await fetch("/libraries/" + libId + "/manufacturers");
         if (!res.ok) return;
-        this.ssMfrs = await res.json();
-        this.ssFilteredMfrs = this.ssMfrs;
+        this.libMfrs = await res.json();
+        this.libFilteredMfrs = this.libMfrs;
       } catch {
-        this.ssMfrs = [];
-        this.ssFilteredMfrs = [];
+        this.libMfrs = [];
+        this.libFilteredMfrs = [];
       }
     },
 
-    filterSsMfrs() {
-      var search = this.ssMfrSearch.toLowerCase();
+    filterLibMfrs() {
+      var search = this.libMfrSearch.toLowerCase();
       if (!search) {
-        this.ssFilteredMfrs = this.ssMfrs;
+        this.libFilteredMfrs = this.libMfrs;
         return;
       }
-      this.ssFilteredMfrs = this.ssMfrs.filter(function(m) {
+      this.libFilteredMfrs = this.libMfrs.filter(function(m) {
         return m.name.toLowerCase().includes(search);
       });
     },
 
-    async selectSsMfr(mfr) {
-      this.ssSelectedMfr = mfr;
-      this.ssStep = 2;
-      this.ssFixtureSearch = "";
+    async selectLibMfr(mfr) {
+      this.libSelectedMfr = mfr;
+      this.libStep = 2;
+      this.libFixtureSearch = "";
       try {
-        var res = await fetch("/soundswitch/manufacturers/" + mfr.id + "/fixtures");
-        this.ssFixtures = await res.json();
-        this.ssFilteredFixtures = this.ssFixtures;
+        var res = await fetch("/libraries/" + this.browseSource + "/manufacturers/" + mfr.id + "/fixtures");
+        this.libFixtures = await res.json();
+        this.libFilteredFixtures = this.libFixtures;
       } catch {
-        this.ssFixtures = [];
-        this.ssFilteredFixtures = [];
+        this.libFixtures = [];
+        this.libFilteredFixtures = [];
       }
     },
 
-    filterSsFixtures() {
-      var search = this.ssFixtureSearch.toLowerCase();
+    filterLibFixtures() {
+      var search = this.libFixtureSearch.toLowerCase();
       if (!search) {
-        this.ssFilteredFixtures = this.ssFixtures;
+        this.libFilteredFixtures = this.libFixtures;
         return;
       }
-      this.ssFilteredFixtures = this.ssFixtures.filter(function(f) {
+      this.libFilteredFixtures = this.libFixtures.filter(function(f) {
         return f.name.toLowerCase().includes(search);
       });
     },
 
-    async selectSsFixture(fixture) {
-      this.ssSelectedFixture = fixture;
-      this.ssStep = 3;
+    async selectLibFixture(fixture) {
+      this.libSelectedFixture = fixture;
+      this.libStep = 3;
       this.fixtureName = fixture.name;
       try {
-        var res = await fetch("/soundswitch/fixtures/" + fixture.id);
+        var res = await fetch("/libraries/" + this.browseSource + "/fixtures/" + fixture.id + "/modes");
         var data = await res.json();
-        this.ssModes = data.modes || [];
-        if (this.ssModes.length > 0) {
-          this.ssSelectedModeId = this.ssModes[0].id;
-          this.channelCount = this.ssModes[0].channelCount;
-          await this.loadSsChannels();
+        this.libModes = data.modes || [];
+        if (this.libModes.length > 0) {
+          this.libSelectedModeId = this.libModes[0].id;
+          this.channelCount = this.libModes[0].channelCount;
+          await this.loadLibChannels();
         }
         this.validateAddress();
       } catch {
-        this.ssModes = [];
+        this.libModes = [];
       }
     },
 
-    async onSsModeChange() {
-      var mode = this.ssModes.find(function(m) { return m.id == this.ssSelectedModeId; }.bind(this));
+    async onLibModeChange() {
+      var mode = this.libModes.find(function(m) { return m.id == this.libSelectedModeId; }.bind(this));
       if (mode) {
         this.channelCount = mode.channelCount;
       }
-      await this.loadSsChannels();
+      await this.loadLibChannels();
       this.validateAddress();
     },
 
-    async loadSsChannels() {
-      if (!this.ssSelectedFixture || !this.ssSelectedModeId) return;
+    async loadLibChannels() {
+      if (!this.libSelectedFixture || !this.libSelectedModeId) return;
       try {
         var res = await fetch(
-          "/soundswitch/fixtures/" + this.ssSelectedFixture.id +
-          "/modes/" + this.ssSelectedModeId + "/channels"
+          "/libraries/" + this.browseSource +
+          "/fixtures/" + this.libSelectedFixture.id +
+          "/modes/" + this.libSelectedModeId + "/channels"
         );
-        this.ssChannels = await res.json();
-        this.channelCount = this.ssChannels.length;
+        this.libChannels = await res.json();
+        this.channelCount = this.libChannels.length;
       } catch {
-        this.ssChannels = [];
+        this.libChannels = [];
       }
     },
 
-    async importSsFixture() {
-      if (this.addressError || !this.fixtureName || !this.ssSelectedModeId) return;
+    async importLibFixture() {
+      if (this.addressError || !this.fixtureName || !this.libSelectedModeId) return;
 
       try {
         var res = await fetch(
-          "/soundswitch/fixtures/" + this.ssSelectedFixture.id +
-          "/modes/" + this.ssSelectedModeId + "/import",
+          "/libraries/" + this.browseSource +
+          "/fixtures/" + this.libSelectedFixture.id +
+          "/modes/" + this.libSelectedModeId + "/import",
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },

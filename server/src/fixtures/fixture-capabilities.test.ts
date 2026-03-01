@@ -170,4 +170,20 @@ describe("defaultValueForChannel", () => {
   it("Generic → 0", () => {
     expect(defaultValueForChannel("Generic", "shutter")).toBe(0);
   });
+
+  it("Pan Fine → 0 (not 128)", () => {
+    expect(defaultValueForChannel("Pan", "none", "Pan Fine")).toBe(0);
+  });
+
+  it("Tilt Fine → 0 (not 128)", () => {
+    expect(defaultValueForChannel("Tilt", "effect", "Tilt Fine")).toBe(0);
+  });
+
+  it("Pan coarse (no name) → 128", () => {
+    expect(defaultValueForChannel("Pan", "none")).toBe(128);
+  });
+
+  it("Pan coarse (explicit name) → 128", () => {
+    expect(defaultValueForChannel("Pan", "none", "Pan")).toBe(128);
+  });
 });

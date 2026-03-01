@@ -85,7 +85,11 @@ export function mapColor(
             ? channel.defaultValue
             : 255;
     } else if (channel.type === "Pan" || channel.type === "Tilt") {
-      result[addr] = channel.defaultValue > 0 ? channel.defaultValue : 128;
+      if (/fine/i.test(channel.name)) {
+        result[addr] = channel.defaultValue;
+      } else {
+        result[addr] = channel.defaultValue > 0 ? channel.defaultValue : 128;
+      }
     } else {
       result[addr] = channel.defaultValue;
     }

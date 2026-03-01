@@ -102,10 +102,13 @@ export function analyzeFixture(
 export function defaultValueForChannel(
   type: string,
   strobeMode: StrobeMode,
+  name?: string,
 ): number {
   if (type === "Strobe" || type === "ShutterStrobe") {
     return strobeMode === "shutter" ? 255 : 0;
   }
-  if (type === "Pan" || type === "Tilt") return 128;
+  if (type === "Pan" || type === "Tilt") {
+    return /fine/i.test(name ?? "") ? 0 : 128;
+  }
   return 0;
 }

@@ -63,6 +63,16 @@ header h1 { font-size: 1.4rem; }
 .btn-danger { background: var(--danger); color: #fff; }
 .btn-warning { background: var(--warning); color: #000; }
 .btn-sm { padding: 0.3rem 0.7rem; font-size: 0.8rem; }
+.btn-success { background: var(--success); color: #000; }
+
+.sync-result {
+  margin-bottom: 1rem;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+.sync-result .msg-success { color: var(--success); }
+.sync-result .msg-error { color: var(--danger); }
 
 .empty-state {
   text-align: center;

@@ -202,7 +202,7 @@ export function createSsClient(dbPath: string): SsClient {
       // Pass 3: apply correct defaults based on fixture capabilities
       const channels = rawChannels.map((ch) => ({
         ...ch,
-        defaultValue: defaultValueForChannel(ch.type, caps.strobeMode),
+        defaultValue: defaultValueForChannel(ch.type, caps.strobeMode, ch.name),
       }));
 
       return channels.sort((a, b) => a.offset - b.offset);

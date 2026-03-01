@@ -66,9 +66,14 @@ export function buildComponent(fixture: FixtureConfig): SignalRgbComponent {
   };
 }
 
-/** Get the SignalRGB Components directory path */
+/** Get the SignalRGB Components directory path.
+ *  Checks SIGNALRGB_COMPONENTS_DIR env var first (needed when running
+ *  as a Windows service under SYSTEM where homedir() is wrong). */
 export function getComponentsDir(): string {
-  return join(homedir(), "Documents", "WhirlwindFX", "Components");
+  return (
+    process.env["SIGNALRGB_COMPONENTS_DIR"] ??
+    join(homedir(), "Documents", "WhirlwindFX", "Components")
+  );
 }
 
 /** Write a component JSON file for a single fixture */

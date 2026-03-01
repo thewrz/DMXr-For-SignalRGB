@@ -21,7 +21,7 @@ const addFixtureSchema = {
       name: { type: "string" as const, minLength: 1 },
       oflKey: { type: "string" as const },
       oflFixtureName: { type: "string" as const },
-      source: { type: "string" as const, enum: ["ofl", "soundswitch", "custom"] },
+      source: { type: "string" as const, enum: ["ofl", "local-db", "custom"] },
       mode: { type: "string" as const, minLength: 1 },
       dmxStartAddress: { type: "integer" as const, minimum: 1, maximum: 512 },
       channelCount: { type: "integer" as const, minimum: 1 },

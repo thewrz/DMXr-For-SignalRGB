@@ -4,6 +4,8 @@ dist/
 logs/
 config/fixtures.json
 sscloud.db
+*.sqlite
+*.sqlite3
 screenshots/
 tools/
 query-attrs.js

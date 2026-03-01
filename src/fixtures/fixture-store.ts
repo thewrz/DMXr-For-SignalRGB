@@ -94,7 +94,11 @@ export function createFixtureStore(filePath: string): FixtureStore {
         const parsed: unknown = JSON.parse(data);
 
         if (isValidFixtureArray(parsed)) {
-          fixtures = parsed;
+          fixtures = parsed.map((f) =>
+            f.source === ("soundswitch" as string)
+              ? { ...f, source: "local-db" as const }
+              : f,
+          );
         } else {
           fixtures = [];
         }

@@ -1,11 +1,10 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
-import type { SsClient, SsStatus } from "../soundswitch/ss-client.js";
+import type { LibraryRegistry, FixtureLibraryProvider } from "../libraries/types.js";
 import type { FixtureStore } from "../fixtures/fixture-store.js";
 import { validateFixtureAddress, validateFixtureChannels } from "../fixtures/fixture-validator.js";
 
-interface SoundswitchRouteDeps {
-  readonly ssClient: SsClient | null;
-  readonly ssStatus: SsStatus;
+interface LibraryRouteDeps {
+  readonly registry: LibraryRegistry;
   readonly store: FixtureStore;
 }
 
@@ -25,131 +24,151 @@ function classifyDbError(error: unknown): { status: number; message: string } {
   const lower = msg.toLowerCase();
 
   if (lower.includes("malformed") || lower.includes("corrupt") || lower.includes("not a database")) {
-    return { status: 503, message: "SoundSwitch database is corrupt" };
+    return { status: 503, message: "Database is corrupt" };
   }
   if (lower.includes("busy") || lower.includes("locked")) {
-    return { status: 503, message: "SoundSwitch database is locked — close SoundSwitch and retry" };
+    return { status: 503, message: "Database is locked — close any applications using it and retry" };
   }
   if (lower.includes("enoent") || lower.includes("no such file")) {
-    return { status: 503, message: "SoundSwitch database file not found" };
+    return { status: 503, message: "Database file not found" };
   }
-  return { status: 500, message: `SoundSwitch database error: ${msg}` };
+  return { status: 500, message: `Database error: ${msg}` };
 }
 
 function handleDbError(error: unknown, reply: FastifyReply): void {
   const { status, message } = classifyDbError(error);
-  reply.log.error(`SoundSwitch DB error: ${message}`);
+  reply.log.error(`Library DB error: ${message}`);
   reply.status(status).send({ error: message });
 }
 
-function requireClient(
-  deps: SoundswitchRouteDeps,
+function requireProvider(
+  registry: LibraryRegistry,
+  id: string,
   reply: FastifyReply,
-): SsClient | null {
-  if (deps.ssClient === null) {
+): FixtureLibraryProvider | null {
+  const provider = registry.getById(id);
+  if (!provider) {
+    reply.status(404).send({ error: "Library not found" });
+    return null;
+  }
+  if (!provider.status().available) {
     reply.status(503).send({
-      error: "SoundSwitch is not available",
-      state: deps.ssStatus.state,
+      error: "Library not available",
+      state: provider.status().state,
     });
     return null;
   }
-  return deps.ssClient;
+  return provider;
 }
 
-export function registerSoundswitchRoutes(
+export function registerLibraryRoutes(
   app: FastifyInstance,
-  deps: SoundswitchRouteDeps,
+  deps: LibraryRouteDeps,
 ): void {
-  // Status endpoint — always registered
-  app.get("/soundswitch/status", async (): Promise<SsStatus> => {
-    return deps.ssStatus;
+  // List all libraries with their status
+  app.get("/libraries", async () => {
+    return deps.registry.getAll().map((p) => ({
+      id: p.id,
+      displayName: p.displayName,
+      description: p.description,
+      type: p.type,
+      status: p.status(),
+    }));
   });
 
-  app.get("/soundswitch/manufacturers", async (_request, reply) => {
-    const client = requireClient(deps, reply);
-    if (!client) return;
-    try {
-      return client.getManufacturers();
-    } catch (error) {
-      handleDbError(error, reply);
-    }
-  });
-
+  // Get manufacturers for a library
   app.get<{ Params: { id: string } }>(
-    "/soundswitch/manufacturers/:id/fixtures",
+    "/libraries/:id/manufacturers",
     async (request, reply) => {
-      const client = requireClient(deps, reply);
-      if (!client) return;
-      const id = parseInt(request.params.id, 10);
-      if (!Number.isFinite(id)) {
+      const provider = requireProvider(deps.registry, request.params.id, reply);
+      if (!provider) return;
+      try {
+        return provider.getManufacturers();
+      } catch (error) {
+        handleDbError(error, reply);
+      }
+    },
+  );
+
+  // Get fixtures for a manufacturer within a library
+  app.get<{ Params: { id: string; mfrId: string } }>(
+    "/libraries/:id/manufacturers/:mfrId/fixtures",
+    async (request, reply) => {
+      const provider = requireProvider(deps.registry, request.params.id, reply);
+      if (!provider) return;
+      const mfrId = parseInt(request.params.mfrId, 10);
+      if (!Number.isFinite(mfrId)) {
         return reply.status(400).send({ error: "Invalid manufacturer ID" });
       }
       try {
-        return client.getFixtures(id);
+        return provider.getFixtures(mfrId);
       } catch (error) {
         handleDbError(error, reply);
       }
     },
   );
 
-  app.get<{ Params: { id: string } }>(
-    "/soundswitch/fixtures/:id",
+  // Get modes for a fixture within a library
+  app.get<{ Params: { id: string; fid: string } }>(
+    "/libraries/:id/fixtures/:fid/modes",
     async (request, reply) => {
-      const client = requireClient(deps, reply);
-      if (!client) return;
-      const id = parseInt(request.params.id, 10);
-      if (!Number.isFinite(id)) {
+      const provider = requireProvider(deps.registry, request.params.id, reply);
+      if (!provider) return;
+      const fid = parseInt(request.params.fid, 10);
+      if (!Number.isFinite(fid)) {
         return reply.status(400).send({ error: "Invalid fixture ID" });
       }
       try {
-        const modes = client.getFixtureModes(id);
-        return { fixtureId: id, modes };
+        const modes = provider.getFixtureModes(fid);
+        return { fixtureId: fid, modes };
       } catch (error) {
         handleDbError(error, reply);
       }
     },
   );
 
-  app.get<{ Params: { id: string; modeId: string } }>(
-    "/soundswitch/fixtures/:id/modes/:modeId/channels",
+  // Get channels for a mode within a library
+  app.get<{ Params: { id: string; fid: string; mid: string } }>(
+    "/libraries/:id/fixtures/:fid/modes/:mid/channels",
     async (request, reply) => {
-      const client = requireClient(deps, reply);
-      if (!client) return;
-      const modeId = parseInt(request.params.modeId, 10);
-      if (!Number.isFinite(modeId)) {
+      const provider = requireProvider(deps.registry, request.params.id, reply);
+      if (!provider) return;
+      const mid = parseInt(request.params.mid, 10);
+      if (!Number.isFinite(mid)) {
         return reply.status(400).send({ error: "Invalid mode ID" });
       }
       try {
-        return client.mapToFixtureChannels(modeId);
+        return provider.getModeChannels(mid);
       } catch (error) {
         handleDbError(error, reply);
       }
     },
   );
 
+  // Import a fixture from a library
   app.post<{
-    Params: { id: string; modeId: string };
+    Params: { id: string; fid: string; mid: string };
     Body: { name: string; dmxStartAddress: number };
   }>(
-    "/soundswitch/fixtures/:id/modes/:modeId/import",
+    "/libraries/:id/fixtures/:fid/modes/:mid/import",
     { schema: importSchema },
     async (request, reply) => {
-      const client = requireClient(deps, reply);
-      if (!client) return;
+      const provider = requireProvider(deps.registry, request.params.id, reply);
+      if (!provider) return;
 
-      const fixtureId = parseInt(request.params.id, 10);
+      const fixtureId = parseInt(request.params.fid, 10);
       if (!Number.isFinite(fixtureId)) {
         return reply.status(400).send({ error: "Invalid fixture ID" });
       }
 
-      const modeId = parseInt(request.params.modeId, 10);
+      const modeId = parseInt(request.params.mid, 10);
       if (!Number.isFinite(modeId)) {
         return reply.status(400).send({ error: "Invalid mode ID" });
       }
 
       let channels: readonly import("../types/protocol.js").FixtureChannel[];
       try {
-        channels = client.mapToFixtureChannels(modeId);
+        channels = provider.getModeChannels(modeId);
       } catch (error) {
         handleDbError(error, reply);
         return;
@@ -171,7 +190,7 @@ export function registerSoundswitchRoutes(
 
       let modeName: string;
       try {
-        const modes = client.getFixtureModes(fixtureId);
+        const modes = provider.getFixtureModes(fixtureId);
         const mode = modes.find((m) => m.id === modeId);
         modeName = mode ? mode.name : `Mode ${modeId}`;
       } catch (error) {
@@ -194,7 +213,7 @@ export function registerSoundswitchRoutes(
 
       const fixture = deps.store.add({
         name: request.body.name,
-        source: "soundswitch",
+        source: provider.id as "local-db",
         mode: modeName,
         dmxStartAddress: request.body.dmxStartAddress,
         channelCount: channels.length,

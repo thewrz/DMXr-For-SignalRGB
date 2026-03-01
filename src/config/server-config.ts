@@ -9,7 +9,7 @@ export interface ServerConfig {
   readonly fixturesPath: string;
   readonly mdnsEnabled: boolean;
   readonly portRangeSize: number;
-  readonly soundswitchDbPath?: string;
+  readonly localDbPath?: string;
 }
 
 const VALID_DRIVERS = ["null", "enttec-usb-dmx-pro"];
@@ -55,12 +55,12 @@ export function loadConfig(): ServerConfig {
     fixturesPath: process.env["FIXTURES_PATH"] ?? "./config/fixtures.json",
     mdnsEnabled: process.env["MDNS_ENABLED"] !== "false",
     portRangeSize: rawPortRangeSize,
-    soundswitchDbPath: resolveSoundswitchDbPath(),
+    localDbPath: resolveLocalDbPath(),
   };
 }
 
-function resolveSoundswitchDbPath(): string | undefined {
-  const envPath = process.env["SOUNDSWITCH_DB_PATH"];
+function resolveLocalDbPath(): string | undefined {
+  const envPath = process.env["FIXTURE_DB_PATH"];
   if (envPath) return envPath;
 
   const { path } = findSoundswitchDb();

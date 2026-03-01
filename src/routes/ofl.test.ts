@@ -6,6 +6,7 @@ import {
   createTestConfig,
   createTestFixtureStore,
   createMockOflClient,
+  createMockRegistry,
 } from "../test-helpers.js";
 import type { FastifyInstance } from "fastify";
 
@@ -21,6 +22,7 @@ describe("OFL routes", () => {
       startTime: Date.now(),
       fixtureStore: createTestFixtureStore(),
       oflClient: createMockOflClient(),
+      registry: createMockRegistry(),
     });
   });
 

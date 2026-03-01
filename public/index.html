@@ -51,7 +51,7 @@
                   <span class="result-detail" x-show="result.type === 'fixture'" x-text="result.detail"></span>
                 </div>
                 <span class="source-badge" :class="'badge-' + result.source"
-                      x-text="result.source === 'ofl' ? 'OFL' : 'SS'"></span>
+                      x-text="result.source === 'ofl' ? 'OFL' : result.sourceLabel"></span>
               </div>
               <div class="result-meta">
                 <span class="result-type-badge" :class="result.type === 'fixture' ? 'badge-fixture' : 'badge-mfr'"
@@ -65,7 +65,7 @@
           </template>
         </div>
         <div class="sidebar-hint" x-show="!unifiedSearch && unifiedSearchResults.length === 0">
-          Type to search across OFL and SoundSwitch libraries
+          Search across all available fixture libraries
         </div>
       </div>
 
@@ -75,8 +75,10 @@
         <div class="source-tabs">
           <button class="tab" :class="{ active: browseSource === 'ofl' }"
                   @click="switchBrowseSource('ofl')">OFL</button>
-          <button class="tab" :class="{ active: browseSource === 'soundswitch' }"
-                  @click="switchBrowseSource('soundswitch')">SoundSwitch</button>
+          <template x-for="lib in getNonOflLibraries()" :key="lib.id">
+            <button class="tab" :class="{ active: browseSource === lib.id }"
+                    @click="switchBrowseSource(lib.id)" x-text="lib.displayName"></button>
+          </template>
         </div>
 
         <!-- OFL Browse -->
@@ -135,35 +137,35 @@
           </div>
         </template>
 
-        <!-- SoundSwitch Browse -->
-        <template x-if="browseSource === 'soundswitch'">
+        <!-- Library Browse (non-OFL) -->
+        <template x-if="browseSource !== 'ofl'">
           <div>
-            <template x-if="!ssAvailable && ssStatus">
-              <div class="ss-status-message">
-                <template x-if="ssStatus.state === 'not_configured'">
-                  <p>SoundSwitch database not found. Set <code>SOUNDSWITCH_DB_PATH</code>.</p>
+            <template x-if="!isLibAvailable(browseSource) && getLibStatus(browseSource)">
+              <div class="library-status-message">
+                <template x-if="getLibStatus(browseSource).state === 'not_configured'">
+                  <p>Database not found. Set <code>FIXTURE_DB_PATH</code> environment variable.</p>
                 </template>
-                <template x-if="ssStatus.state === 'not_found'">
-                  <p>Database not found at <code x-text="ssStatus.path"></code>.</p>
+                <template x-if="getLibStatus(browseSource).state === 'not_found'">
+                  <p>Database not found at <code x-text="getLibStatus(browseSource).path"></code>.</p>
                 </template>
-                <template x-if="ssStatus.state === 'permission_denied'">
-                  <p>Cannot read database at <code x-text="ssStatus.path"></code>.</p>
+                <template x-if="getLibStatus(browseSource).state === 'permission_denied'">
+                  <p>Cannot read database at <code x-text="getLibStatus(browseSource).path"></code>.</p>
                 </template>
-                <template x-if="ssStatus.state === 'corrupt'">
-                  <p>Database corrupt: <span x-text="ssStatus.error"></span></p>
+                <template x-if="getLibStatus(browseSource).state === 'corrupt'">
+                  <p>Database corrupt: <span x-text="getLibStatus(browseSource).error"></span></p>
                 </template>
-                <template x-if="ssStatus.state === 'error'">
-                  <p>Database error: <span x-text="ssStatus.error"></span></p>
+                <template x-if="getLibStatus(browseSource).state === 'error'">
+                  <p>Database error: <span x-text="getLibStatus(browseSource).error"></span></p>
                 </template>
               </div>
             </template>
 
-            <div x-show="ssAvailable && ssStep === 1">
-              <input type="text" x-model="ssMfrSearch" placeholder="Filter manufacturers..."
-                     @input="filterSsMfrs()" class="sidebar-search">
+            <div x-show="isLibAvailable(browseSource) && libStep === 1">
+              <input type="text" x-model="libMfrSearch" placeholder="Filter manufacturers..."
+                     @input="filterLibMfrs()" class="sidebar-search">
               <div class="search-results">
-                <template x-for="mfr in ssFilteredMfrs" :key="mfr.id">
-                  <div class="result-item" @click="selectSsMfr(mfr)">
+                <template x-for="mfr in libFilteredMfrs" :key="mfr.id">
+                  <div class="result-item" @click="selectLibMfr(mfr)">
                     <strong x-text="mfr.name"></strong>
                     <span class="count" x-text="mfr.fixtureCount + ' fixtures'"></span>
                   </div>
@@ -171,14 +173,14 @@
               </div>
             </div>
 
-            <div x-show="ssAvailable && ssStep === 2">
-              <button class="btn btn-sm btn-back" @click="ssStep = 1">&larr; Manufacturers</button>
-              <label x-text="'Fixtures by ' + (ssSelectedMfr?.name || '')"></label>
-              <input type="text" x-model="ssFixtureSearch" placeholder="Filter fixtures..."
-                     @input="filterSsFixtures()" class="sidebar-search">
+            <div x-show="isLibAvailable(browseSource) && libStep === 2">
+              <button class="btn btn-sm btn-back" @click="libStep = 1">&larr; Manufacturers</button>
+              <label x-text="'Fixtures by ' + (libSelectedMfr?.name || '')"></label>
+              <input type="text" x-model="libFixtureSearch" placeholder="Filter fixtures..."
+                     @input="filterLibFixtures()" class="sidebar-search">
               <div class="search-results">
-                <template x-for="f in ssFilteredFixtures" :key="f.id">
-                  <div class="result-item" @click="selectSsFixture(f)">
+                <template x-for="f in libFilteredFixtures" :key="f.id">
+                  <div class="result-item" @click="selectLibFixture(f)">
                     <strong x-text="f.name"></strong>
                     <span class="count" x-text="f.modeCount + ' mode' + (f.modeCount !== 1 ? 's' : '')"></span>
                   </div>
@@ -186,23 +188,23 @@
               </div>
             </div>
 
-            <div x-show="ssAvailable && ssStep === 3">
-              <button class="btn btn-sm btn-back" @click="ssStep = 2">&larr; Fixtures</button>
-              <p class="selected-fixture" x-text="ssSelectedFixture?.name"></p>
+            <div x-show="isLibAvailable(browseSource) && libStep === 3">
+              <button class="btn btn-sm btn-back" @click="libStep = 2">&larr; Fixtures</button>
+              <p class="selected-fixture" x-text="libSelectedFixture?.name"></p>
 
               <label>Mode</label>
-              <select x-model="ssSelectedModeId" @change="onSsModeChange()">
-                <template x-for="mode in ssModes" :key="mode.id">
+              <select x-model="libSelectedModeId" @change="onLibModeChange()">
+                <template x-for="mode in libModes" :key="mode.id">
                   <option :value="mode.id"
                           x-text="mode.name + ' (' + mode.channelCount + ' ch)'"></option>
                 </template>
               </select>
 
-              <template x-if="ssChannels.length > 0">
+              <template x-if="libChannels.length > 0">
                 <div>
-                  <label x-text="ssChannels.length + ' DMX channel' + (ssChannels.length !== 1 ? 's' : '')"></label>
+                  <label x-text="libChannels.length + ' DMX channel' + (libChannels.length !== 1 ? 's' : '')"></label>
                   <div class="channel-preview">
-                    <template x-for="ch in ssChannels" :key="ch.offset">
+                    <template x-for="ch in libChannels" :key="ch.offset">
                       <span class="badge" :class="'badge-' + (ch.color || ch.type).toLowerCase()"
                             x-text="ch.name + ' (' + ch.type + ')'"></span>
                     </template>
@@ -213,8 +215,8 @@
               <label>Display Name</label>
               <input type="text" x-model="fixtureName">
 
-              <button class="btn btn-primary btn-stage" @click="stageSsFixture()"
-                      :disabled="!fixtureName || !ssSelectedModeId">Stage for Placement</button>
+              <button class="btn btn-primary btn-stage" @click="stageLibFixture()"
+                      :disabled="!fixtureName || !libSelectedModeId">Stage for Placement</button>
             </div>
           </div>
         </template>
@@ -338,8 +340,10 @@
       <div class="source-tabs">
         <button class="tab" :class="{ active: fixtureSource === 'ofl' }"
                 @click="switchSource('ofl')">Open Fixture Library</button>
-        <button class="tab" :class="{ active: fixtureSource === 'soundswitch' }"
-                @click="switchSource('soundswitch')">SoundSwitch</button>
+        <template x-for="lib in getNonOflLibraries()" :key="lib.id">
+          <button class="tab" :class="{ active: fixtureSource === lib.id }"
+                  @click="switchSource(lib.id)" x-text="lib.displayName"></button>
+        </template>
       </div>
 
       <!-- OFL Flow -->
@@ -406,36 +410,36 @@
         </div>
       </template>
 
-      <!-- SoundSwitch Flow -->
-      <template x-if="fixtureSource === 'soundswitch'">
+      <!-- Library Flow (non-OFL) -->
+      <template x-if="fixtureSource !== 'ofl'">
         <div>
-          <template x-if="!ssAvailable && ssStatus">
-            <div class="ss-status-message">
-              <template x-if="ssStatus.state === 'not_configured'">
-                <p>SoundSwitch database not found. Set the <code>SOUNDSWITCH_DB_PATH</code> environment variable or install SoundSwitch to a standard location.</p>
+          <template x-if="!isLibAvailable(fixtureSource) && getLibStatus(fixtureSource)">
+            <div class="library-status-message">
+              <template x-if="getLibStatus(fixtureSource).state === 'not_configured'">
+                <p>Database not found. Set the <code>FIXTURE_DB_PATH</code> environment variable.</p>
               </template>
-              <template x-if="ssStatus.state === 'not_found'">
-                <p>Database not found at <code x-text="ssStatus.path"></code>. Check that the file exists.</p>
+              <template x-if="getLibStatus(fixtureSource).state === 'not_found'">
+                <p>Database not found at <code x-text="getLibStatus(fixtureSource).path"></code>. Check that the file exists.</p>
               </template>
-              <template x-if="ssStatus.state === 'permission_denied'">
-                <p>Cannot read database at <code x-text="ssStatus.path"></code>. Check file permissions.</p>
+              <template x-if="getLibStatus(fixtureSource).state === 'permission_denied'">
+                <p>Cannot read database at <code x-text="getLibStatus(fixtureSource).path"></code>. Check file permissions.</p>
               </template>
-              <template x-if="ssStatus.state === 'corrupt'">
-                <p>Database appears corrupt: <span x-text="ssStatus.error"></span></p>
+              <template x-if="getLibStatus(fixtureSource).state === 'corrupt'">
+                <p>Database appears corrupt: <span x-text="getLibStatus(fixtureSource).error"></span></p>
               </template>
-              <template x-if="ssStatus.state === 'error'">
-                <p>Database error: <span x-text="ssStatus.error"></span></p>
+              <template x-if="getLibStatus(fixtureSource).state === 'error'">
+                <p>Database error: <span x-text="getLibStatus(fixtureSource).error"></span></p>
               </template>
             </div>
           </template>
 
-          <div x-show="ssAvailable && ssStep === 1">
+          <div x-show="isLibAvailable(fixtureSource) && libStep === 1">
             <label>Manufacturer</label>
-            <input type="text" x-model="ssMfrSearch" placeholder="Search manufacturers..."
-                   @input="filterSsMfrs()">
+            <input type="text" x-model="libMfrSearch" placeholder="Search manufacturers..."
+                   @input="filterLibMfrs()">
             <div class="search-results">
-              <template x-for="mfr in ssFilteredMfrs" :key="mfr.id">
-                <div class="result-item" @click="selectSsMfr(mfr)">
+              <template x-for="mfr in libFilteredMfrs" :key="mfr.id">
+                <div class="result-item" @click="selectLibMfr(mfr)">
                   <strong x-text="mfr.name"></strong>
                   <span class="count" x-text="mfr.fixtureCount + ' fixtures'"></span>
                 </div>
@@ -443,37 +447,37 @@
             </div>
           </div>
 
-          <div x-show="ssAvailable && ssStep === 2">
-            <label x-text="'Fixtures by ' + ssSelectedMfr?.name"></label>
-            <input type="text" x-model="ssFixtureSearch" placeholder="Search fixtures..."
-                   @input="filterSsFixtures()">
+          <div x-show="isLibAvailable(fixtureSource) && libStep === 2">
+            <label x-text="'Fixtures by ' + libSelectedMfr?.name"></label>
+            <input type="text" x-model="libFixtureSearch" placeholder="Search fixtures..."
+                   @input="filterLibFixtures()">
             <div class="search-results">
-              <template x-for="f in ssFilteredFixtures" :key="f.id">
-                <div class="result-item" @click="selectSsFixture(f)">
+              <template x-for="f in libFilteredFixtures" :key="f.id">
+                <div class="result-item" @click="selectLibFixture(f)">
                   <strong x-text="f.name"></strong>
                   <span class="count" x-text="f.modeCount + ' mode' + (f.modeCount !== 1 ? 's' : '')"></span>
                 </div>
               </template>
             </div>
-            <button class="btn btn-sm" @click="ssStep = 1">Back</button>
+            <button class="btn btn-sm" @click="libStep = 1">Back</button>
           </div>
 
-          <div x-show="ssAvailable && ssStep === 3">
-            <p class="selected-fixture" x-text="ssSelectedFixture?.name"></p>
+          <div x-show="isLibAvailable(fixtureSource) && libStep === 3">
+            <p class="selected-fixture" x-text="libSelectedFixture?.name"></p>
 
             <label>Mode</label>
-            <select x-model="ssSelectedModeId" @change="onSsModeChange()">
-              <template x-for="mode in ssModes" :key="mode.id">
+            <select x-model="libSelectedModeId" @change="onLibModeChange()">
+              <template x-for="mode in libModes" :key="mode.id">
                 <option :value="mode.id"
                         x-text="mode.name + ' (' + mode.channelCount + ' ch)'"></option>
               </template>
             </select>
 
-            <template x-if="ssChannels.length > 0">
+            <template x-if="libChannels.length > 0">
               <div>
-                <label x-text="ssChannels.length + ' DMX channel' + (ssChannels.length !== 1 ? 's' : '')"></label>
+                <label x-text="libChannels.length + ' DMX channel' + (libChannels.length !== 1 ? 's' : '')"></label>
                 <div class="channel-preview">
-                  <template x-for="ch in ssChannels" :key="ch.offset">
+                  <template x-for="ch in libChannels" :key="ch.offset">
                     <span class="badge" :class="'badge-' + (ch.color || ch.type).toLowerCase()"
                           x-text="ch.name + ' (' + ch.type + ')'"></span>
                   </template>
@@ -490,9 +494,9 @@
             <input type="text" x-model="fixtureName">
 
             <div class="modal-actions">
-              <button class="btn btn-sm" @click="ssStep = 2">Back</button>
-              <button class="btn btn-primary" @click="importSsFixture()"
-                      :disabled="!!addressError || !fixtureName || !ssSelectedModeId">Import</button>
+              <button class="btn btn-sm" @click="libStep = 2">Back</button>
+              <button class="btn btn-primary" @click="importLibFixture()"
+                      :disabled="!!addressError || !fixtureName || !libSelectedModeId">Import</button>
             </div>
           </div>
         </div>

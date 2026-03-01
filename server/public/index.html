@@ -21,6 +21,19 @@
     <button class="btn btn-danger" @click="blackout()">Blackout All</button>
     <button class="btn btn-warning" @click="whiteout()">Whiteout All</button>
     <button class="btn btn-success" x-show="overrideActive" @click="resume()">Resume</button>
+    <button class="btn" x-show="fixtures.length > 0" @click="syncComponents()"
+            title="Write component files for SignalRGB Layout tile names">Sync SignalRGB Components</button>
+  </div>
+  <div class="sync-result" x-show="syncResult" x-cloak>
+    <template x-if="syncResult && syncResult.success">
+      <p class="msg-success">
+        Synced <strong x-text="syncResult.synced"></strong> component(s).
+        Restart SignalRGB to see updated tile names.
+      </p>
+    </template>
+    <template x-if="syncResult && !syncResult.success">
+      <p class="msg-error" x-text="syncResult.error"></p>
+    </template>
   </div>
 
   <template x-if="fixtures.length === 0">

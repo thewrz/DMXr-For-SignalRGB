@@ -331,6 +331,24 @@ function dmxrApp() {
       }
     },
 
+    syncResult: null,
+
+    async syncComponents() {
+      this.syncResult = null;
+      try {
+        var res = await fetch("/signalrgb/components/sync", { method: "POST" });
+        if (res.ok) {
+          var data = await res.json();
+          this.syncResult = { success: true, synced: data.synced, dir: data.componentsDir };
+        } else {
+          var err = await res.json().catch(function() { return {}; });
+          this.syncResult = { success: false, error: err.error || "Sync failed" };
+        }
+      } catch {
+        this.syncResult = { success: false, error: "Network error" };
+      }
+    },
+
     getChannelClass(ch) {
       for (var i = 0; i < this.fixtures.length; i++) {
         var f = this.fixtures[i];

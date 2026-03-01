@@ -245,6 +245,55 @@ describe("mapColor", () => {
     expect(result[1]).toBe(64);
   });
 
+  it("defaults Pan Fine to 0 (not 128)", () => {
+    const fixture = makeFixture([
+      { offset: 0, name: "Pan", type: "Pan", defaultValue: 0 },
+      { offset: 1, name: "Pan Fine", type: "Pan", defaultValue: 0 },
+      { offset: 2, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
+    ]);
+
+    const result = mapColor(fixture, 255, 0, 0, 1.0);
+
+    expect(result[1]).toBe(128); // coarse Pan centers
+    expect(result[2]).toBe(0);   // fine Pan stays at 0
+  });
+
+  it("defaults Tilt Fine to 0 (not 128)", () => {
+    const fixture = makeFixture([
+      { offset: 0, name: "Tilt", type: "Tilt", defaultValue: 0 },
+      { offset: 1, name: "Tilt Fine", type: "Tilt", defaultValue: 0 },
+      { offset: 2, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
+    ]);
+
+    const result = mapColor(fixture, 255, 0, 0, 1.0);
+
+    expect(result[1]).toBe(128); // coarse Tilt centers
+    expect(result[2]).toBe(0);   // fine Tilt stays at 0
+  });
+
+  it("uses Pan Fine defaultValue when explicitly set", () => {
+    const fixture = makeFixture([
+      { offset: 0, name: "Pan", type: "Pan", defaultValue: 0 },
+      { offset: 1, name: "Pan Fine", type: "Pan", defaultValue: 42 },
+      { offset: 2, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
+    ]);
+
+    const result = mapColor(fixture, 255, 0, 0, 1.0);
+
+    expect(result[2]).toBe(42); // explicit fine value honored
+  });
+
+  it("handles lowercase 'fine' in channel name", () => {
+    const fixture = makeFixture([
+      { offset: 0, name: "Pan fine", type: "Pan", defaultValue: 0 },
+      { offset: 1, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
+    ]);
+
+    const result = mapColor(fixture, 255, 0, 0, 1.0);
+
+    expect(result[1]).toBe(0); // fine channel, not center
+  });
+
   it("maps Cyan as subtractive (255 - Red)", () => {
     const fixture = makeFixture([
       { offset: 0, name: "Cyan", type: "ColorIntensity", color: "Cyan", defaultValue: 0 },

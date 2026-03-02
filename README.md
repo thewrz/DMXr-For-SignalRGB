@@ -13,6 +13,12 @@ Control your DMX lighting fixtures from [SignalRGB](https://signalrgb.com) — s
 - Resilient USB connection — survives unplug/replug with automatic reconnect and state replay
 - Guaranteed blackout on shutdown
 
+## Hardware & fixture support
+
+Tested with an **ENTTEC DMX USB Pro** — other USB-to-DMX adapters may work but haven't been tried.
+
+Fixture-wise, I've only tested with what I own: a couple of RGB PAR cans, two moving heads (color only — pan/tilt isn't driven yet), and a strobe. It works well for RGB color mapping, but fixtures like lasers and movers that need interpreted movement/pattern data are still a work in progress. If you try it with something else and it works (or doesn't), let me know.
+
 ## Architecture
 
 - **Node.js server** (Fastify) — fixture management, DMX output, web UI at `http://localhost:8080`

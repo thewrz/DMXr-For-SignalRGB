@@ -17,10 +17,42 @@ function isEnttecDevice(vendorId?: string, productId?: string): boolean {
   );
 }
 
+interface PortInfo {
+  path: string;
+  manufacturer?: string | null;
+  vendorId?: string | null;
+  productId?: string | null;
+  serialNumber?: string | null;
+}
+
+/**
+ * Resolves the `list()` function from the serialport package.
+ *
+ * serialport v9 (used by dmx-ts) exports `list` on the default/CJS export,
+ * while serialport v10+ exports `SerialPort.list()` as a named export.
+ * We handle both so the scanner works regardless of which version is installed.
+ */
+async function resolveListFn(): Promise<() => Promise<PortInfo[]>> {
+  const mod = await import("serialport") as Record<string, unknown>;
+
+  // v10+: named export SerialPort with static list()
+  if (mod["SerialPort"] && typeof (mod["SerialPort"] as Record<string, unknown>)["list"] === "function") {
+    return (mod["SerialPort"] as { list: () => Promise<PortInfo[]> }).list;
+  }
+
+  // v9: default export with list() directly
+  const defaultExport = (mod["default"] ?? mod) as Record<string, unknown>;
+  if (typeof defaultExport["list"] === "function") {
+    return defaultExport["list"] as () => Promise<PortInfo[]>;
+  }
+
+  throw new Error("serialport: could not find list() function");
+}
+
 export async function listSerialPorts(): Promise<readonly SerialPortInfo[]> {
   try {
-    const { SerialPort } = await import("serialport");
-    const ports = await SerialPort.list();
+    const listFn = await resolveListFn();
+    const ports = await listFn();
 
     return ports.map((port) => ({
       path: port.path,

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// Mock serialport before importing the module under test
+// Mock serialport v10+ style (named export SerialPort with list)
 vi.mock("serialport", () => ({
   SerialPort: {
     list: vi.fn(),

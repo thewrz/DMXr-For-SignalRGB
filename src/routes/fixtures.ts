@@ -95,8 +95,20 @@ export function registerFixtureRoutes(
           properties: {
             name: { type: "string" as const, minLength: 1 },
             dmxStartAddress: { type: "integer" as const, minimum: 1, maximum: 512 },
+            channelOverrides: {
+              type: "object" as const,
+              additionalProperties: {
+                type: "object" as const,
+                required: ["value", "enabled"],
+                properties: {
+                  value: { type: "integer" as const, minimum: 0, maximum: 255 },
+                  enabled: { type: "boolean" as const },
+                },
+                additionalProperties: false,
+              },
+            },
+            whiteGateThreshold: { type: "integer" as const, minimum: 0, maximum: 255 },
           },
-          additionalProperties: false,
         },
       },
     },

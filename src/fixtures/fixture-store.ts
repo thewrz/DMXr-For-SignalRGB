@@ -66,6 +66,8 @@ export function createFixtureStore(filePath: string): FixtureStore {
         ...fixtures[index],
         ...(changes.name !== undefined ? { name: changes.name } : {}),
         ...(changes.dmxStartAddress !== undefined ? { dmxStartAddress: changes.dmxStartAddress } : {}),
+        ...(changes.channelOverrides !== undefined ? { channelOverrides: changes.channelOverrides } : {}),
+        ...(changes.whiteGateThreshold !== undefined ? { whiteGateThreshold: changes.whiteGateThreshold } : {}),
       };
 
       fixtures = fixtures.map((f, i) => (i === index ? updated : f));

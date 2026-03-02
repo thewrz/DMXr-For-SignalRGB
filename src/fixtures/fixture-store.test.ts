@@ -152,6 +152,41 @@ describe("createFixtureStore", () => {
 
       expect(store2.getById(fixture.id)!.name).toBe("After");
     });
+
+    it("updates channelOverrides → persisted", async () => {
+      const fixture = store.add(makeRequest());
+      const overrides = { 0: { value: 128, enabled: true } };
+      const updated = store.update(fixture.id, { channelOverrides: overrides });
+
+      expect(updated!.channelOverrides).toEqual(overrides);
+
+      await store.save();
+      const store2 = createFixtureStore(filePath);
+      await store2.load();
+      expect(store2.getById(fixture.id)!.channelOverrides).toEqual(overrides);
+    });
+
+    it("updates without channelOverrides → existing preserved", async () => {
+      const fixture = store.add(makeRequest());
+      const overrides = { 0: { value: 128, enabled: true } };
+      store.update(fixture.id, { channelOverrides: overrides });
+      const updated = store.update(fixture.id, { name: "New Name" });
+
+      expect(updated!.channelOverrides).toEqual(overrides);
+      expect(updated!.name).toBe("New Name");
+    });
+
+    it("updates whiteGateThreshold → persisted", async () => {
+      const fixture = store.add(makeRequest());
+      const updated = store.update(fixture.id, { whiteGateThreshold: 200 });
+
+      expect(updated!.whiteGateThreshold).toBe(200);
+
+      await store.save();
+      const store2 = createFixtureStore(filePath);
+      await store2.load();
+      expect(store2.getById(fixture.id)!.whiteGateThreshold).toBe(200);
+    });
   });
 
   describe("save and load", () => {

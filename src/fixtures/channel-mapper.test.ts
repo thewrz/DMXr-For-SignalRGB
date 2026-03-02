@@ -1,11 +1,16 @@
 import { describe, it, expect } from "vitest";
 import { mapColor, isWhiteGateOpen, DEFAULT_WHITE_GATE_THRESHOLD } from "./channel-mapper.js";
-import type { FixtureConfig, FixtureChannel } from "../types/protocol.js";
+import type { FixtureConfig, FixtureChannel, ChannelOverride } from "../types/protocol.js";
+
+interface MutableFixture extends Omit<FixtureConfig, "channelOverrides" | "whiteGateThreshold"> {
+  channelOverrides?: Record<number, ChannelOverride>;
+  whiteGateThreshold?: number;
+}
 
 function makeFixture(
   channels: FixtureChannel[],
   startAddress = 1,
-): FixtureConfig {
+): MutableFixture {
   return {
     id: "test-fixture",
     name: "Test",
@@ -386,6 +391,94 @@ describe("mapColor", () => {
     const result = mapColor(fixture, 255, 0, 0, 1.0);
 
     expect(result[1]).toBe(255); // red on (not gated)
+  });
+
+  // Channel override tests
+  it("override enabled on Red → override value used", () => {
+    const fixture = makeFixture([
+      { offset: 0, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
+      { offset: 1, name: "Green", type: "ColorIntensity", color: "Green", defaultValue: 0 },
+      { offset: 2, name: "Blue", type: "ColorIntensity", color: "Blue", defaultValue: 0 },
+    ]);
+    fixture.channelOverrides = { 0: { value: 42, enabled: true } };
+
+    const result = mapColor(fixture, 255, 128, 64, 1.0);
+
+    expect(result[1]).toBe(42);  // overridden
+    expect(result[2]).toBe(128); // normal
+    expect(result[3]).toBe(64);  // normal
+  });
+
+  it("override disabled → normal mapping", () => {
+    const fixture = makeFixture([
+      { offset: 0, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
+    ]);
+    fixture.channelOverrides = { 0: { value: 42, enabled: false } };
+
+    const result = mapColor(fixture, 255, 0, 0, 1.0);
+
+    expect(result[1]).toBe(255);
+  });
+
+  it("override on Generic channel → override value used", () => {
+    const fixture = makeFixture([
+      { offset: 0, name: "Mode", type: "Generic", defaultValue: 128 },
+      { offset: 1, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
+    ]);
+    fixture.channelOverrides = { 0: { value: 200, enabled: true } };
+
+    const result = mapColor(fixture, 255, 0, 0, 1.0);
+
+    expect(result[1]).toBe(200);
+  });
+
+  it("override on strobe channel when gate closed → override still applied", () => {
+    const fixture = makeFixture([
+      { offset: 0, name: "Dimmer", type: "Intensity", defaultValue: 0 },
+      { offset: 1, name: "Strobe", type: "Strobe", defaultValue: 0 },
+      { offset: 2, name: "Mode", type: "Generic", defaultValue: 128 },
+    ]);
+    fixture.channelOverrides = { 1: { value: 100, enabled: true } };
+
+    // Red → gate closed for basic strobe, but override wins
+    const result = mapColor(fixture, 255, 0, 0, 1.0);
+
+    expect(result[1]).toBe(0);   // dimmer: gate closed, no override → 0
+    expect(result[2]).toBe(100); // strobe: override wins even with gate closed
+    expect(result[3]).toBe(0);   // generic: gate closed, no override → 0
+  });
+
+  it("no overrides field → unchanged behavior", () => {
+    const fixture = makeFixture([
+      { offset: 0, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
+    ]);
+
+    const result = mapColor(fixture, 255, 0, 0, 1.0);
+
+    expect(result[1]).toBe(255);
+  });
+
+  it("override value clamped to 0-255", () => {
+    const fixture = makeFixture([
+      { offset: 0, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
+    ]);
+    fixture.channelOverrides = { 0: { value: 300, enabled: true } };
+
+    const result = mapColor(fixture, 255, 0, 0, 1.0);
+
+    expect(result[1]).toBe(255); // clamped from 300
+  });
+
+  it("custom whiteGateThreshold=200 on basic strobe → gate opens at (210,210,210)", () => {
+    const fixture = makeFixture([
+      { offset: 0, name: "Dimmer", type: "Intensity", defaultValue: 0 },
+      { offset: 1, name: "Strobe", type: "Strobe", defaultValue: 0 },
+    ]);
+    fixture.whiteGateThreshold = 200;
+
+    const result = mapColor(fixture, 210, 210, 210, 1.0);
+
+    expect(result[1]).toBe(255); // dimmer on (gate open at 200 threshold)
   });
 });
 

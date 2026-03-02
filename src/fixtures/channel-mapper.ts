@@ -30,10 +30,12 @@ export function mapColor(
   const caps = analyzeFixture(fixture.channels);
 
   if (caps.isBasicStrobe) {
-    const threshold = DEFAULT_WHITE_GATE_THRESHOLD;
+    const threshold = fixture.whiteGateThreshold ?? DEFAULT_WHITE_GATE_THRESHOLD;
     if (!isWhiteGateOpen(r, g, b, threshold)) {
       for (const channel of fixture.channels) {
-        result[base + channel.offset] = 0;
+        const addr = base + channel.offset;
+        const override = fixture.channelOverrides?.[channel.offset];
+        result[addr] = override?.enabled ? clamp(override.value) : 0;
       }
       return result;
     }
@@ -60,6 +62,12 @@ export function mapColor(
 
   for (const channel of fixture.channels) {
     const addr = base + channel.offset;
+    const override = fixture.channelOverrides?.[channel.offset];
+
+    if (override?.enabled) {
+      result[addr] = clamp(override.value);
+      continue;
+    }
 
     if (channel.type === "ColorIntensity") {
       switch (channel.color) {

@@ -239,6 +239,59 @@ describe("Fixture routes", () => {
 
       expect(patchRes.statusCode).toBe(400);
     });
+
+    it("updates channelOverrides and returns 200", async () => {
+      const addRes = await app.inject({
+        method: "POST",
+        url: "/fixtures",
+        payload: validFixtureBody,
+      });
+      const { id } = addRes.json();
+
+      const patchRes = await app.inject({
+        method: "PATCH",
+        url: `/fixtures/${id}`,
+        payload: { channelOverrides: { "0": { value: 128, enabled: true } } },
+      });
+
+      expect(patchRes.statusCode).toBe(200);
+      expect(patchRes.json().channelOverrides).toEqual({ "0": { value: 128, enabled: true } });
+    });
+
+    it("updates whiteGateThreshold and returns 200", async () => {
+      const addRes = await app.inject({
+        method: "POST",
+        url: "/fixtures",
+        payload: validFixtureBody,
+      });
+      const { id } = addRes.json();
+
+      const patchRes = await app.inject({
+        method: "PATCH",
+        url: `/fixtures/${id}`,
+        payload: { whiteGateThreshold: 200 },
+      });
+
+      expect(patchRes.statusCode).toBe(200);
+      expect(patchRes.json().whiteGateThreshold).toBe(200);
+    });
+
+    it("returns 400 for override value > 255", async () => {
+      const addRes = await app.inject({
+        method: "POST",
+        url: "/fixtures",
+        payload: validFixtureBody,
+      });
+      const { id } = addRes.json();
+
+      const patchRes = await app.inject({
+        method: "PATCH",
+        url: `/fixtures/${id}`,
+        payload: { channelOverrides: { "0": { value: 300, enabled: true } } },
+      });
+
+      expect(patchRes.statusCode).toBe(400);
+    });
   });
 
   describe("DELETE /fixtures/:id", () => {

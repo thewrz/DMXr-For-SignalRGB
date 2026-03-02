@@ -14,16 +14,52 @@ describe("loadConfig", () => {
     delete process.env["DMX_DRIVER"];
     delete process.env["DMX_DEVICE_PATH"];
     delete process.env["LOG_LEVEL"];
+    delete process.env["MDNS_ENABLED"];
 
     const config = loadConfig();
 
     expect(config.port).toBe(8080);
-    expect(config.host).toBe("127.0.0.1");
+    expect(config.host).toBe("0.0.0.0");
     expect(config.dmxDriver).toBe("null");
-    expect(config.dmxDevicePath).toBe("/dev/ttyUSB0");
+    expect(config.dmxDevicePath).toBe("auto");
     expect(config.logLevel).toBe("info");
     expect(config.mdnsEnabled).toBe(true);
     expect(config.portRangeSize).toBe(10);
+  });
+
+  it("uses persisted settings as base layer", () => {
+    delete process.env["PORT"];
+    delete process.env["HOST"];
+    delete process.env["DMX_DRIVER"];
+    delete process.env["DMX_DEVICE_PATH"];
+    delete process.env["MDNS_ENABLED"];
+
+    const config = loadConfig({
+      port: 9090,
+      host: "192.168.1.50",
+      dmxDriver: "enttec-usb-dmx-pro",
+      dmxDevicePath: "COM3",
+      mdnsEnabled: false,
+    });
+
+    expect(config.port).toBe(9090);
+    expect(config.host).toBe("192.168.1.50");
+    expect(config.dmxDriver).toBe("enttec-usb-dmx-pro");
+    expect(config.dmxDevicePath).toBe("COM3");
+    expect(config.mdnsEnabled).toBe(false);
+  });
+
+  it("env vars override persisted settings", () => {
+    process.env["PORT"] = "3000";
+    process.env["DMX_DRIVER"] = "null";
+
+    const config = loadConfig({
+      port: 9090,
+      dmxDriver: "enttec-usb-dmx-pro",
+    });
+
+    expect(config.port).toBe(3000);
+    expect(config.dmxDriver).toBe("null");
   });
 
   it("reads MDNS_ENABLED from environment", () => {

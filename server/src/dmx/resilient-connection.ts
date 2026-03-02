@@ -4,6 +4,7 @@ import type { DmxLogger } from "./universe-manager.js";
 import type { ConnectionState, ConnectionStatus } from "./connection-state.js";
 import { createInitialStatus } from "./connection-state.js";
 import { createDmxConnection } from "./driver-factory.js";
+import { translateDmxError } from "./error-messages.js";
 
 /** Mutable version of ConnectionStatus for internal state tracking */
 interface MutableStatus {
@@ -12,6 +13,8 @@ interface MutableStatus {
   lastDisconnectedAt: number | null;
   reconnectAttempts: number;
   lastError: string | null;
+  lastErrorTitle: string | null;
+  lastErrorSuggestion: string | null;
 }
 
 const MIN_RECONNECT_DELAY_MS = 1_000;
@@ -68,6 +71,8 @@ export async function createResilientConnection(
       status.lastConnectedAt = Date.now();
       status.reconnectAttempts = 0;
       status.lastError = null;
+      status.lastErrorTitle = null;
+      status.lastErrorSuggestion = null;
     } else if (state === "disconnected") {
       status.lastDisconnectedAt = Date.now();
     }
@@ -130,8 +135,11 @@ export async function createResilientConnection(
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
+      const translated = translateDmxError(err);
       logger.error(`Reconnect failed: ${msg}`);
       status.lastError = msg;
+      status.lastErrorTitle = translated.title;
+      status.lastErrorSuggestion = translated.suggestion;
       notifyStateChange();
       scheduleReconnect();
     }
@@ -147,8 +155,11 @@ export async function createResilientConnection(
     onStateChange?.(snapshotStatus());
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
+    const translated = translateDmxError(err);
     logger.error(`Initial DMX connection failed: ${msg}`);
     status.lastError = msg;
+    status.lastErrorTitle = translated.title;
+    status.lastErrorSuggestion = translated.suggestion;
     onStateChange?.(snapshotStatus());
     scheduleReconnect();
   }

@@ -11,6 +11,7 @@ import type { FixtureStore } from "./fixtures/fixture-store.js";
 import type { OflClient } from "./ofl/ofl-client.js";
 import type { LibraryRegistry } from "./libraries/types.js";
 import type { ConnectionStatus } from "./dmx/connection-state.js";
+import type { SettingsStore } from "./config/settings-store.js";
 import { registerHealthRoute } from "./routes/health.js";
 import { registerUpdateRoute } from "./routes/update.js";
 import { registerFixtureRoutes } from "./routes/fixtures.js";
@@ -19,6 +20,7 @@ import { registerControlRoutes } from "./routes/control.js";
 import { registerLibraryRoutes } from "./routes/libraries.js";
 import { registerSignalRgbRoutes } from "./routes/signalrgb.js";
 import { registerSearchRoutes } from "./routes/search.js";
+import { registerSettingsRoutes } from "./routes/settings.js";
 import { registerApiKeyAuth } from "./middleware/api-key-auth.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -32,6 +34,8 @@ interface BuildServerDeps {
   readonly oflClient: OflClient;
   readonly registry: LibraryRegistry;
   readonly getConnectionStatus?: () => ConnectionStatus;
+  readonly settingsStore?: SettingsStore;
+  readonly serverVersion?: string;
 }
 
 export async function buildServer(
@@ -94,6 +98,8 @@ export async function buildServer(
     startTime: deps.startTime,
     fixtureStore: deps.fixtureStore,
     getConnectionStatus: deps.getConnectionStatus,
+    serverVersion: deps.serverVersion,
+    dmxDevicePath: deps.config.dmxDevicePath,
   });
 
   registerUpdateRoute(app, {
@@ -127,6 +133,13 @@ export async function buildServer(
     oflClient: deps.oflClient,
     registry: deps.registry,
   });
+
+  if (deps.settingsStore) {
+    registerSettingsRoutes(app, {
+      settingsStore: deps.settingsStore,
+      serverVersion: deps.serverVersion ?? "0.0.0",
+    });
+  }
 
   app.setErrorHandler((error: FastifyError, request, reply) => {
     request.log.error({ err: error }, "Unhandled error");

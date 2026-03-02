@@ -1,4 +1,5 @@
 import { findSoundswitchDb } from "../soundswitch/ss-db-finder.js";
+import type { PersistedSettings } from "./settings-store.js";
 
 export interface ServerConfig {
   readonly port: number;
@@ -16,16 +17,24 @@ export interface ServerConfig {
 
 const VALID_DRIVERS = ["null", "enttec-usb-dmx-pro"];
 
-export function loadConfig(): ServerConfig {
-  const rawPort = parseInt(process.env["PORT"] ?? "8080", 10);
+export function loadConfig(
+  persisted?: Partial<PersistedSettings>,
+): ServerConfig {
+  const base = persisted ?? {};
+
+  const rawPort = parseInt(
+    process.env["PORT"] ?? String(base.port ?? 8080),
+    10,
+  );
 
   if (!Number.isFinite(rawPort) || rawPort < 1 || rawPort > 65535) {
     throw new Error(
-      `Invalid PORT: "${process.env["PORT"]}". Must be a number between 1 and 65535.`,
+      `Invalid PORT: "${process.env["PORT"] ?? base.port}". Must be a number between 1 and 65535.`,
     );
   }
 
-  const dmxDriver = process.env["DMX_DRIVER"] ?? "null";
+  const dmxDriver =
+    process.env["DMX_DRIVER"] ?? base.dmxDriver ?? "null";
 
   if (!VALID_DRIVERS.includes(dmxDriver)) {
     throw new Error(
@@ -50,12 +59,16 @@ export function loadConfig(): ServerConfig {
 
   return {
     port: rawPort,
-    host: process.env["HOST"] ?? "127.0.0.1",
+    host: process.env["HOST"] ?? base.host ?? "0.0.0.0",
     dmxDriver,
-    dmxDevicePath: process.env["DMX_DEVICE_PATH"] ?? "/dev/ttyUSB0",
+    dmxDevicePath:
+      process.env["DMX_DEVICE_PATH"] ?? base.dmxDevicePath ?? "auto",
     logLevel: process.env["LOG_LEVEL"] ?? "info",
     fixturesPath: process.env["FIXTURES_PATH"] ?? "./config/fixtures.json",
-    mdnsEnabled: process.env["MDNS_ENABLED"] !== "false",
+    mdnsEnabled:
+      process.env["MDNS_ENABLED"] !== undefined
+        ? process.env["MDNS_ENABLED"] !== "false"
+        : (base.mdnsEnabled ?? true),
     portRangeSize: rawPortRangeSize,
     localDbPath: resolveLocalDbPath(),
     corsOrigin: process.env["CORS_ORIGIN"] || undefined,

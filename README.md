@@ -42,6 +42,12 @@ Click **Add to SignalRGB** at the top of this page to auto-install the plugin. A
 
 ### Server
 
+**Option A — Portable (recommended):**
+Download `DMXr-Server-win-x64.zip` from the
+[latest release](https://github.com/thewrz/DMXr/releases/latest),
+extract anywhere, and double-click `DMXr-Server.bat`.
+
+**Option B — From source:**
 ```bash
 cd server
 npm install

@@ -1,7 +1,12 @@
+import { readFile } from "node:fs/promises";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { loadConfig } from "./config/server-config.js";
+import { createSettingsStore } from "./config/settings-store.js";
 import { createUniverseManager } from "./dmx/universe-manager.js";
 import { createResilientConnection } from "./dmx/resilient-connection.js";
 import { createFixtureStore } from "./fixtures/fixture-store.js";
+import { autoDetectDmxPort } from "./dmx/serial-port-scanner.js";
 import {
   createMdnsAdvertiser,
   type MdnsAdvertiser,
@@ -13,9 +18,50 @@ import { createOflProvider } from "./libraries/ofl-provider.js";
 import { createLibraryRegistry } from "./libraries/registry.js";
 import { buildServer } from "./server.js";
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+async function readServerVersion(): Promise<string> {
+  try {
+    const pkgPath = join(__dirname, "..", "package.json");
+    const raw = await readFile(pkgPath, "utf-8");
+    const pkg = JSON.parse(raw) as { version?: string };
+    return pkg.version ?? "0.0.0";
+  } catch {
+    return "0.0.0";
+  }
+}
+
 async function main() {
-  const config = loadConfig();
+  const serverVersion = await readServerVersion();
+  const settingsStore = createSettingsStore("./config/settings.json");
+  const persistedSettings = await settingsStore.load();
+  const config = loadConfig(persistedSettings);
   const startTime = Date.now();
+
+  // Auto-detect DMX port if set to "auto"
+  let resolvedDevicePath = config.dmxDevicePath;
+  if (resolvedDevicePath === "auto" && config.dmxDriver !== "null") {
+    const detected = await autoDetectDmxPort();
+    if (detected) {
+      resolvedDevicePath = detected;
+    } else {
+      process.stderr.write(
+        "[DMXr] No DMX adapter detected. Falling back to null driver (test mode).\n" +
+        "[DMXr] Open the Web Manager to configure your DMX adapter.\n",
+      );
+    }
+  }
+
+  // Build an effective config with the resolved device path
+  const effectiveConfig = resolvedDevicePath !== config.dmxDevicePath
+    ? { ...config, dmxDevicePath: resolvedDevicePath }
+    : config;
+
+  // Fall back to null driver if auto-detect failed
+  const finalConfig =
+    effectiveConfig.dmxDevicePath === "auto" && effectiveConfig.dmxDriver !== "null"
+      ? { ...effectiveConfig, dmxDriver: "null" }
+      : effectiveConfig;
 
   const consoleLogger = {
     info: (msg: string) => process.stdout.write(`[DMX] ${msg}\n`),
@@ -27,7 +73,7 @@ async function main() {
   let managerRef: ReturnType<typeof createUniverseManager> | null = null;
 
   const connection = await createResilientConnection({
-    config,
+    config: finalConfig,
     logger: consoleLogger,
     getChannelSnapshot: () => managerRef?.getFullSnapshot() ?? {},
     onStateChange: (status) => {
@@ -45,27 +91,29 @@ async function main() {
   });
   managerRef = manager;
 
-  const fixtureStore = createFixtureStore(config.fixturesPath);
+  const fixtureStore = createFixtureStore(finalConfig.fixturesPath);
   await fixtureStore.load();
 
   manager.blackout();
 
   const oflClient = createOflClient();
-  const { client: ssClient, status: ssStatus } = createSsClientIfConfigured(config.localDbPath);
+  const { client: ssClient, status: ssStatus } = createSsClientIfConfigured(finalConfig.localDbPath);
 
   const oflProvider = createOflProvider(oflClient);
   const localDbProvider = createLocalDbProvider(ssClient, ssStatus);
   const registry = createLibraryRegistry([oflProvider, localDbProvider]);
 
   const app = await buildServer({
-    config,
+    config: finalConfig,
     manager,
-    driver: config.dmxDriver,
+    driver: finalConfig.dmxDriver,
     startTime,
     fixtureStore,
     oflClient,
     registry,
     getConnectionStatus: () => connection.getStatus(),
+    settingsStore,
+    serverVersion,
   });
 
   let mdnsAdvertiser: MdnsAdvertiser | undefined;
@@ -110,15 +158,34 @@ async function main() {
     shutdown("unhandledRejection").catch(() => process.exit(1));
   });
 
-  const boundPort = await listenWithRetry(app, config);
+  const boundPort = await listenWithRetry(app, finalConfig);
 
-  if (config.mdnsEnabled) {
+  if (finalConfig.mdnsEnabled) {
     mdnsAdvertiser = createMdnsAdvertiser(boundPort);
-    app.log.info(`mDNS: advertising _dmxr._tcp on port ${boundPort}`);
   }
 
-  app.log.info(`DMXr server running on ${config.host}:${boundPort}`);
-  app.log.info(`DMX driver: ${config.dmxDriver}`);
+  // Startup banner
+  const devicePathLabel =
+    finalConfig.dmxDevicePath === config.dmxDevicePath
+      ? finalConfig.dmxDevicePath
+      : `${finalConfig.dmxDevicePath} (auto-detected)`;
+
+  process.stdout.write(
+    "\n" +
+    "  ╔══════════════════════════════════════╗\n" +
+    `  ║  DMXr Server v${serverVersion.padEnd(22)}║\n` +
+    "  ╚══════════════════════════════════════╝\n" +
+    "\n" +
+    `  Port:        ${boundPort}\n` +
+    `  DMX Driver:  ${finalConfig.dmxDriver}\n` +
+    `  COM Port:    ${devicePathLabel}\n` +
+    `  Web Manager: http://localhost:${boundPort}\n` +
+    "\n",
+  );
+
+  if (finalConfig.mdnsEnabled) {
+    app.log.info(`mDNS: advertising _dmxr._tcp on port ${boundPort}`);
+  }
   app.log.info(`Fixtures loaded: ${fixtureStore.getAll().length}`);
   for (const provider of registry.getAll()) {
     const s = provider.status();

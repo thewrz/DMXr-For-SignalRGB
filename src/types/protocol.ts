@@ -35,6 +35,14 @@ export interface FixtureChannel {
   readonly type: string;
   readonly color?: string;
   readonly defaultValue: number;
+  readonly rangeMin?: number;
+  readonly rangeMax?: number;
+}
+
+/** Per-channel manual override (user locks a channel to a fixed value) */
+export interface ChannelOverride {
+  readonly value: number;
+  readonly enabled: boolean;
 }
 
 /** Fixture data source */
@@ -51,6 +59,8 @@ export interface FixtureConfig {
   readonly dmxStartAddress: number;
   readonly channelCount: number;
   readonly channels: readonly FixtureChannel[];
+  readonly channelOverrides?: Readonly<Record<number, ChannelOverride>>;
+  readonly whiteGateThreshold?: number;
 }
 
 /** POST /fixtures request body */
@@ -69,6 +79,8 @@ export interface AddFixtureRequest {
 export interface UpdateFixtureRequest {
   readonly name?: string;
   readonly dmxStartAddress?: number;
+  readonly channelOverrides?: Readonly<Record<number, ChannelOverride>>;
+  readonly whiteGateThreshold?: number;
 }
 
 /** POST /update/colors request body */

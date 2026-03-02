@@ -42,6 +42,12 @@ Click **Add to SignalRGB** at the top of this page to auto-install the plugin. A
 
 ### Server
 
+**Option A — Portable (recommended):**
+Download `DMXr-Server-win-x64.zip` from the
+[latest release](https://github.com/thewrz/DMXr/releases/latest),
+extract anywhere, and double-click `DMXr-Server.bat`.
+
+**Option B — From source:**
 ```bash
 cd server
 npm install
@@ -81,3 +87,13 @@ cd server
 npm test          # Run tests (350+)
 npx tsc --noEmit  # Type check
 ```
+
+## Acknowledgments
+
+DMXr is built on the work of these open-source projects:
+
+- **[dmx-ts](https://github.com/node-dmx/dmx-ts)** — Node.js DMX library with ENTTEC USB Pro driver support. The backbone of all DMX output in this project.
+- **[Open Fixture Library](https://open-fixture-library.org)** — Community-maintained database of DMX fixture definitions. Powers the OFL browser and fixture import in the web UI.
+- **[Alpine.js](https://alpinejs.dev)** — Lightweight reactive framework that drives the entire web manager UI without a build step.
+- **[bonjour-service](https://github.com/onlxltd/bonjour-service)** — mDNS/Zeroconf implementation used for automatic server discovery by the SignalRGB plugin.
+- **[NSSM](https://nssm.cc)** — The Non-Sucking Service Manager, used to run DMXr as a Windows service with auto-restart.

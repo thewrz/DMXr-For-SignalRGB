@@ -70,6 +70,7 @@ function dmxrApp() {
       await this.loadManufacturers();
       await this.loadLibraries();
       this.pollFixtures();
+      await this.checkWizardNeeded();
     },
   };
 
@@ -79,5 +80,7 @@ function dmxrApp() {
     dmxrLibraryBrowser(),
     dmxrSearch(),
     dmxrDragDrop(),
+    dmxrSettings(),
+    dmxrSetupWizard(),
   );
 }

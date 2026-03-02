@@ -26,6 +26,10 @@ export interface HealthResponse {
   readonly lastDmxSendError: string | null;
   readonly connectionState?: "connected" | "disconnected" | "reconnecting";
   readonly reconnectAttempts?: number;
+  readonly version?: string;
+  readonly dmxDevicePath?: string;
+  readonly lastErrorTitle?: string;
+  readonly lastErrorSuggestion?: string;
 }
 
 /** A single DMX channel within a fixture (derived from OFL definition) */

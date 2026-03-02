@@ -10,6 +10,8 @@ interface HealthDeps {
   readonly startTime: number;
   readonly fixtureStore?: FixtureStore;
   readonly getConnectionStatus?: () => ConnectionStatus;
+  readonly serverVersion?: string;
+  readonly dmxDevicePath?: string;
 }
 
 export function registerHealthRoute(
@@ -33,6 +35,10 @@ export function registerHealthRoute(
       lastDmxSendError: dmxStatus.lastSendError,
       connectionState: connStatus?.state,
       reconnectAttempts: connStatus?.reconnectAttempts,
+      version: deps.serverVersion,
+      dmxDevicePath: deps.dmxDevicePath,
+      lastErrorTitle: connStatus?.lastErrorTitle ?? undefined,
+      lastErrorSuggestion: connStatus?.lastErrorSuggestion ?? undefined,
     };
   });
 

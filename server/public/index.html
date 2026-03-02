@@ -11,6 +11,8 @@
   <script src="/js/fixture-manager.js"></script>
   <script src="/js/library-browser.js"></script>
   <script src="/js/search.js"></script>
+  <script src="/js/settings.js"></script>
+  <script src="/js/setup-wizard.js"></script>
   <script src="/js/app.js"></script>
 </head>
 <body x-data="dmxrApp()" x-init="init()">
@@ -27,8 +29,17 @@
       </button>
       <h1>DMXr Fixture Manager</h1>
     </div>
-    <span class="status" :class="serverOnline ? 'online' : 'offline'"
-          x-text="serverOnline ? 'Connected' : 'Disconnected'"></span>
+    <div class="header-right">
+      <button class="btn btn-sm btn-settings" @click="openSettings()" title="Server Settings">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z"/>
+          <path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52l-.094-.319zm-2.633.283c.246-.835 1.428-.835 1.674 0l.094.319a1.873 1.873 0 0 0 2.693 1.115l.291-.16c.764-.415 1.6.42 1.184 1.185l-.159.292a1.873 1.873 0 0 0 1.116 2.692l.318.094c.835.246.835 1.428 0 1.674l-.319.094a1.873 1.873 0 0 0-1.115 2.693l.16.291c.415.764-.421 1.6-1.185 1.184l-.291-.159a1.873 1.873 0 0 0-2.693 1.116l-.094.318c-.246.835-1.428.835-1.674 0l-.094-.319a1.873 1.873 0 0 0-2.692-1.115l-.292.16c-.764.415-1.6-.421-1.184-1.185l.159-.291A1.873 1.873 0 0 0 1.945 8.93l-.319-.094c-.835-.246-.835-1.428 0-1.674l.319-.094A1.873 1.873 0 0 0 3.06 4.377l-.16-.292c-.415-.764.42-1.6 1.185-1.184l.292.159a1.873 1.873 0 0 0 2.692-1.115l.094-.319z"/>
+        </svg>
+        Settings
+      </button>
+      <span class="status" :class="serverOnline ? 'online' : 'offline'"
+            x-text="serverOnline ? 'Connected' : 'Disconnected'"></span>
+    </div>
   </header>
 
   <div class="app-layout" :class="{ 'sidebar-collapsed': !sidebarOpen }">
@@ -309,7 +320,7 @@
                 <strong x-text="fixture.name"></strong>
                 <span class="fixture-meta">
                   <span x-text="fixture.oflFixtureName || fixture.source || ''"></span>
-                  <template x-if="fixture.oflFixtureName || fixture.source"> &middot; </template>
+                  <span x-show="fixture.oflFixtureName || fixture.source"> &middot; </span>
                   <span x-text="fixture.mode"></span>
                 </span>
               </div>
@@ -531,6 +542,136 @@
       </template>
 
       <button class="modal-close" @click="closeAddModal()">&times;</button>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="modal-overlay" x-show="showSettings" x-cloak @click.self="closeSettings()">
+    <div class="modal settings-modal">
+      <h2>Server Settings</h2>
+      <p class="settings-version" x-show="serverVersion" x-text="'DMXr Server v' + serverVersion"></p>
+
+      <div x-show="settingsLoading" class="settings-loading">Loading settings...</div>
+      <p class="validation-error" x-show="settingsError" x-text="settingsError"></p>
+
+      <div x-show="!settingsLoading && !settingsError">
+        <label>DMX Driver</label>
+        <select x-model="settingsDriver">
+          <option value="null">None (test mode)</option>
+          <option value="enttec-usb-dmx-pro">ENTTEC USB DMX Pro</option>
+        </select>
+
+        <label>COM Port</label>
+        <div class="port-row">
+          <select x-model="settingsDevicePath">
+            <option value="auto">Auto-detect</option>
+            <template x-for="port in availablePorts" :key="port.path">
+              <option :value="port.path" x-text="getPortLabel(port)"></option>
+            </template>
+          </select>
+          <button class="btn btn-sm" @click="scanPorts()" :disabled="portsScanning">
+            <span x-text="portsScanning ? 'Scanning...' : 'Scan'"></span>
+          </button>
+        </div>
+
+        <label>Server Port</label>
+        <input type="number" x-model.number="settingsPort" min="1024" max="65535">
+
+        <label>Bind Address</label>
+        <input type="text" x-model="settingsHost" placeholder="0.0.0.0">
+
+        <label class="checkbox-label">
+          <input type="checkbox" x-model="settingsMdns">
+          Enable mDNS discovery
+        </label>
+
+        <div class="settings-actions">
+          <button class="btn btn-primary" @click="saveSettings()">Apply</button>
+          <button class="btn" @click="closeSettings()">Close</button>
+        </div>
+
+        <div class="settings-saved" x-show="settingsSaved" x-cloak>Settings saved.</div>
+
+        <div class="restart-banner" x-show="requiresRestart" x-cloak>
+          <p>Restart required for changes to take effect.</p>
+          <button class="btn btn-warning" @click="restartServer()" :disabled="restarting">
+            <span x-text="restarting ? 'Restarting...' : 'Restart Now'"></span>
+          </button>
+        </div>
+      </div>
+
+      <button class="modal-close" @click="closeSettings()">&times;</button>
+    </div>
+  </div>
+
+  <!-- First-Run Setup Wizard -->
+  <div class="modal-overlay wizard-overlay" x-show="wizardVisible" x-cloak>
+    <div class="modal wizard-modal">
+      <!-- Step 1: Welcome -->
+      <div x-show="wizardStep === 1">
+        <h2>Welcome to DMXr</h2>
+        <p class="wizard-text">DMXr bridges your DMX lighting fixtures into SignalRGB, letting your stage lights react to games, music, and effects.</p>
+        <p class="wizard-text">This server connects to your DMX adapter (like an ENTTEC USB DMX Pro) and receives color data from the SignalRGB plugin.</p>
+        <div class="wizard-actions">
+          <button class="btn btn-primary" @click="wizardNext()">Get Started</button>
+        </div>
+      </div>
+
+      <!-- Step 2: DMX Adapter -->
+      <div x-show="wizardStep === 2">
+        <h2>Select Your DMX Adapter</h2>
+
+        <label>DMX Driver</label>
+        <select x-model="wizardDriver">
+          <option value="null">None (test mode — no DMX output)</option>
+          <option value="enttec-usb-dmx-pro">ENTTEC USB DMX Pro</option>
+        </select>
+
+        <label>COM Port</label>
+        <div class="port-row">
+          <select x-model="wizardDevicePath">
+            <option value="auto">Auto-detect</option>
+            <template x-for="port in wizardPorts" :key="port.path">
+              <option :value="port.path" x-text="getWizardPortLabel(port)"></option>
+            </template>
+          </select>
+          <button class="btn btn-sm" @click="wizardScanPorts()" :disabled="wizardScanning">
+            <span x-text="wizardScanning ? 'Scanning...' : 'Scan Ports'"></span>
+          </button>
+        </div>
+
+        <div class="wizard-hint" x-show="wizardPorts.length === 0">
+          No serial ports detected. If your adapter is plugged in, click "Scan Ports".
+        </div>
+
+        <p class="validation-error" x-show="wizardError" x-text="wizardError"></p>
+
+        <div class="wizard-actions">
+          <button class="btn" @click="wizardBack()">Back</button>
+          <button class="btn btn-primary" @click="wizardNext()">Next</button>
+        </div>
+      </div>
+
+      <!-- Step 3: Ready -->
+      <div x-show="wizardStep === 3">
+        <h2>Ready!</h2>
+        <div class="wizard-summary">
+          <div class="summary-row">
+            <span class="summary-label">DMX Driver:</span>
+            <span x-text="wizardDriver === 'null' ? 'None (test mode)' : 'ENTTEC USB DMX Pro'"></span>
+          </div>
+          <div class="summary-row">
+            <span class="summary-label">COM Port:</span>
+            <span x-text="wizardDevicePath"></span>
+          </div>
+        </div>
+        <p class="wizard-text">You can always change these later in Settings.</p>
+        <p class="validation-error" x-show="wizardError" x-text="wizardError"></p>
+        <div class="wizard-actions">
+          <button class="btn" @click="wizardBack()">Back</button>
+          <button class="btn btn-primary" @click="wizardFinish()">Finish Setup</button>
+        </div>
+      </div>
     </div>
   </div>
 

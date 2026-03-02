@@ -1,0 +1,70 @@
+name: Build Portable Server
+
+on:
+  release:
+    types: [created]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Compile TypeScript
+        working-directory: server
+        run: npx tsc
+
+      - name: Prune dev dependencies
+        working-directory: server
+        run: npm prune --production
+
+      - name: Download portable Node.js
+        shell: pwsh
+        run: |
+          $nodeVersion = node -e "console.log(process.version)"
+          $url = "https://nodejs.org/dist/$nodeVersion/node-$nodeVersion-win-x64.zip"
+          Write-Host "Downloading $url"
+          Invoke-WebRequest -Uri $url -OutFile node-portable.zip
+          Expand-Archive -Path node-portable.zip -DestinationPath node-extracted
+          Copy-Item "node-extracted/node-$nodeVersion-win-x64/node.exe" -Destination node.exe
+
+      - name: Assemble distribution
+        shell: pwsh
+        run: |
+          $dist = "DMXr-Server-win-x64"
+          New-Item -ItemType Directory -Path $dist
+          Copy-Item node.exe -Destination $dist/
+          Copy-Item server/scripts/DMXr-Server.bat -Destination $dist/
+          Copy-Item -Recurse server/dist -Destination $dist/dist
+          Copy-Item -Recurse server/node_modules -Destination $dist/node_modules
+          Copy-Item -Recurse server/public -Destination $dist/public
+          Copy-Item server/package.json -Destination $dist/
+          Compress-Archive -Path $dist -DestinationPath DMXr-Server-win-x64.zip
+
+      - name: Upload release asset
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: DMXr-Server-win-x64.zip
+
+      - name: Upload workflow artifact
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: DMXr-Server-win-x64
+          path: DMXr-Server-win-x64.zip

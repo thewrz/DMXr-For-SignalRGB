@@ -6,6 +6,8 @@ export interface ConnectionStatus {
   readonly lastDisconnectedAt: number | null;
   readonly reconnectAttempts: number;
   readonly lastError: string | null;
+  readonly lastErrorTitle: string | null;
+  readonly lastErrorSuggestion: string | null;
 }
 
 export function createInitialStatus(state: ConnectionState): ConnectionStatus {
@@ -15,5 +17,7 @@ export function createInitialStatus(state: ConnectionState): ConnectionStatus {
     lastDisconnectedAt: null,
     reconnectAttempts: 0,
     lastError: null,
+    lastErrorTitle: null,
+    lastErrorSuggestion: null,
   };
 }

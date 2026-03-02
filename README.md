@@ -32,12 +32,23 @@ Fixture-wise, I've only tested with what I own: a couple of RGB PAR cans, two mo
 
 ## Setup
 
+### Plugin (SignalRGB)
+
+[![Add to SignalRGB](https://github.com/SRGBmods/qmk-plugins/raw/main/_images/add-to-signalrgb.png)](https://srgbmods.net/s?p=addon/install?url=https://github.com/thewrz/DMXr)
+
+Click the button above to auto-install the plugin into SignalRGB. After install, restart SignalRGB and enable DMXr under **Settings → Plugins**.
+
+**Manual install**: Copy `DMXr.js` and `DMXr.qml` from the repo root to `Documents\WhirlwindFX\Plugins\`.
+
+### Server
+
 ```bash
+cd server
 npm install
 npm start
 ```
 
-Copy `plugin/DMXr.js` to your SignalRGB plugins folder, then add fixtures through the web UI at `http://localhost:8080`.
+Add fixtures through the web UI at `http://localhost:8080`.
 
 ### Environment Variables
 
@@ -57,7 +68,7 @@ Copy `plugin/DMXr.js` to your SignalRGB plugins folder, then add fixtures throug
 Windows (NSSM):
 ```bash
 nssm install DMXr node.exe tsx src/index.ts
-nssm set DMXr AppDirectory C:\path\to\DMXr
+nssm set DMXr AppDirectory C:\path\to\DMXr\server
 nssm start DMXr
 ```
 
@@ -66,6 +77,7 @@ Linux (systemd): see `service/dmxr.service`.
 ## Development
 
 ```bash
+cd server
 npm test          # Run tests (350+)
 npx tsc --noEmit  # Type check
 ```

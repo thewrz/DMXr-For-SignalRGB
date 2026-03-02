@@ -2,7 +2,7 @@ node_modules/
 dist/
 *.log
 logs/
-config/fixtures.json
+server/config/fixtures.json
 *.sqlite
 *.sqlite3
 screenshots/

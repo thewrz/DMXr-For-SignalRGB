@@ -3,7 +3,6 @@ dist/
 *.log
 logs/
 config/fixtures.json
-
 *.sqlite
 *.sqlite3
 screenshots/

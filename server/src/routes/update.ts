@@ -6,7 +6,7 @@ import type {
 } from "../types/protocol.js";
 import type { UniverseManager } from "../dmx/universe-manager.js";
 import type { FixtureStore } from "../fixtures/fixture-store.js";
-import { mapColor } from "../fixtures/channel-mapper.js";
+import { processColorBatch } from "../fixtures/color-pipeline.js";
 
 const updateSchema = {
   body: {
@@ -85,52 +85,21 @@ export function registerUpdateRoute(
         return reply.status(500).send({ error: "Fixture store not available" });
       }
 
-      let totalChannels = 0;
-      let fixturesMatched = 0;
-      const allUpdates: Record<number, number> = {};
-
-      for (const entry of request.body.fixtures) {
-        const fixture = deps.fixtureStore.getById(entry.id);
-
-        if (fixture === undefined) {
-          continue;
-        }
-
-        fixturesMatched++;
-
-        const channels = mapColor(
-          fixture,
-          entry.r,
-          entry.g,
-          entry.b,
-          entry.brightness,
-        );
-
-        for (const [addr, val] of Object.entries(channels)) {
-          allUpdates[Number(addr)] = val;
-        }
-
-        totalChannels += Object.keys(channels).length;
-      }
-
-      let channelsUpdated = 0;
-
-      if (totalChannels > 0) {
-        channelsUpdated = deps.manager.applyFixtureUpdate({
-          fixture: "color-batch",
-          channels: allUpdates,
-        });
-      }
+      const result = processColorBatch(
+        request.body.fixtures,
+        deps.fixtureStore,
+        deps.manager,
+      );
 
       request.log.info(
-        { fixturesMatched, channelsUpdated },
-        `color update: ${fixturesMatched} fixtures, ${channelsUpdated} channels`,
+        { fixturesMatched: result.fixturesMatched, channelsUpdated: result.channelsUpdated },
+        `color update: ${result.fixturesMatched} fixtures, ${result.channelsUpdated} channels`,
       );
 
       return {
-        success: channelsUpdated > 0,
-        fixturesUpdated: fixturesMatched,
-        channelsUpdated,
+        success: result.channelsUpdated > 0,
+        fixturesUpdated: result.fixturesMatched,
+        channelsUpdated: result.channelsUpdated,
       };
     },
   );

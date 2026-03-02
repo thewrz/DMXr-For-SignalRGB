@@ -28,6 +28,7 @@ export function createMockUniverse(): DmxUniverse & {
 export function createTestConfig(overrides: Partial<ServerConfig> = {}): ServerConfig {
   return {
     port: 0,
+    udpPort: 0,
     host: "127.0.0.1",
     dmxDriver: "null",
     dmxDevicePath: "",

@@ -4,7 +4,7 @@ export interface MdnsAdvertiser {
   readonly unpublishAll: () => void;
 }
 
-export function createMdnsAdvertiser(port: number): MdnsAdvertiser {
+export function createMdnsAdvertiser(port: number, udpPort?: number): MdnsAdvertiser {
   const bonjour = new Bonjour();
 
   bonjour.publish({
@@ -12,7 +12,11 @@ export function createMdnsAdvertiser(port: number): MdnsAdvertiser {
     type: "dmxr",
     protocol: "tcp",
     port,
-    txt: { version: "1.0", path: "/fixtures" },
+    txt: {
+      version: "1.0",
+      path: "/fixtures",
+      ...(udpPort !== undefined ? { udpPort: String(udpPort) } : {}),
+    },
   });
 
   return {

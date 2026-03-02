@@ -3,6 +3,8 @@ import type { HealthResponse } from "../types/protocol.js";
 import type { UniverseManager } from "../dmx/universe-manager.js";
 import type { FixtureStore } from "../fixtures/fixture-store.js";
 import type { ConnectionStatus } from "../dmx/connection-state.js";
+import type { LatencyTracker } from "../metrics/latency-tracker.js";
+import type { UdpColorServer } from "../udp/udp-color-server.js";
 
 interface HealthDeps {
   readonly manager: UniverseManager;
@@ -12,6 +14,8 @@ interface HealthDeps {
   readonly getConnectionStatus?: () => ConnectionStatus;
   readonly serverVersion?: string;
   readonly dmxDevicePath?: string;
+  readonly latencyTracker?: LatencyTracker;
+  readonly udpServer?: UdpColorServer;
 }
 
 export function registerHealthRoute(
@@ -26,6 +30,9 @@ export function registerHealthRoute(
       dmxStatus.lastSendError !== null ||
       (connStatus !== undefined && connStatus.state !== "connected");
 
+    const udpStats = deps.udpServer?.getStats();
+    const latency = deps.latencyTracker?.getMetrics();
+
     return {
       status: isDegraded ? "degraded" : "ok",
       driver: deps.driver,
@@ -39,6 +46,11 @@ export function registerHealthRoute(
       dmxDevicePath: deps.dmxDevicePath,
       lastErrorTitle: connStatus?.lastErrorTitle ?? undefined,
       lastErrorSuggestion: connStatus?.lastErrorSuggestion ?? undefined,
+      udpActive: udpStats !== undefined ? udpStats.packetsReceived > 0 : undefined,
+      udpPacketsReceived: udpStats?.packetsReceived,
+      latencyAvgMs: latency !== undefined
+        ? Math.round((latency.totalProcessing.avg) * 100) / 100
+        : undefined,
     };
   });
 

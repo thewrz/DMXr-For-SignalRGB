@@ -1,0 +1,155 @@
+import { createSocket, type Socket } from "node:dgram";
+import { parseColorPacket, isParseError, FLAG_BLACKOUT, FLAG_PING, encodeColorPacket } from "./packet-parser.js";
+import { processColorBatch, type ColorEntry } from "../fixtures/color-pipeline.js";
+import type { FixtureStore } from "../fixtures/fixture-store.js";
+import type { UniverseManager } from "../dmx/universe-manager.js";
+import type { LatencyTracker } from "../metrics/latency-tracker.js";
+
+export interface UdpColorServerDeps {
+  readonly fixtureStore: FixtureStore;
+  readonly manager: UniverseManager;
+  readonly latencyTracker?: LatencyTracker;
+  readonly logger?: {
+    readonly info: (msg: string) => void;
+    readonly warn: (msg: string) => void;
+    readonly error: (msg: string) => void;
+  };
+}
+
+export interface UdpColorServerStats {
+  readonly packetsReceived: number;
+  readonly packetsProcessed: number;
+  readonly parseErrors: number;
+  readonly lastSequence: number;
+  readonly sequenceGaps: number;
+}
+
+export interface UdpColorServer {
+  readonly start: (port: number, host?: string) => Promise<number>;
+  readonly close: () => Promise<void>;
+  readonly getStats: () => UdpColorServerStats;
+}
+
+export function createUdpColorServer(deps: UdpColorServerDeps): UdpColorServer {
+  let socket: Socket | null = null;
+  let packetsReceived = 0;
+  let packetsProcessed = 0;
+  let parseErrors = 0;
+  let lastSequence = -1;
+  let sequenceGaps = 0;
+
+  return {
+    start(port: number, host = "0.0.0.0"): Promise<number> {
+      return new Promise((resolve, reject) => {
+        const sock = createSocket("udp4");
+        socket = sock;
+
+        sock.on("error", (err) => {
+          deps.logger?.error(`UDP server error: ${err.message}`);
+          reject(err);
+        });
+
+        sock.on("message", (msg, rinfo) => {
+          packetsReceived++;
+          const receiveTime = performance.now();
+
+          const packet = parseColorPacket(msg);
+
+          if (isParseError(packet)) {
+            parseErrors++;
+            deps.logger?.warn(`UDP parse error from ${rinfo.address}:${rinfo.port}: ${packet.error}`);
+            return;
+          }
+
+          // Sequence gap detection
+          if (lastSequence >= 0) {
+            const expected = (lastSequence + 1) & 0xffff;
+            if (packet.sequence !== expected) {
+              sequenceGaps++;
+            }
+          }
+          lastSequence = packet.sequence;
+
+          // Record network latency (plugin timestamp → server receive)
+          if (deps.latencyTracker && packet.timestamp > 0) {
+            const networkMs = Date.now() - packet.timestamp;
+            deps.latencyTracker.recordNetwork(networkMs);
+          }
+
+          // Handle blackout flag
+          if (packet.flags & FLAG_BLACKOUT) {
+            deps.manager.blackout();
+            packetsProcessed++;
+            return;
+          }
+
+          // Handle ping flag — echo the packet back
+          if (packet.flags & FLAG_PING) {
+            const reply = encodeColorPacket({
+              ...packet,
+              flags: packet.flags & ~FLAG_PING,
+            });
+            sock.send(reply, rinfo.port, rinfo.address);
+          }
+
+          // Map fixture entries to ColorEntry format
+          const entries: ColorEntry[] = packet.fixtures.map((f) => ({
+            fixtureIndex: f.index,
+            r: f.r,
+            g: f.g,
+            b: f.b,
+            brightness: f.brightness / 255,
+          }));
+
+          const mapStart = performance.now();
+          const result = processColorBatch(entries, deps.fixtureStore, deps.manager);
+          const mapDuration = performance.now() - mapStart;
+
+          if (deps.latencyTracker) {
+            deps.latencyTracker.recordColorMap(mapDuration);
+          }
+
+          deps.latencyTracker?.recordProcessed(receiveTime);
+
+          packetsProcessed++;
+
+          if (result.fixturesMatched === 0 && packet.fixtures.length > 0) {
+            deps.logger?.warn(
+              `UDP color update matched 0/${packet.fixtures.length} fixtures (seq=${packet.sequence})`,
+            );
+          }
+        });
+
+        sock.bind(port, host, () => {
+          const addr = sock.address();
+          const boundPort = addr.port;
+          deps.logger?.info(`UDP color server listening on ${host}:${boundPort}`);
+          resolve(boundPort);
+        });
+      });
+    },
+
+    close(): Promise<void> {
+      return new Promise((resolve) => {
+        if (socket === null) {
+          resolve();
+          return;
+        }
+        socket.close(() => {
+          socket = null;
+          resolve();
+        });
+      });
+    },
+
+    getStats(): UdpColorServerStats {
+      return {
+        packetsReceived,
+        packetsProcessed,
+        parseErrors,
+        lastSequence,
+        sequenceGaps,
+      };
+    },
+  };
+}

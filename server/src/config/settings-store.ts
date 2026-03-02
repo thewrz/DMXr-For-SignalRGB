@@ -5,6 +5,7 @@ export interface PersistedSettings {
   readonly dmxDriver: string;
   readonly dmxDevicePath: string;
   readonly port: number;
+  readonly udpPort: number;
   readonly host: string;
   readonly mdnsEnabled: boolean;
   readonly setupCompleted: boolean;
@@ -14,6 +15,7 @@ const DEFAULTS: PersistedSettings = {
   dmxDriver: "null",
   dmxDevicePath: "auto",
   port: 8080,
+  udpPort: 0,
   host: "0.0.0.0",
   mdnsEnabled: true,
   setupCompleted: false,
@@ -34,6 +36,7 @@ function isValidSettings(data: unknown): data is Partial<PersistedSettings> {
   if ("dmxDriver" in record && typeof record["dmxDriver"] !== "string") return false;
   if ("dmxDevicePath" in record && typeof record["dmxDevicePath"] !== "string") return false;
   if ("port" in record && typeof record["port"] !== "number") return false;
+  if ("udpPort" in record && typeof record["udpPort"] !== "number") return false;
   if ("host" in record && typeof record["host"] !== "string") return false;
   if ("mdnsEnabled" in record && typeof record["mdnsEnabled"] !== "boolean") return false;
   if ("setupCompleted" in record && typeof record["setupCompleted"] !== "boolean") return false;

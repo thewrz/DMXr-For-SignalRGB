@@ -870,3 +870,98 @@ header h1 { font-size: 1.4rem; }
 .summary-label {
   color: var(--text-dim);
 }
+
+/* ── Latency Dashboard ── */
+
+.latency-modal {
+  max-width: 600px;
+}
+
+.latency-modal h3 {
+  margin: 1.2rem 0 0.6rem;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+}
+
+.latency-stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.35rem 0;
+}
+
+.latency-label {
+  font-size: 0.9rem;
+  color: var(--text-dim);
+}
+
+.latency-value {
+  font-size: 0.9rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.latency-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.latency-bar-row {
+  display: grid;
+  grid-template-columns: 80px 1fr auto;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.latency-bar-label {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  text-align: right;
+}
+
+.latency-bar-track {
+  height: 14px;
+  background: var(--surface);
+  border-radius: 3px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.latency-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+  min-width: 2px;
+}
+
+.latency-bar-stats {
+  display: flex;
+  gap: 0.75rem;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.latency-bar-stats strong {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.latency-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.25rem 1.5rem;
+}
+
+.text-warning {
+  color: #ffb74d;
+}
+
+.settings-hint {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  font-weight: normal;
+}

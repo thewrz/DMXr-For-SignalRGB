@@ -84,7 +84,7 @@ describe("createSettingsStore", () => {
 
       const settings = await store.load();
 
-      expect(settings).toEqual(full);
+      expect(settings).toEqual({ ...full, udpPort: 0 });
     });
   });
 

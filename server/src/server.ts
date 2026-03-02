@@ -21,7 +21,10 @@ import { registerLibraryRoutes } from "./routes/libraries.js";
 import { registerSignalRgbRoutes } from "./routes/signalrgb.js";
 import { registerSearchRoutes } from "./routes/search.js";
 import { registerSettingsRoutes } from "./routes/settings.js";
+import { registerMetricsRoute } from "./routes/metrics.js";
 import { registerApiKeyAuth } from "./middleware/api-key-auth.js";
+import type { LatencyTracker } from "./metrics/latency-tracker.js";
+import type { UdpColorServer } from "./udp/udp-color-server.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -36,6 +39,8 @@ interface BuildServerDeps {
   readonly getConnectionStatus?: () => ConnectionStatus;
   readonly settingsStore?: SettingsStore;
   readonly serverVersion?: string;
+  readonly latencyTracker?: LatencyTracker;
+  readonly udpServer?: UdpColorServer;
 }
 
 export async function buildServer(
@@ -100,6 +105,8 @@ export async function buildServer(
     getConnectionStatus: deps.getConnectionStatus,
     serverVersion: deps.serverVersion,
     dmxDevicePath: deps.config.dmxDevicePath,
+    latencyTracker: deps.latencyTracker,
+    udpServer: deps.udpServer,
   });
 
   registerUpdateRoute(app, {
@@ -138,6 +145,13 @@ export async function buildServer(
     registerSettingsRoutes(app, {
       settingsStore: deps.settingsStore,
       serverVersion: deps.serverVersion ?? "0.0.0",
+    });
+  }
+
+  if (deps.latencyTracker) {
+    registerMetricsRoute(app, {
+      latencyTracker: deps.latencyTracker,
+      udpServer: deps.udpServer,
     });
   }
 

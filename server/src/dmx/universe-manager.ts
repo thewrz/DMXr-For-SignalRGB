@@ -20,6 +20,7 @@ export interface DmxLogger {
 export interface UniverseManagerOptions {
   readonly onDmxError?: (error: unknown) => void;
   readonly logger?: DmxLogger;
+  readonly onDmxSendTiming?: (durationMs: number) => void;
 }
 
 export interface UniverseManager {
@@ -75,9 +76,12 @@ export function createUniverseManager(
 
   function safeSend(label: string, fn: () => void): void {
     try {
+      const start = performance.now();
       fn();
+      const duration = performance.now() - start;
       lastSendTime = Date.now();
       lastSendError = null;
+      options.onDmxSendTiming?.(duration);
     } catch (error: unknown) {
       lastSendError = error instanceof Error ? error.message : String(error);
       log?.error(`DMX send failed (${label}): ${lastSendError}`);

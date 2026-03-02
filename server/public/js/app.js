@@ -81,6 +81,7 @@ function dmxrApp() {
     dmxrSearch(),
     dmxrDragDrop(),
     dmxrSettings(),
+    dmxrLatency(),
     dmxrSetupWizard(),
   );
 }

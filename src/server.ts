@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import Fastify, { type FastifyInstance } from "fastify";
 import fastifyStatic from "@fastify/static";
 import rateLimit from "@fastify/rate-limit";
+import cors from "@fastify/cors";
 import type { ServerConfig } from "./config/server-config.js";
 import type { UniverseManager } from "./dmx/universe-manager.js";
 import type { FixtureStore } from "./fixtures/fixture-store.js";
@@ -43,6 +44,14 @@ export async function buildServer(
   await app.register(rateLimit, {
     max: 100,
     timeWindow: "1 minute",
+  });
+
+  const corsOrigins = deps.config.corsOrigin
+    ? deps.config.corsOrigin.split(",").map((o) => o.trim())
+    : [/^https?:\/\/localhost(:\d+)?$/, /^https?:\/\/127\.0\.0\.1(:\d+)?$/];
+
+  await app.register(cors, {
+    origin: corsOrigins,
   });
 
   await app.register(fastifyStatic, {

@@ -10,6 +10,7 @@ export interface ServerConfig {
   readonly mdnsEnabled: boolean;
   readonly portRangeSize: number;
   readonly localDbPath?: string;
+  readonly corsOrigin?: string;
 }
 
 const VALID_DRIVERS = ["null", "enttec-usb-dmx-pro"];
@@ -56,6 +57,7 @@ export function loadConfig(): ServerConfig {
     mdnsEnabled: process.env["MDNS_ENABLED"] !== "false",
     portRangeSize: rawPortRangeSize,
     localDbPath: resolveLocalDbPath(),
+    corsOrigin: process.env["CORS_ORIGIN"] || undefined,
   };
 }
 

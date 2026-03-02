@@ -140,6 +140,52 @@ describe("analyzeFixture", () => {
     expect(caps.colors.hasAmber).toBe(true);
     expect(caps.colors.hasUV).toBe(true);
   });
+
+  it("Intensity + Strobe, no colors → isBasicStrobe true", () => {
+    const caps = analyzeFixture([
+      ch(0, "Intensity"),
+      ch(1, "Strobe"),
+      ch(2, "Generic"),
+    ]);
+
+    expect(caps.isBasicStrobe).toBe(true);
+  });
+
+  it("ShutterStrobe + no colors → isBasicStrobe true", () => {
+    const caps = analyzeFixture([
+      ch(0, "Intensity"),
+      ch(1, "ShutterStrobe"),
+    ]);
+
+    expect(caps.isBasicStrobe).toBe(true);
+  });
+
+  it("Strobe + RGB → isBasicStrobe false", () => {
+    const caps = analyzeFixture([
+      ch(0, "Intensity"),
+      ch(1, "ColorIntensity", "Red"),
+      ch(2, "ColorIntensity", "Green"),
+      ch(3, "ColorIntensity", "Blue"),
+      ch(4, "Strobe"),
+    ]);
+
+    expect(caps.isBasicStrobe).toBe(false);
+  });
+
+  it("No strobe → isBasicStrobe false", () => {
+    const caps = analyzeFixture([
+      ch(0, "Intensity"),
+      ch(1, "ColorIntensity", "Red"),
+    ]);
+
+    expect(caps.isBasicStrobe).toBe(false);
+  });
+
+  it("empty channels → isBasicStrobe false", () => {
+    const caps = analyzeFixture([]);
+
+    expect(caps.isBasicStrobe).toBe(false);
+  });
 });
 
 describe("defaultValueForChannel", () => {

@@ -18,6 +18,7 @@ export interface FixtureCapabilities {
   readonly hasDimmer: boolean;
   readonly colors: ColorCapabilities;
   readonly strobeMode: StrobeMode;
+  readonly isBasicStrobe: boolean;
   readonly hasPan: boolean;
   readonly hasTilt: boolean;
   readonly channelsByType: ReadonlyMap<string, readonly FixtureChannel[]>;
@@ -71,6 +72,10 @@ export function analyzeFixture(
       : "shutter"
     : "none";
 
+  const hasRGB = colorFlags["Red"] === true ||
+    colorFlags["Green"] === true ||
+    colorFlags["Blue"] === true;
+
   return {
     hasDimmer,
     colors: {
@@ -85,6 +90,7 @@ export function analyzeFixture(
       hasUV: colorFlags["UV"] === true,
     },
     strobeMode,
+    isBasicStrobe: hasStrobe && !hasRGB,
     hasPan,
     hasTilt,
     channelsByType: byType,

@@ -19,6 +19,7 @@ import { registerControlRoutes } from "./routes/control.js";
 import { registerLibraryRoutes } from "./routes/libraries.js";
 import { registerSignalRgbRoutes } from "./routes/signalrgb.js";
 import { registerSearchRoutes } from "./routes/search.js";
+import { registerApiKeyAuth } from "./middleware/api-key-auth.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -66,6 +67,10 @@ export async function buildServer(
       },
     },
   });
+
+  if (deps.config.apiKey) {
+    registerApiKeyAuth(app, deps.config.apiKey);
+  }
 
   await app.register(fastifyStatic, {
     root: join(__dirname, "..", "public"),

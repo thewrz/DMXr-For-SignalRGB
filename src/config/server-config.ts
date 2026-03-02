@@ -11,6 +11,7 @@ export interface ServerConfig {
   readonly portRangeSize: number;
   readonly localDbPath?: string;
   readonly corsOrigin?: string;
+  readonly apiKey?: string;
 }
 
 const VALID_DRIVERS = ["null", "enttec-usb-dmx-pro"];
@@ -58,6 +59,7 @@ export function loadConfig(): ServerConfig {
     portRangeSize: rawPortRangeSize,
     localDbPath: resolveLocalDbPath(),
     corsOrigin: process.env["CORS_ORIGIN"] || undefined,
+    apiKey: process.env["API_KEY"] || undefined,
   };
 }
 

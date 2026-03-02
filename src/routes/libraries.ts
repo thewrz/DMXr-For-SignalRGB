@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
 import type { LibraryRegistry, FixtureLibraryProvider } from "../libraries/types.js";
 import type { FixtureStore } from "../fixtures/fixture-store.js";
+import type { FixtureSource } from "../types/protocol.js";
 import { validateFixtureAddress, validateFixtureChannels } from "../fixtures/fixture-validator.js";
 
 interface LibraryRouteDeps {
@@ -61,6 +62,25 @@ function requireProvider(
   return provider;
 }
 
+const FIXTURE_SOURCES: readonly string[] = ["ofl", "local-db", "custom"];
+
+function isFixtureSource(value: string): value is FixtureSource {
+  return FIXTURE_SOURCES.includes(value);
+}
+
+function parseIntParam(
+  value: string,
+  name: string,
+  reply: FastifyReply,
+): number | null {
+  const parsed = parseInt(value, 10);
+  if (!Number.isFinite(parsed)) {
+    reply.status(400).send({ error: `Invalid ${name}` });
+    return null;
+  }
+  return parsed;
+}
+
 export function registerLibraryRoutes(
   app: FastifyInstance,
   deps: LibraryRouteDeps,
@@ -96,10 +116,8 @@ export function registerLibraryRoutes(
     async (request, reply) => {
       const provider = requireProvider(deps.registry, request.params.id, reply);
       if (!provider) return;
-      const mfrId = parseInt(request.params.mfrId, 10);
-      if (!Number.isFinite(mfrId)) {
-        return reply.status(400).send({ error: "Invalid manufacturer ID" });
-      }
+      const mfrId = parseIntParam(request.params.mfrId, "manufacturer ID", reply);
+      if (mfrId === null) return;
       try {
         return provider.getFixtures(mfrId);
       } catch (error) {
@@ -114,10 +132,8 @@ export function registerLibraryRoutes(
     async (request, reply) => {
       const provider = requireProvider(deps.registry, request.params.id, reply);
       if (!provider) return;
-      const fid = parseInt(request.params.fid, 10);
-      if (!Number.isFinite(fid)) {
-        return reply.status(400).send({ error: "Invalid fixture ID" });
-      }
+      const fid = parseIntParam(request.params.fid, "fixture ID", reply);
+      if (fid === null) return;
       try {
         const modes = provider.getFixtureModes(fid);
         return { fixtureId: fid, modes };
@@ -133,10 +149,8 @@ export function registerLibraryRoutes(
     async (request, reply) => {
       const provider = requireProvider(deps.registry, request.params.id, reply);
       if (!provider) return;
-      const mid = parseInt(request.params.mid, 10);
-      if (!Number.isFinite(mid)) {
-        return reply.status(400).send({ error: "Invalid mode ID" });
-      }
+      const mid = parseIntParam(request.params.mid, "mode ID", reply);
+      if (mid === null) return;
       try {
         return provider.getModeChannels(mid);
       } catch (error) {
@@ -156,15 +170,11 @@ export function registerLibraryRoutes(
       const provider = requireProvider(deps.registry, request.params.id, reply);
       if (!provider) return;
 
-      const fixtureId = parseInt(request.params.fid, 10);
-      if (!Number.isFinite(fixtureId)) {
-        return reply.status(400).send({ error: "Invalid fixture ID" });
-      }
+      const fixtureId = parseIntParam(request.params.fid, "fixture ID", reply);
+      if (fixtureId === null) return;
 
-      const modeId = parseInt(request.params.mid, 10);
-      if (!Number.isFinite(modeId)) {
-        return reply.status(400).send({ error: "Invalid mode ID" });
-      }
+      const modeId = parseIntParam(request.params.mid, "mode ID", reply);
+      if (modeId === null) return;
 
       let channels: readonly import("../types/protocol.js").FixtureChannel[];
       try {
@@ -213,7 +223,7 @@ export function registerLibraryRoutes(
 
       const fixture = deps.store.add({
         name: request.body.name,
-        source: provider.id as "local-db",
+        source: isFixtureSource(provider.id) ? provider.id : "custom",
         mode: modeName,
         dmxStartAddress: request.body.dmxStartAddress,
         channelCount: channels.length,

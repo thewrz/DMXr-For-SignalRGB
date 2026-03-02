@@ -38,6 +38,7 @@ describe("Fixture routes", () => {
   });
 
   afterEach(async () => {
+    store.dispose();
     await app.close();
   });
 

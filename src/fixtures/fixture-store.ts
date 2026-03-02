@@ -10,7 +10,9 @@ export interface FixtureStore {
   readonly update: (id: string, changes: UpdateFixtureRequest) => FixtureConfig | undefined;
   readonly remove: (id: string) => boolean;
   readonly save: () => Promise<void>;
+  readonly scheduleSave: () => void;
   readonly load: () => Promise<void>;
+  readonly dispose: () => void;
 }
 
 function isValidFixtureArray(data: unknown): data is FixtureConfig[] {
@@ -28,9 +30,12 @@ function isValidFixtureArray(data: unknown): data is FixtureConfig[] {
   );
 }
 
+const SAVE_DEBOUNCE_MS = 250;
+
 export function createFixtureStore(filePath: string): FixtureStore {
   let fixtures: FixtureConfig[] = [];
   let saveChain: Promise<void> = Promise.resolve();
+  let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
   return {
     getAll(): readonly FixtureConfig[] {
@@ -88,6 +93,25 @@ export function createFixtureStore(filePath: string): FixtureStore {
         await rename(tmpPath, filePath);
       });
       return saveChain;
+    },
+
+    scheduleSave(): void {
+      if (saveTimer !== null) {
+        clearTimeout(saveTimer);
+      }
+      saveTimer = setTimeout(() => {
+        saveTimer = null;
+        this.save().catch(() => {
+          // best-effort persistence — in-memory state is authoritative
+        });
+      }, SAVE_DEBOUNCE_MS);
+    },
+
+    dispose(): void {
+      if (saveTimer !== null) {
+        clearTimeout(saveTimer);
+        saveTimer = null;
+      }
     },
 
     async load(): Promise<void> {

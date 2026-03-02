@@ -131,7 +131,11 @@ export function registerFixtureRoutes(
       }
 
       const updated = deps.store.update(request.params.id, request.body);
-      await deps.store.save();
+
+      // Debounced save: in-memory state is already updated for mapColor.
+      // Don't block the response on disk I/O — rapid slider drags would
+      // queue sequential writes that stall the event loop for color updates.
+      deps.store.scheduleSave();
 
       return reply.status(200).send(updated);
     },

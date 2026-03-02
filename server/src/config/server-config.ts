@@ -3,6 +3,7 @@ import type { PersistedSettings } from "./settings-store.js";
 
 export interface ServerConfig {
   readonly port: number;
+  readonly udpPort: number;
   readonly host: string;
   readonly dmxDriver: string;
   readonly dmxDevicePath: string;
@@ -57,8 +58,14 @@ export function loadConfig(
     );
   }
 
+  const rawUdpPort = parseInt(
+    process.env["UDP_PORT"] ?? String(base.udpPort ?? 0),
+    10,
+  );
+
   return {
     port: rawPort,
+    udpPort: Number.isFinite(rawUdpPort) && rawUdpPort >= 0 ? rawUdpPort : 0,
     host: process.env["HOST"] ?? base.host ?? "0.0.0.0",
     dmxDriver,
     dmxDevicePath:

@@ -12,6 +12,7 @@
   <script src="/js/library-browser.js"></script>
   <script src="/js/search.js"></script>
   <script src="/js/settings.js"></script>
+  <script src="/js/latency.js"></script>
   <script src="/js/setup-wizard.js"></script>
   <script src="/js/app.js"></script>
 </head>
@@ -30,6 +31,13 @@
       <h1>DMXr Fixture Manager</h1>
     </div>
     <div class="header-right">
+      <button class="btn btn-sm" @click="openLatency()" title="Latency Dashboard">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71V3.5z"/>
+          <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0z"/>
+        </svg>
+        Latency
+      </button>
       <button class="btn btn-sm btn-settings" @click="openSettings()" title="Server Settings">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
           <path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z"/>
@@ -574,8 +582,11 @@
           </button>
         </div>
 
-        <label>Server Port</label>
+        <label>HTTP Port</label>
         <input type="number" x-model.number="settingsPort" min="1024" max="65535">
+
+        <label>UDP Port <span class="settings-hint">(0 = HTTP port + 1)</span></label>
+        <input type="number" x-model.number="settingsUdpPort" min="0" max="65535">
 
         <label>Bind Address</label>
         <input type="text" x-model="settingsHost" placeholder="0.0.0.0">
@@ -601,6 +612,72 @@
       </div>
 
       <button class="modal-close" @click="closeSettings()">&times;</button>
+    </div>
+  </div>
+
+  <!-- Latency Dashboard Modal -->
+  <div class="modal-overlay" x-show="showLatency" x-cloak @click.self="closeLatency()">
+    <div class="modal latency-modal">
+      <h2>Latency Dashboard</h2>
+
+      <p class="validation-error" x-show="latencyError" x-text="latencyError"></p>
+
+      <div x-show="!latencyError">
+        <!-- Throughput -->
+        <div class="latency-stat-row">
+          <span class="latency-label">Packets/sec</span>
+          <span class="latency-value" x-text="packetsPerSecond"></span>
+        </div>
+
+        <!-- Pipeline Breakdown -->
+        <h3>Pipeline Latency</h3>
+        <div class="latency-bars">
+          <template x-for="segment in [
+            { label: 'Network', data: networkLatency, color: '#4fc3f7' },
+            { label: 'Color Map', data: colorMapLatency, color: '#81c784' },
+            { label: 'DMX Send', data: dmxSendLatency, color: '#ffb74d' },
+            { label: 'Total', data: totalLatency, color: '#e57373' }
+          ]" :key="segment.label">
+            <div class="latency-bar-row">
+              <span class="latency-bar-label" x-text="segment.label"></span>
+              <div class="latency-bar-track">
+                <div class="latency-bar-fill"
+                     :style="'width:' + barWidth(segment.data?.avg, totalLatency?.p99 || 10) + ';background:' + segment.color">
+                </div>
+              </div>
+              <div class="latency-bar-stats">
+                <span>avg <strong x-text="formatMs(segment.data?.avg)"></strong>ms</span>
+                <span>p95 <strong x-text="formatMs(segment.data?.p95)"></strong>ms</span>
+                <span>p99 <strong x-text="formatMs(segment.data?.p99)"></strong>ms</span>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <!-- UDP Stats -->
+        <h3>UDP Transport</h3>
+        <div class="latency-stats-grid">
+          <div class="latency-stat-row">
+            <span class="latency-label">Packets Received</span>
+            <span class="latency-value" x-text="udpPacketsReceived.toLocaleString()"></span>
+          </div>
+          <div class="latency-stat-row">
+            <span class="latency-label">Packets Processed</span>
+            <span class="latency-value" x-text="udpPacketsProcessed.toLocaleString()"></span>
+          </div>
+          <div class="latency-stat-row">
+            <span class="latency-label">Parse Errors</span>
+            <span class="latency-value" :class="udpParseErrors > 0 ? 'text-warning' : ''"
+                  x-text="udpParseErrors"></span>
+          </div>
+          <div class="latency-stat-row">
+            <span class="latency-label">Packet Loss</span>
+            <span class="latency-value" x-text="lossRate()"></span>
+          </div>
+        </div>
+      </div>
+
+      <button class="modal-close" @click="closeLatency()">&times;</button>
     </div>
   </div>
 

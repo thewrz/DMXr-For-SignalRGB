@@ -9,6 +9,7 @@ function dmxrSettings() {
     settingsDriver: "null",
     settingsDevicePath: "auto",
     settingsPort: 8080,
+    settingsUdpPort: 0,
     settingsHost: "0.0.0.0",
     settingsMdns: true,
     settingsSetupCompleted: false,
@@ -40,6 +41,7 @@ function dmxrSettings() {
         this.settingsDriver = s.dmxDriver;
         this.settingsDevicePath = s.dmxDevicePath;
         this.settingsPort = s.port;
+        this.settingsUdpPort = s.udpPort || 0;
         this.settingsHost = s.host;
         this.settingsMdns = s.mdnsEnabled;
         this.settingsSetupCompleted = s.setupCompleted;
@@ -64,6 +66,7 @@ function dmxrSettings() {
             dmxDriver: this.settingsDriver,
             dmxDevicePath: this.settingsDevicePath,
             port: this.settingsPort,
+            udpPort: this.settingsUdpPort,
             host: this.settingsHost,
             mdnsEnabled: this.settingsMdns,
           }),

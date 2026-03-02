@@ -17,6 +17,8 @@ import { createLocalDbProvider } from "./libraries/local-db-provider.js";
 import { createOflProvider } from "./libraries/ofl-provider.js";
 import { createLibraryRegistry } from "./libraries/registry.js";
 import { buildServer } from "./server.js";
+import { createUdpColorServer } from "./udp/udp-color-server.js";
+import { createLatencyTracker } from "./metrics/latency-tracker.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -85,9 +87,12 @@ async function main() {
     },
   });
 
+  const latencyTracker = createLatencyTracker();
+
   const manager = createUniverseManager(connection.universe, {
     logger: consoleLogger,
     onDmxError: (err) => process.stderr.write(`[DMX] Send error: ${err}\n`),
+    onDmxSendTiming: (ms) => latencyTracker.recordDmxSend(ms),
   });
   managerRef = manager;
 
@@ -103,6 +108,13 @@ async function main() {
   const localDbProvider = createLocalDbProvider(ssClient, ssStatus);
   const registry = createLibraryRegistry([oflProvider, localDbProvider]);
 
+  const udpServer = createUdpColorServer({
+    fixtureStore,
+    manager,
+    latencyTracker,
+    logger: consoleLogger,
+  });
+
   const app = await buildServer({
     config: finalConfig,
     manager,
@@ -114,6 +126,8 @@ async function main() {
     getConnectionStatus: () => connection.getStatus(),
     settingsStore,
     serverVersion,
+    latencyTracker,
+    udpServer,
   });
 
   let mdnsAdvertiser: MdnsAdvertiser | undefined;
@@ -139,6 +153,7 @@ async function main() {
       provider.close?.();
     }
     manager.blackout();
+    await udpServer.close();
     await app.close();
     await connection.close();
     process.exit(0);
@@ -160,8 +175,12 @@ async function main() {
 
   const boundPort = await listenWithRetry(app, finalConfig);
 
+  // Start UDP color server — use configured port, or HTTP port + 1
+  const udpPortTarget = finalConfig.udpPort > 0 ? finalConfig.udpPort : boundPort + 1;
+  const boundUdpPort = await udpServer.start(udpPortTarget, finalConfig.host);
+
   if (finalConfig.mdnsEnabled) {
-    mdnsAdvertiser = createMdnsAdvertiser(boundPort);
+    mdnsAdvertiser = createMdnsAdvertiser(boundPort, boundUdpPort);
   }
 
   // Startup banner
@@ -176,7 +195,8 @@ async function main() {
     `  ║  DMXr Server v${serverVersion.padEnd(22)}║\n` +
     "  ╚══════════════════════════════════════╝\n" +
     "\n" +
-    `  Port:        ${boundPort}\n` +
+    `  HTTP Port:   ${boundPort}\n` +
+    `  UDP Port:    ${boundUdpPort}\n` +
     `  DMX Driver:  ${finalConfig.dmxDriver}\n` +
     `  COM Port:    ${devicePathLabel}\n` +
     `  Web Manager: http://localhost:${boundPort}\n` +
@@ -184,7 +204,7 @@ async function main() {
   );
 
   if (finalConfig.mdnsEnabled) {
-    app.log.info(`mDNS: advertising _dmxr._tcp on port ${boundPort}`);
+    app.log.info(`mDNS: advertising _dmxr._tcp on port ${boundPort} (UDP: ${boundUdpPort})`);
   }
   app.log.info(`Fixtures loaded: ${fixtureStore.getAll().length}`);
   for (const provider of registry.getAll()) {

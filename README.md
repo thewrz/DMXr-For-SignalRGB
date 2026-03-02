@@ -1,6 +1,8 @@
 # DMXr
 
-Bridge DMX lighting fixtures into [SignalRGB](https://signalrgb.com) as first-class canvas devices.
+Control your DMX lighting fixtures from [SignalRGB](https://signalrgb.com) — sync stage lights, PARs, moving heads, and strobes with your PC lighting effects.
+
+> Currently targets SignalRGB (Windows). [OpenRGB](https://openrgb.org) support for native Linux is planned.
 
 ## What it does
 

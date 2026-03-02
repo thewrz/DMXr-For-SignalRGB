@@ -1,6 +1,17 @@
 import type { FixtureConfig } from "../types/protocol.js";
 import { analyzeFixture } from "./fixture-capabilities.js";
 
+export const DEFAULT_WHITE_GATE_THRESHOLD = 240;
+
+export function isWhiteGateOpen(
+  r: number,
+  g: number,
+  b: number,
+  threshold: number,
+): boolean {
+  return r >= threshold && g >= threshold && b >= threshold;
+}
+
 /**
  * Maps RGB + brightness to DMX channel values for a fixture,
  * based on its channel definitions from OFL.
@@ -17,6 +28,16 @@ export function mapColor(
   const result: Record<number, number> = {};
   const base = fixture.dmxStartAddress;
   const caps = analyzeFixture(fixture.channels);
+
+  if (caps.isBasicStrobe) {
+    const threshold = DEFAULT_WHITE_GATE_THRESHOLD;
+    if (!isWhiteGateOpen(r, g, b, threshold)) {
+      for (const channel of fixture.channels) {
+        result[base + channel.offset] = 0;
+      }
+      return result;
+    }
+  }
 
   let scaledR = r;
   let scaledG = g;

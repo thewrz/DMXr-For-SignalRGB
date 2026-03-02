@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { mapColor } from "./channel-mapper.js";
+import { mapColor, isWhiteGateOpen, DEFAULT_WHITE_GATE_THRESHOLD } from "./channel-mapper.js";
 import type { FixtureConfig, FixtureChannel } from "../types/protocol.js";
 
 function makeFixture(
@@ -283,5 +283,130 @@ describe("mapColor", () => {
     const result = mapColor(fixture, 255, 255, 255, 1.0);
 
     expect(result[1]).toBe(0);
+  });
+
+  // White-gate tests for basic strobe fixtures
+  it("basic strobe + white (255,255,255) → normal output (gate open)", () => {
+    const fixture = makeFixture([
+      { offset: 0, name: "Dimmer", type: "Intensity", defaultValue: 0 },
+      { offset: 1, name: "Strobe", type: "Strobe", defaultValue: 0 },
+      { offset: 2, name: "Mode", type: "Generic", defaultValue: 128 },
+    ]);
+
+    const result = mapColor(fixture, 255, 255, 255, 1.0);
+
+    expect(result[1]).toBe(255); // dimmer on
+    expect(result[2]).toBe(0);   // strobe = effect mode → 0
+    expect(result[3]).toBe(128); // generic default
+  });
+
+  it("basic strobe + near-white (245,250,248) → normal output", () => {
+    const fixture = makeFixture([
+      { offset: 0, name: "Dimmer", type: "Intensity", defaultValue: 0 },
+      { offset: 1, name: "Strobe", type: "Strobe", defaultValue: 0 },
+      { offset: 2, name: "Mode", type: "Generic", defaultValue: 128 },
+    ]);
+
+    const result = mapColor(fixture, 245, 250, 248, 1.0);
+
+    expect(result[1]).toBe(255); // dimmer still full
+  });
+
+  it("basic strobe + red (255,0,0) → ALL channels 0", () => {
+    const fixture = makeFixture([
+      { offset: 0, name: "Dimmer", type: "Intensity", defaultValue: 0 },
+      { offset: 1, name: "Strobe", type: "Strobe", defaultValue: 0 },
+      { offset: 2, name: "Mode", type: "Generic", defaultValue: 128 },
+    ]);
+
+    const result = mapColor(fixture, 255, 0, 0, 1.0);
+
+    expect(result[1]).toBe(0);
+    expect(result[2]).toBe(0);
+    expect(result[3]).toBe(0);
+  });
+
+  it("basic strobe + dim white (200,200,200) → ALL channels 0", () => {
+    const fixture = makeFixture([
+      { offset: 0, name: "Dimmer", type: "Intensity", defaultValue: 0 },
+      { offset: 1, name: "Strobe", type: "Strobe", defaultValue: 0 },
+    ]);
+
+    const result = mapColor(fixture, 200, 200, 200, 1.0);
+
+    expect(result[1]).toBe(0);
+    expect(result[2]).toBe(0);
+  });
+
+  it("basic strobe boundary: (240,240,240) → open", () => {
+    const fixture = makeFixture([
+      { offset: 0, name: "Dimmer", type: "Intensity", defaultValue: 0 },
+      { offset: 1, name: "Strobe", type: "Strobe", defaultValue: 0 },
+    ]);
+
+    const result = mapColor(fixture, 240, 240, 240, 1.0);
+
+    expect(result[1]).toBe(255); // dimmer on (gate open)
+  });
+
+  it("basic strobe boundary: (240,239,240) → closed", () => {
+    const fixture = makeFixture([
+      { offset: 0, name: "Dimmer", type: "Intensity", defaultValue: 0 },
+      { offset: 1, name: "Strobe", type: "Strobe", defaultValue: 0 },
+    ]);
+
+    const result = mapColor(fixture, 240, 239, 240, 1.0);
+
+    expect(result[1]).toBe(0);
+    expect(result[2]).toBe(0);
+  });
+
+  it("PAR with strobe + RGB channels → not gated (not basic strobe)", () => {
+    const fixture = makeFixture([
+      { offset: 0, name: "Dimmer", type: "Intensity", defaultValue: 0 },
+      { offset: 1, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
+      { offset: 2, name: "Green", type: "ColorIntensity", color: "Green", defaultValue: 0 },
+      { offset: 3, name: "Blue", type: "ColorIntensity", color: "Blue", defaultValue: 0 },
+      { offset: 4, name: "Strobe", type: "Strobe", defaultValue: 0 },
+    ]);
+
+    const result = mapColor(fixture, 255, 0, 0, 1.0);
+
+    expect(result[1]).toBe(255); // dimmer = brightness * 255 = 255
+    expect(result[2]).toBe(255); // red on
+  });
+
+  it("RGB-only fixture → not gated", () => {
+    const fixture = makeFixture([
+      { offset: 0, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
+      { offset: 1, name: "Green", type: "ColorIntensity", color: "Green", defaultValue: 0 },
+      { offset: 2, name: "Blue", type: "ColorIntensity", color: "Blue", defaultValue: 0 },
+    ]);
+
+    const result = mapColor(fixture, 255, 0, 0, 1.0);
+
+    expect(result[1]).toBe(255); // red on (not gated)
+  });
+});
+
+describe("isWhiteGateOpen", () => {
+  it("returns true when all >= threshold", () => {
+    expect(isWhiteGateOpen(255, 255, 255, 240)).toBe(true);
+  });
+
+  it("returns true at exact threshold", () => {
+    expect(isWhiteGateOpen(240, 240, 240, 240)).toBe(true);
+  });
+
+  it("returns false when one below threshold", () => {
+    expect(isWhiteGateOpen(240, 239, 240, 240)).toBe(false);
+  });
+
+  it("returns false for pure red", () => {
+    expect(isWhiteGateOpen(255, 0, 0, 240)).toBe(false);
+  });
+
+  it("DEFAULT_WHITE_GATE_THRESHOLD is 240", () => {
+    expect(DEFAULT_WHITE_GATE_THRESHOLD).toBe(240);
   });
 });

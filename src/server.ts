@@ -50,7 +50,13 @@ export async function buildServer(
 
   const corsOrigins = deps.config.corsOrigin
     ? deps.config.corsOrigin.split(",").map((o) => o.trim())
-    : [/^https?:\/\/localhost(:\d+)?$/, /^https?:\/\/127\.0\.0\.1(:\d+)?$/];
+    : [
+        /^https?:\/\/localhost(:\d+)?$/,
+        /^https?:\/\/127\.0\.0\.1(:\d+)?$/,
+        /^https?:\/\/192\.168\.\d{1,3}\.\d{1,3}(:\d+)?$/,
+        /^https?:\/\/10\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?$/,
+        /^https?:\/\/172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}(:\d+)?$/,
+      ];
 
   await app.register(cors, {
     origin: corsOrigins,
@@ -60,12 +66,16 @@ export async function buildServer(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-eval'"],
+        scriptSrc: ["'self'", "'unsafe-eval'", "'unsafe-inline'"],
+        scriptSrcAttr: ["'unsafe-inline'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
-        imgSrc: ["'self'"],
+        imgSrc: ["'self'", "data:"],
         connectSrc: ["'self'"],
+        mediaSrc: ["'self'", "data:"],
+        upgradeInsecureRequests: null,
       },
     },
+    crossOriginResourcePolicy: { policy: "cross-origin" },
   });
 
   if (deps.config.apiKey) {

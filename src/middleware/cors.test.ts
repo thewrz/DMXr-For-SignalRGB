@@ -54,6 +54,18 @@ describe("CORS", () => {
       );
     });
 
+    it("allows LAN origin (192.168.x.x)", async () => {
+      const res = await app.inject({
+        method: "GET",
+        url: "/health",
+        headers: { origin: "http://192.168.1.75:8080" },
+      });
+
+      expect(res.headers["access-control-allow-origin"]).toBe(
+        "http://192.168.1.75:8080",
+      );
+    });
+
     it("rejects foreign origin", async () => {
       const res = await app.inject({
         method: "GET",

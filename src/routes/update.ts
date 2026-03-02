@@ -56,7 +56,7 @@ export function registerUpdateRoute(
 ): void {
   app.post<{ Body: FixtureUpdatePayload }>(
     "/update",
-    { schema: updateSchema },
+    { schema: updateSchema, config: { rateLimit: { max: 600, timeWindow: "1 minute" } } },
     async (request): Promise<FixtureUpdateResponse> => {
       const { fixture, channels } = request.body;
       const channelsUpdated = deps.manager.applyFixtureUpdate({
@@ -79,7 +79,7 @@ export function registerUpdateRoute(
 
   app.post<{ Body: ColorUpdatePayload }>(
     "/update/colors",
-    { schema: colorUpdateSchema },
+    { schema: colorUpdateSchema, config: { rateLimit: { max: 6000, timeWindow: "1 minute" } } },
     async (request, reply) => {
       if (deps.fixtureStore === undefined) {
         return reply.status(500).send({ error: "Fixture store not available" });

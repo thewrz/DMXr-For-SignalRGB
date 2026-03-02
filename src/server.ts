@@ -2,6 +2,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import Fastify, { type FastifyInstance } from "fastify";
 import fastifyStatic from "@fastify/static";
+import rateLimit from "@fastify/rate-limit";
 import type { ServerConfig } from "./config/server-config.js";
 import type { UniverseManager } from "./dmx/universe-manager.js";
 import type { FixtureStore } from "./fixtures/fixture-store.js";
@@ -37,6 +38,11 @@ export async function buildServer(
     logger: {
       level: deps.config.logLevel,
     },
+  });
+
+  await app.register(rateLimit, {
+    max: 100,
+    timeWindow: "1 minute",
   });
 
   await app.register(fastifyStatic, {

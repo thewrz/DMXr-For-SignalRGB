@@ -11,7 +11,7 @@ export function registerMetricsRoute(
   app: FastifyInstance,
   deps: MetricsDeps,
 ): void {
-  app.get("/metrics", async () => {
+  app.get("/metrics", { config: { rateLimit: { max: 120, timeWindow: "1 minute" } } }, async () => {
     const latency = deps.latencyTracker.getMetrics();
     const udpStats = deps.udpServer?.getStats();
 

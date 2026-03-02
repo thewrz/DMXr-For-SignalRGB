@@ -143,8 +143,8 @@ export function registerSearchRoutes(
               fixtureCount: m.fixtureCount,
             });
           }
-        } catch {
-          // Library unavailable, continue with other sources
+        } catch (error) {
+          request.log.debug({ err: error, provider: provider.id }, "Library search unavailable");
         }
       }
 
@@ -185,8 +185,8 @@ export function registerSearchRoutes(
             fixtureCount: mfr.fixtureCount,
           });
         }
-      } catch {
-        // OFL unavailable
+      } catch (error) {
+        request.log.debug({ err: error }, "OFL search unavailable");
       }
 
       // Sort by score descending, return top 20

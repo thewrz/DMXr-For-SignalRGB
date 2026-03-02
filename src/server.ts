@@ -118,5 +118,16 @@ export async function buildServer(
     registry: deps.registry,
   });
 
+  app.setErrorHandler((error, request, reply) => {
+    request.log.error({ err: error }, "Unhandled error");
+    const statusCode = error.statusCode ?? 500;
+    if (statusCode >= 500) {
+      return reply.status(statusCode).send({ error: "Internal server error" });
+    }
+    return reply
+      .status(statusCode)
+      .send({ error: error.message || "Request error" });
+  });
+
   return app;
 }

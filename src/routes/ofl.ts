@@ -31,9 +31,12 @@ export function registerOflRoutes(
           request.params.key,
         );
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "Unknown error";
-        return reply.status(404).send({ error: message });
+        request.log.error({ err: error, key: request.params.key }, "OFL manufacturer lookup failed");
+        const message = error instanceof Error ? error.message : "";
+        const safe = message.toLowerCase().includes("not found")
+          ? message
+          : "Failed to load manufacturer fixtures";
+        return reply.status(404).send({ error: safe });
       }
     },
   );
@@ -51,9 +54,12 @@ export function registerOflRoutes(
           request.params.model,
         );
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "Unknown error";
-        return reply.status(404).send({ error: message });
+        request.log.error({ err: error, mfr: request.params.mfr, model: request.params.model }, "OFL fixture lookup failed");
+        const message = error instanceof Error ? error.message : "";
+        const safe = message.toLowerCase().includes("not found")
+          ? message
+          : "Failed to load fixture";
+        return reply.status(404).send({ error: safe });
       }
     },
   );

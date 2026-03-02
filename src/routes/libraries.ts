@@ -32,7 +32,7 @@ function classifyDbError(error: unknown): { status: number; message: string } {
   if (lower.includes("enoent") || lower.includes("no such file")) {
     return { status: 503, message: "Database file not found" };
   }
-  return { status: 500, message: `Database error: ${msg}` };
+  return { status: 500, message: "An unexpected database error occurred" };
 }
 
 function handleDbError(error: unknown, reply: FastifyReply): void {

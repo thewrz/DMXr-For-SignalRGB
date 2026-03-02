@@ -348,7 +348,7 @@ export function createSsClientIfConfigured(
 
 function classifySsError(message: string): SsStatus["state"] {
   const lower = message.toLowerCase();
-  if (lower.includes("enoent") || lower.includes("no such file")) return "not_found";
+  if (lower.includes("enoent") || lower.includes("no such file") || lower.includes("unable to open")) return "not_found";
   if (lower.includes("eacces") || lower.includes("permission denied")) return "permission_denied";
   if (lower.includes("malformed") || lower.includes("corrupt") || lower.includes("not a database")) return "corrupt";
   return "error";

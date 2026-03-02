@@ -11,8 +11,13 @@ function dmxrFixtureManager() {
           this.serverOnline = false;
           return;
         }
-        this.fixtures = await res.json();
+        var incoming = await res.json();
         this.serverOnline = true;
+        // Only replace the array when data actually changed to avoid
+        // Alpine tearing down and rebuilding DOM nodes on every poll.
+        if (JSON.stringify(this.fixtures) !== JSON.stringify(incoming)) {
+          this.fixtures = incoming;
+        }
       } catch {
         this.serverOnline = false;
       }

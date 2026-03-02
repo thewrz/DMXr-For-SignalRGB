@@ -320,7 +320,7 @@
                 <strong x-text="fixture.name"></strong>
                 <span class="fixture-meta">
                   <span x-text="fixture.oflFixtureName || fixture.source || ''"></span>
-                  <template x-if="fixture.oflFixtureName || fixture.source"> &middot; </template>
+                  <span x-show="fixture.oflFixtureName || fixture.source"> &middot; </span>
                   <span x-text="fixture.mode"></span>
                 </span>
               </div>

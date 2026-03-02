@@ -61,6 +61,10 @@ function dmxrApp() {
 
     syncResult: null,
 
+    // Channel override UI
+    expandedFixtureId: null,
+    overrideTimers: {},
+
     async init() {
       await this.loadFixtures();
       await this.loadManufacturers();

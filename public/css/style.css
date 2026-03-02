@@ -635,6 +635,100 @@ header h1 { font-size: 1.4rem; }
 .badge-strobe { background: #f1c40f; color: #000; }
 .badge-generic { background: var(--surface2); color: var(--text-dim); }
 
+/* Channel override UI */
+.channel-overrides {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.channel-override-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.4rem;
+  border-radius: 4px;
+  background: var(--bg);
+}
+
+.channel-override-row.override-active {
+  background: rgba(0, 184, 212, 0.08);
+  border: 1px solid rgba(0, 184, 212, 0.25);
+}
+
+.override-badge {
+  font-size: 0.7rem;
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+  min-width: 60px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.override-lock {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  cursor: pointer;
+  flex-shrink: 0;
+  min-width: 60px;
+}
+
+.override-lock input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+  cursor: pointer;
+}
+
+.override-slider {
+  flex: 1;
+  min-width: 80px;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--surface2);
+  border-radius: 2px;
+  outline: none;
+}
+
+.override-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+}
+
+.override-slider:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.override-slider:disabled::-webkit-slider-thumb {
+  background: var(--text-dim);
+  cursor: not-allowed;
+}
+
+.override-value {
+  font-family: monospace;
+  font-size: 0.75rem;
+  min-width: 28px;
+  text-align: right;
+  color: var(--text-dim);
+}
+
+.btn-expand {
+  padding: 0.2rem 0.5rem;
+  font-size: 0.7rem;
+  line-height: 1;
+}
+
 .library-status-message {
   padding: 0.75rem;
   font-size: 0.85rem;

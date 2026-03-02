@@ -245,5 +245,75 @@ function dmxrFixtureManager() {
         this.loadLibMfrs(source);
       }
     },
+
+    // Channel override methods
+    toggleFixtureExpand(fixtureId) {
+      this.expandedFixtureId = this.expandedFixtureId === fixtureId ? null : fixtureId;
+    },
+
+    getOverrideValue(fixture, offset) {
+      if (!fixture.channelOverrides) return 0;
+      var ov = fixture.channelOverrides[offset];
+      return ov ? ov.value : 0;
+    },
+
+    isOverrideEnabled(fixture, offset) {
+      if (!fixture.channelOverrides) return false;
+      var ov = fixture.channelOverrides[offset];
+      return ov ? ov.enabled : false;
+    },
+
+    async toggleChannelOverride(fixtureId, offset) {
+      var fixture = this.fixtures.find(function(f) { return f.id === fixtureId; });
+      if (!fixture) return;
+
+      var overrides = Object.assign({}, fixture.channelOverrides || {});
+      var current = overrides[offset] || { value: 0, enabled: false };
+      overrides[offset] = { value: current.value, enabled: !current.enabled };
+
+      await this.patchFixture(fixtureId, { channelOverrides: overrides });
+    },
+
+    setChannelOverrideValue(fixtureId, offset, value) {
+      var self = this;
+      var key = fixtureId + ":" + offset;
+
+      if (self.overrideTimers[key]) {
+        clearTimeout(self.overrideTimers[key]);
+      }
+
+      // Update local state immediately for responsiveness
+      var fixture = self.fixtures.find(function(f) { return f.id === fixtureId; });
+      if (fixture) {
+        if (!fixture.channelOverrides) fixture.channelOverrides = {};
+        var current = fixture.channelOverrides[offset] || { value: 0, enabled: false };
+        fixture.channelOverrides[offset] = { value: parseInt(value, 10), enabled: current.enabled };
+      }
+
+      self.overrideTimers[key] = setTimeout(function() {
+        delete self.overrideTimers[key];
+        var f = self.fixtures.find(function(f) { return f.id === fixtureId; });
+        if (!f) return;
+        self.patchFixture(fixtureId, { channelOverrides: f.channelOverrides });
+      }, 150);
+    },
+
+    async patchFixture(fixtureId, changes) {
+      try {
+        var res = await fetch("/fixtures/" + fixtureId, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(changes),
+        });
+        if (res.ok) {
+          var updated = await res.json();
+          this.fixtures = this.fixtures.map(function(f) {
+            return f.id === fixtureId ? updated : f;
+          });
+        }
+      } catch {
+        // ignore
+      }
+    },
   };
 }

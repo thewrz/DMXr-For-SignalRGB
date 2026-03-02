@@ -314,6 +314,10 @@
                 </span>
               </div>
               <div class="fixture-actions">
+                <button class="btn btn-sm btn-expand" @click="toggleFixtureExpand(fixture.id)"
+                        :title="expandedFixtureId === fixture.id ? 'Collapse channels' : 'Expand channels'">
+                  <span x-text="expandedFixtureId === fixture.id ? '\u25B2' : '\u25BC'"></span>
+                </button>
                 <button class="btn btn-sm" @click="flashFixture(fixture.id)">Flash</button>
                 <button class="btn btn-sm btn-danger" @click="removeFixture(fixture.id)">Remove</button>
               </div>
@@ -327,6 +331,27 @@
                         x-text="ch.name"></span>
                 </template>
               </span>
+            </div>
+            <div class="channel-overrides" x-show="expandedFixtureId === fixture.id" x-cloak>
+              <template x-for="ch in fixture.channels" :key="'ov-' + ch.offset">
+                <div class="channel-override-row" :class="{ 'override-active': isOverrideEnabled(fixture, ch.offset) }">
+                  <span class="override-badge" :class="'badge-' + (ch.color || ch.type).toLowerCase()"
+                        x-text="ch.name"></span>
+                  <label class="override-lock" :title="isOverrideEnabled(fixture, ch.offset) ? 'Unlock channel' : 'Lock channel'">
+                    <input type="checkbox"
+                           :checked="isOverrideEnabled(fixture, ch.offset)"
+                           @change="toggleChannelOverride(fixture.id, ch.offset)">
+                    <span x-text="isOverrideEnabled(fixture, ch.offset) ? 'Locked' : 'Auto'"></span>
+                  </label>
+                  <input type="range" class="override-slider"
+                         :min="ch.rangeMin || 0"
+                         :max="ch.rangeMax || 255"
+                         :value="getOverrideValue(fixture, ch.offset)"
+                         :disabled="!isOverrideEnabled(fixture, ch.offset)"
+                         @input="setChannelOverrideValue(fixture.id, ch.offset, $event.target.value)">
+                  <span class="override-value" x-text="getOverrideValue(fixture, ch.offset)"></span>
+                </div>
+              </template>
             </div>
           </div>
         </template>

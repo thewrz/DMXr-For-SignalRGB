@@ -242,11 +242,17 @@ export function createSsClient(dbPath: string): SsClient {
 
       for (const attr of attrs) {
         const mapped = mapSsType(attr.type);
+        const rangeProps = {
+          ...(attr.value_range_min !== 0 ? { rangeMin: attr.value_range_min } : {}),
+          ...(attr.value_range_max !== 255 ? { rangeMax: attr.value_range_max } : {}),
+        };
+
         rawChannels.push({
           offset: attr.coarse_chan,
           name: attr.name,
           type: mapped.type,
           ...(mapped.color ? { color: mapped.color } : {}),
+          ...rangeProps,
           defaultValue: 0,
         });
 
@@ -260,6 +266,7 @@ export function createSsClient(dbPath: string): SsClient {
             name: attr.name + " Fine",
             type: mapped.type,
             ...(mapped.color ? { color: mapped.color } : {}),
+            ...rangeProps,
             defaultValue: 0,
           });
         }

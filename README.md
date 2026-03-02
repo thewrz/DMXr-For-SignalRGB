@@ -4,6 +4,8 @@ Control your DMX lighting fixtures from [SignalRGB](https://signalrgb.com) — s
 
 > Currently targets SignalRGB (Windows). [OpenRGB](https://openrgb.org) support for native Linux is planned.
 
+[![Add to SignalRGB](https://github.com/SRGBmods/qmk-plugins/raw/main/_images/add-to-signalrgb.png)](https://srgbmods.net/s?p=addon/install?url=https://github.com/thewrz/DMXr)
+
 ## What it does
 
 - Turns any DMX fixture into a draggable tile on the SignalRGB canvas
@@ -34,9 +36,7 @@ Fixture-wise, I've only tested with what I own: a couple of RGB PAR cans, two mo
 
 ### Plugin (SignalRGB)
 
-[![Add to SignalRGB](https://github.com/SRGBmods/qmk-plugins/raw/main/_images/add-to-signalrgb.png)](https://srgbmods.net/s?p=addon/install?url=https://github.com/thewrz/DMXr)
-
-Click the button above to auto-install the plugin into SignalRGB. After install, restart SignalRGB and enable DMXr under **Settings → Plugins**.
+Click **Add to SignalRGB** at the top of this page to auto-install the plugin. After install, restart SignalRGB and enable DMXr under **Settings → Plugins**.
 
 **Manual install**: Copy `DMXr.js` and `DMXr.qml` from the repo root to `Documents\WhirlwindFX\Plugins\`.
 

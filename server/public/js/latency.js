@@ -70,6 +70,24 @@ function dmxrLatency() {
       return Math.round(value).toString();
     },
 
+    barScale() {
+      var vals = [
+        this.networkLatency?.p99,
+        this.colorMapLatency?.p99,
+        this.dmxSendLatency?.p99,
+        this.totalLatency?.p99,
+      ].filter(function(v) { return v != null && v > 0; });
+      if (vals.length === 0) return 10;
+      return Math.max.apply(null, vals);
+    },
+
+    barWidth(value) {
+      if (!value) return "0%";
+      var scale = this.barScale();
+      var pct = Math.min(100, (value / scale) * 100);
+      return Math.max(1, pct) + "%";
+    },
+
     lossRate() {
       if (this.udpPacketsReceived === 0) return "0%";
       var dropped = this.udpPacketsReceived - this.udpPacketsProcessed;

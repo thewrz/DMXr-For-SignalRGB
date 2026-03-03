@@ -642,7 +642,7 @@
               <span class="latency-bar-label" x-text="segment.label"></span>
               <div class="latency-bar-track">
                 <div class="latency-bar-fill"
-                     :style="'width:100%;background:' + segment.color">
+                     :style="'width:' + barWidth(segment.data?.avg) + ';background:' + segment.color">
                 </div>
               </div>
               <div class="latency-bar-stats">

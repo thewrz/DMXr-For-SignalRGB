@@ -76,11 +76,21 @@ function dmxrLatency() {
       return pct + "%";
     },
 
+    maxBarValue() {
+      var vals = [
+        this.networkLatency?.avg,
+        this.colorMapLatency?.avg,
+        this.dmxSendLatency?.avg,
+        this.totalLatency?.avg,
+      ].filter(function(v) { return v != null && v > 0; });
+      if (vals.length === 0) return 10;
+      return Math.max.apply(null, vals) * 1.1; // 10% headroom
+    },
+
     lossRate() {
       if (this.udpPacketsReceived === 0) return "0%";
-      var lost = this.udpSequenceGaps;
-      var total = this.udpPacketsReceived + lost;
-      return ((lost / total) * 100).toFixed(1) + "%";
+      var dropped = this.udpPacketsReceived - this.udpPacketsProcessed;
+      return ((dropped / this.udpPacketsReceived) * 100).toFixed(1) + "%";
     },
   };
 }

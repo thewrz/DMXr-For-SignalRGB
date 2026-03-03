@@ -4,6 +4,7 @@ import type { FixtureStore } from "../fixtures/fixture-store.js";
 import type { FixtureConfig } from "../types/protocol.js";
 import { mapColor } from "../fixtures/channel-mapper.js";
 import { analyzeFixture } from "../fixtures/fixture-capabilities.js";
+import { pipeLog } from "../logging/pipeline-logger.js";
 
 interface ControlRouteDeps {
   readonly manager: UniverseManager;
@@ -107,6 +108,55 @@ export function registerControlRoutes(
     );
     return { success: true, action: "resume" };
   });
+
+  // Diagnostic: dump DMX channel snapshot for a fixture or address range
+  app.get<{ Params: { id: string } }>(
+    "/debug/fixture/:id",
+    async (request, reply) => {
+      const fixture = deps.store.getById(request.params.id);
+      if (!fixture) {
+        return reply.status(404).send({ error: "Fixture not found" });
+      }
+
+      const base = fixture.dmxStartAddress;
+      const count = fixture.channelCount;
+      const snapshot = deps.manager.getChannelSnapshot(base, count);
+
+      const channels = fixture.channels.map((ch) => {
+        const addr = base + ch.offset;
+        const override = fixture.channelOverrides?.[ch.offset];
+        return {
+          offset: ch.offset,
+          dmxAddress: addr,
+          name: ch.name,
+          type: ch.type,
+          color: ch.color ?? null,
+          defaultValue: ch.defaultValue,
+          overrideEnabled: override?.enabled ?? false,
+          overrideValue: override?.value ?? null,
+          currentDmxValue: snapshot[addr] ?? 0,
+        };
+      });
+
+      pipeLog("info",
+        `DEBUG fixture "${fixture.name}" (base=${base}):\n` +
+        channels.map((ch) =>
+          `  [${ch.offset}] DMX${ch.dmxAddress} ${ch.name.padEnd(16)} ` +
+          `buffer=${ch.currentDmxValue} ovr=${ch.overrideEnabled ? "ON" : "off"}(${ch.overrideValue})`
+        ).join("\n"),
+      );
+
+      return {
+        fixture: fixture.name,
+        id: fixture.id,
+        dmxStartAddress: base,
+        channelCount: count,
+        blackoutActive: deps.manager.isBlackoutActive(),
+        activeChannels: deps.manager.getActiveChannelCount(),
+        channels,
+      };
+    },
+  );
 
   app.post<{ Params: { id: string }; Body: TestBody }>(
     "/fixtures/:id/test",

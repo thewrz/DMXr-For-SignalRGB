@@ -1,10 +1,12 @@
 import type { FastifyInstance } from "fastify";
 import type { FixtureStore } from "../fixtures/fixture-store.js";
+import type { UniverseManager } from "../dmx/universe-manager.js";
 import type { AddFixtureRequest, UpdateFixtureRequest } from "../types/protocol.js";
 import { validateFixtureAddress, validateFixtureChannels } from "../fixtures/fixture-validator.js";
 
 interface FixtureRouteDeps {
   readonly store: FixtureStore;
+  readonly manager?: UniverseManager;
 }
 
 const addFixtureSchema = {
@@ -131,6 +133,27 @@ export function registerFixtureRoutes(
       }
 
       const updated = deps.store.update(request.params.id, request.body);
+
+      // Immediately push override values to DMX so changes take effect
+      // without waiting for the next color frame from SignalRGB.
+      if (updated && request.body.channelOverrides && deps.manager) {
+        const base = updated.dmxStartAddress;
+        const channels: Record<number, number> = {};
+
+        for (const [offsetStr, override] of Object.entries(request.body.channelOverrides)) {
+          const offset = Number(offsetStr);
+          const channel = updated.channels.find((ch) => ch.offset === offset);
+          if (!channel) continue;
+
+          channels[base + offset] = override.enabled
+            ? Math.max(0, Math.min(255, Math.round(override.value)))
+            : channel.defaultValue;
+        }
+
+        if (Object.keys(channels).length > 0) {
+          deps.manager.applyFixtureUpdate({ fixture: updated.id, channels });
+        }
+      }
 
       // Debounced save: in-memory state is already updated for mapColor.
       // Don't block the response on disk I/O — rapid slider drags would

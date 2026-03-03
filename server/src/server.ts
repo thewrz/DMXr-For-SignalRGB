@@ -120,6 +120,7 @@ export async function buildServer(
 
   registerFixtureRoutes(app, {
     store: deps.fixtureStore,
+    manager: deps.manager,
   });
 
   registerOflRoutes(app, {

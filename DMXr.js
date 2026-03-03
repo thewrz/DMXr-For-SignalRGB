@@ -604,7 +604,7 @@ function probeOneServer(host, port) {
 			serverName: health.serverName || "",
 			host: host,
 			port: port,
-			udpPort: null, // unknown from /health, will fall back to port+1
+			udpPort: health.udpPort || null,
 			lastSeen: Date.now(),
 			healthy: true,
 		};

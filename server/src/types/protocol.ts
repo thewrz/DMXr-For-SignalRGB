@@ -33,6 +33,7 @@ export interface HealthResponse {
   readonly udpActive?: boolean;
   readonly udpPacketsReceived?: number;
   readonly latencyAvgMs?: number;
+  readonly udpPort?: number;
   readonly serverId?: string;
   readonly serverName?: string;
 }

@@ -28,10 +28,12 @@ export interface UdpColorServer {
   readonly start: (port: number, host?: string) => Promise<number>;
   readonly close: () => Promise<void>;
   readonly getStats: () => UdpColorServerStats;
+  readonly getPort: () => number;
 }
 
 export function createUdpColorServer(deps: UdpColorServerDeps): UdpColorServer {
   let socket: Socket | null = null;
+  let boundPort = 0;
   let packetsReceived = 0;
   let packetsProcessed = 0;
   let parseErrors = 0;
@@ -135,7 +137,7 @@ export function createUdpColorServer(deps: UdpColorServerDeps): UdpColorServer {
 
         sock.bind(port, host, () => {
           const addr = sock.address();
-          const boundPort = addr.port;
+          boundPort = addr.port;
           deps.logger?.info(`UDP color server listening on ${host}:${boundPort}`);
           resolve(boundPort);
         });
@@ -153,6 +155,10 @@ export function createUdpColorServer(deps: UdpColorServerDeps): UdpColorServer {
           resolve();
         });
       });
+    },
+
+    getPort(): number {
+      return boundPort;
     },
 
     getStats(): UdpColorServerStats {

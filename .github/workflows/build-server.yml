@@ -1,6 +1,8 @@
 name: Build Portable Server
 
 on:
+  push:
+    branches: [main]
   release:
     types: [created]
   workflow_dispatch:
@@ -10,7 +12,27 @@ permissions:
 
 jobs:
   build:
-    runs-on: windows-latest
+    strategy:
+      matrix:
+        include:
+          - runner: windows-latest
+            target: win-x64
+            node_platform: win
+            node_arch: x64
+            archive: zip
+          - runner: ubuntu-latest
+            target: linux-x64
+            node_platform: linux
+            node_arch: x64
+            archive: tar.gz
+          - runner: ubuntu-24.04-arm
+            target: linux-arm64
+            node_platform: linux
+            node_arch: arm64
+            archive: tar.gz
+
+    runs-on: ${{ matrix.runner }}
+    name: Build ${{ matrix.target }}
 
     steps:
       - name: Checkout
@@ -33,7 +55,10 @@ jobs:
         working-directory: server
         run: npm prune --production
 
-      - name: Download portable Node.js
+      # --- Download portable Node.js binary ---
+
+      - name: Download portable Node.js (Windows)
+        if: matrix.node_platform == 'win'
         shell: pwsh
         run: |
           $nodeVersion = node -e "console.log(process.version)"
@@ -43,28 +68,74 @@ jobs:
           Expand-Archive -Path node-portable.zip -DestinationPath node-extracted
           Copy-Item "node-extracted/node-$nodeVersion-win-x64/node.exe" -Destination node.exe
 
-      - name: Assemble distribution
+      - name: Download portable Node.js (Linux)
+        if: matrix.node_platform == 'linux'
+        run: |
+          NODE_VERSION=$(node -e "console.log(process.version)")
+          URL="https://nodejs.org/dist/$NODE_VERSION/node-$NODE_VERSION-linux-${{ matrix.node_arch }}.tar.xz"
+          echo "Downloading $URL"
+          curl -fsSL "$URL" -o node-portable.tar.xz
+          tar xf node-portable.tar.xz
+          cp "node-$NODE_VERSION-linux-${{ matrix.node_arch }}/bin/node" node
+
+      # --- Download NSSM (Windows only) ---
+
+      - name: Download NSSM
+        if: matrix.node_platform == 'win'
         shell: pwsh
         run: |
-          $dist = "DMXr-Server-win-x64"
+          $url = "https://nssm.cc/release/nssm-2.24.zip"
+          Write-Host "Downloading NSSM from $url"
+          Invoke-WebRequest -Uri $url -OutFile nssm.zip
+          Expand-Archive -Path nssm.zip -DestinationPath nssm-extracted
+          Copy-Item "nssm-extracted/nssm-2.24/win64/nssm.exe" -Destination nssm.exe
+
+      # --- Assemble distribution ---
+
+      - name: Assemble distribution (Windows)
+        if: matrix.node_platform == 'win'
+        shell: pwsh
+        run: |
+          $dist = "DMXr-Server-${{ matrix.target }}"
           New-Item -ItemType Directory -Path $dist
           Copy-Item node.exe -Destination $dist/
+          Copy-Item nssm.exe -Destination $dist/
           Copy-Item server/scripts/DMXr-Server.bat -Destination $dist/
+          Copy-Item server/scripts/install-service.bat -Destination $dist/
+          Copy-Item server/scripts/uninstall-service.bat -Destination $dist/
           Copy-Item -Recurse server/dist -Destination $dist/dist
           Copy-Item -Recurse server/node_modules -Destination $dist/node_modules
           Copy-Item -Recurse server/public -Destination $dist/public
           Copy-Item server/package.json -Destination $dist/
-          Compress-Archive -Path $dist -DestinationPath DMXr-Server-win-x64.zip
+          Compress-Archive -Path $dist -DestinationPath "DMXr-Server-${{ matrix.target }}.zip"
+
+      - name: Assemble distribution (Linux)
+        if: matrix.node_platform == 'linux'
+        run: |
+          dist="DMXr-Server-${{ matrix.target }}"
+          mkdir -p "$dist"
+          cp node "$dist/"
+          cp server/scripts/dmxr-server.sh "$dist/"
+          cp server/scripts/install.sh "$dist/"
+          cp server/scripts/uninstall.sh "$dist/"
+          chmod +x "$dist"/{node,dmxr-server.sh,install.sh,uninstall.sh}
+          cp -r server/dist "$dist/dist"
+          cp -r server/node_modules "$dist/node_modules"
+          cp -r server/public "$dist/public"
+          cp server/package.json "$dist/"
+          tar czf "DMXr-Server-${{ matrix.target }}.tar.gz" "$dist"
+
+      # --- Upload artifacts ---
 
       - name: Upload release asset
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
-          files: DMXr-Server-win-x64.zip
+          files: DMXr-Server-${{ matrix.target }}.${{ matrix.archive }}
 
       - name: Upload workflow artifact
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name != 'release'
         uses: actions/upload-artifact@v4
         with:
-          name: DMXr-Server-win-x64
-          path: DMXr-Server-win-x64.zip
+          name: DMXr-Server-${{ matrix.target }}
+          path: DMXr-Server-${{ matrix.target }}.${{ matrix.archive }}

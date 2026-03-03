@@ -1,5 +1,6 @@
 import { readFile, writeFile, mkdir, rename } from "node:fs/promises";
 import { dirname } from "node:path";
+import { randomUUID } from "node:crypto";
 
 export interface PersistedSettings {
   readonly dmxDriver: string;
@@ -9,6 +10,8 @@ export interface PersistedSettings {
   readonly host: string;
   readonly mdnsEnabled: boolean;
   readonly setupCompleted: boolean;
+  readonly serverId: string;
+  readonly serverName: string;
 }
 
 const DEFAULTS: PersistedSettings = {
@@ -19,6 +22,8 @@ const DEFAULTS: PersistedSettings = {
   host: "0.0.0.0",
   mdnsEnabled: true,
   setupCompleted: false,
+  serverId: "",
+  serverName: "",
 };
 
 export interface SettingsStore {
@@ -40,6 +45,8 @@ function isValidSettings(data: unknown): data is Partial<PersistedSettings> {
   if ("host" in record && typeof record["host"] !== "string") return false;
   if ("mdnsEnabled" in record && typeof record["mdnsEnabled"] !== "boolean") return false;
   if ("setupCompleted" in record && typeof record["setupCompleted"] !== "boolean") return false;
+  if ("serverId" in record && typeof record["serverId"] !== "string") return false;
+  if ("serverName" in record && typeof record["serverName"] !== "string") return false;
 
   return true;
 }
@@ -68,6 +75,12 @@ export function createSettingsStore(filePath: string): SettingsStore {
       } catch {
         current = { ...DEFAULTS };
       }
+
+      if (!current.serverId) {
+        current = { ...current, serverId: randomUUID() };
+        await save(current);
+      }
+
       return { ...current };
     },
 

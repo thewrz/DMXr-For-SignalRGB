@@ -1,5 +1,5 @@
 export function Name() { return "DMXr"; }
-export function Version() { return "1.1.2"; }
+export function Version() { return "1.2.0"; }
 export function Type() { return "network"; }
 export function Publisher() { return "DMXr Project"; }
 export function Size() { return [1, 1]; }
@@ -113,11 +113,38 @@ function timestampToBytes(ms) {
 	return bytes;
 }
 
+// --------------------------------<( Server Registry )>--------------------------------
+// Multi-server support: tracks all discovered DMXr servers keyed by serverId
+
+var serverRegistry = {};
+// serverRegistry[serverId] = { serverId, serverName, host, port, udpPort, lastSeen, healthy }
+
+var STALE_TIMEOUT_MS = 30000; // prune servers not seen in 30s
+
+function getServerUrlFor(server, path) {
+	return "http://" + server.host + ":" + server.port + path;
+}
+
+// Fallback: first healthy server, or manual config
+function getServerUrl(path) {
+	var keys = Object.keys(serverRegistry);
+	for (var i = 0; i < keys.length; i++) {
+		var srv = serverRegistry[keys[i]];
+		if (srv.healthy) {
+			return getServerUrlFor(srv, path);
+		}
+	}
+
+	var host = serverHost || "127.0.0.1";
+	var port = parseInt(serverPort, 10) || 8080;
+	return "http://" + host + ":" + port + path;
+}
+
 // --------------------------------<( Per-Controller Lifecycle )>--------------------------------
 // SignalRGB calls these with the `controller` global set to the active DMXrBridge instance.
 
 export function Initialize() {
-	device.log("DMXr: Initialize v1.1.2");
+	device.log("DMXr: Initialize v1.2.0");
 	device.setName(controller.name);
 
 	device.setSize([1, 1]);
@@ -142,12 +169,14 @@ export function Initialize() {
 	if (enableDebugLog === "true") {
 		device.log("DMXr: Initialized " + controller.name +
 			(udpEnabled ? " (UDP)" : " (HTTP)") +
-			(controller._udpIndex >= 0 ? " [idx=" + controller._udpIndex + "]" : ""));
+			(controller._udpIndex >= 0 ? " [idx=" + controller._udpIndex + "]" : "") +
+			" -> " + controller._server.host + ":" + controller._server.port);
 	}
 }
 
 export function Render() {
 	var ctrl = controller;
+	var srv = ctrl._server;
 
 	// Single pixel color sample from the canvas tile
 	var color = device.color(0, 0);
@@ -176,8 +205,8 @@ export function Render() {
 
 	// UDP fast path: binary DMXRC packet
 	if (udpEnabled && ctrl._udpIndex >= 0) {
-		var udpPort = discoveredUdpPort || ((parseInt(discoveredPort, 10) || parseInt(serverPort, 10) || 8080) + 1);
-		var ip = discoveredHost || serverHost || "127.0.0.1";
+		var udpPort = srv.udpPort || (srv.port + 1);
+		var ip = srv.host;
 		var brightnessUint8 = Math.round(brightness * 255);
 		var packet = buildDmxrcPacket(ctrl._udpIndex, r, g, b, brightnessUint8);
 
@@ -193,11 +222,11 @@ export function Render() {
 	}
 
 	// HTTP fallback
-	var url = getServerUrl("/update/colors");
+	var url = getServerUrlFor(srv, "/update/colors");
 
 	var payload = JSON.stringify({
 		fixtures: [{
-			id: ctrl.id,
+			id: ctrl._fixtureId,
 			r: r,
 			g: g,
 			b: b,
@@ -227,12 +256,13 @@ export function Render() {
 
 export function Shutdown() {
 	var ctrl = controller;
+	var srv = ctrl._server;
 
 	// UDP blackout (fire-and-forget, best-effort)
 	if (udpEnabled) {
 		try {
-			var udpPort = discoveredUdpPort || ((parseInt(discoveredPort, 10) || parseInt(serverPort, 10) || 8080) + 1);
-			var ip = discoveredHost || serverHost || "127.0.0.1";
+			var udpPort = srv.udpPort || (srv.port + 1);
+			var ip = srv.host;
 			var packet = buildBlackoutPacket();
 			udp.send(ip, udpPort, packet, 1);
 		} catch (e) {
@@ -243,10 +273,10 @@ export function Shutdown() {
 	// HTTP blackout (guaranteed delivery fallback via sync XHR)
 	try {
 		var xhr = new XMLHttpRequest();
-		xhr.open("POST", getServerUrl("/update/colors"), false);
+		xhr.open("POST", getServerUrlFor(srv, "/update/colors"), false);
 		xhr.setRequestHeader("Content-Type", "application/json");
 		xhr.send(JSON.stringify({
-			fixtures: [{ id: ctrl.id, r: 0, g: 0, b: 0, brightness: 0 }],
+			fixtures: [{ id: ctrl._fixtureId, r: 0, g: 0, b: 0, brightness: 0 }],
 		}));
 	} catch (e) {
 		// Server may already be down
@@ -255,23 +285,6 @@ export function Shutdown() {
 	if (enableDebugLog === "true") {
 		device.log("DMXr: Shutdown " + ctrl.name);
 	}
-}
-
-// --------------------------------<( Server URL Helper )>--------------------------------
-
-var discoveredHost = null;
-var discoveredPort = null;
-var discoveredUdpPort = null;
-
-function getServerUrl(path) {
-	if (discoveredHost && discoveredPort) {
-		return "http://" + discoveredHost + ":" + discoveredPort + path;
-	}
-
-	var host = serverHost || "127.0.0.1";
-	var port = parseInt(serverPort, 10) || 8080;
-
-	return "http://" + host + ":" + port + path;
 }
 
 // --------------------------------<( Discovery Service )>--------------------------------
@@ -287,34 +300,51 @@ export function DiscoveryService() {
 		for (var i = 0; i < devices.length; i++) {
 			var dev = devices[i];
 
-			if (dev.ip && dev.port) {
-				discoveredHost = dev.ip;
-				discoveredPort = dev.port;
+			if (!dev.ip || !dev.port) {
+				continue;
+			}
 
-				// Read UDP port from mDNS TXT record
-				if (dev.txt && dev.txt.udpPort) {
-					discoveredUdpPort = parseInt(dev.txt.udpPort, 10) || null;
-				}
+			// Determine server identity — prefer TXT serverId, fall back to ip:port
+			var sid = (dev.txt && dev.txt.serverId) ? dev.txt.serverId : (dev.ip + ":" + dev.port);
+			var sname = (dev.txt && dev.txt.serverName) ? dev.txt.serverName : "";
+			var udpPort = (dev.txt && dev.txt.udpPort) ? (parseInt(dev.txt.udpPort, 10) || null) : null;
 
-				if (enableDebugLog === "true") {
-					service.log(
-						"DMXr: mDNS discovered server at " + dev.ip + ":" + dev.port +
-						(discoveredUdpPort ? " (UDP: " + discoveredUdpPort + ")" : "")
-					);
-				}
+			serverRegistry[sid] = {
+				serverId: sid,
+				serverName: sname,
+				host: dev.ip,
+				port: dev.port,
+				udpPort: udpPort,
+				lastSeen: Date.now(),
+				healthy: true,
+			};
 
-				break;
+			if (enableDebugLog === "true") {
+				service.log(
+					"DMXr: mDNS discovered server " + (sname || sid.slice(0, 8)) +
+					" at " + dev.ip + ":" + dev.port +
+					(udpPort ? " (UDP: " + udpPort + ")" : "")
+				);
 			}
 		}
 	};
 
 	this.forceDiscover = function (ipaddress) {
-		discoveredHost = ipaddress;
-		discoveredPort = parseInt(serverPort, 10) || 8080;
-		discoveredUdpPort = null; // will fall back to port+1
+		var port = parseInt(serverPort, 10) || 8080;
+		var sid = ipaddress + ":" + port;
+
+		serverRegistry[sid] = {
+			serverId: sid,
+			serverName: "",
+			host: ipaddress,
+			port: port,
+			udpPort: null,
+			lastSeen: Date.now(),
+			healthy: true,
+		};
 
 		if (enableDebugLog === "true") {
-			service.log("DMXr: Manual discover " + ipaddress + ":" + discoveredPort);
+			service.log("DMXr: Manual discover " + ipaddress + ":" + port);
 		}
 	};
 
@@ -327,89 +357,204 @@ export function DiscoveryService() {
 		}
 	};
 
+	var self = this;
+
 	this.Update = function () {
 		var now = Date.now();
 
-		if (now - this.lastPollTime < this.pollInterval) {
+		if (now - self.lastPollTime < self.pollInterval) {
 			return;
 		}
 
-		this.lastPollTime = now;
+		self.lastPollTime = now;
 
-		var url = getServerUrl("/fixtures");
+		// Prune stale servers
+		var serverKeys = Object.keys(serverRegistry);
+		for (var s = 0; s < serverKeys.length; s++) {
+			var srv = serverRegistry[serverKeys[s]];
+			if (now - srv.lastSeen > STALE_TIMEOUT_MS) {
+				// Remove all fixtures belonging to this server
+				for (var fid in self.knownFixtures) {
+					if (self.knownFixtures[fid] === srv.serverId) {
+						var existingCtrl = service.getController(fid);
+						if (existingCtrl) {
+							service.removeController(existingCtrl);
+						}
+						delete self.knownFixtures[fid];
 
-		try {
-			var xhr = new XMLHttpRequest();
-			xhr.open("GET", url, false);
-			xhr.send();
-
-			if (xhr.status !== 200) {
-				return;
-			}
-
-			var serverFixtures = JSON.parse(xhr.responseText);
-			var serverIds = {};
-
-			for (var i = 0; i < serverFixtures.length; i++) {
-				var fixture = serverFixtures[i];
-				serverIds[fixture.id] = true;
-
-				if (!this.knownFixtures[fixture.id]) {
-					var bridge = new DMXrBridge(fixture, i);
-					service.addController(bridge);
-					service.announceController(bridge);
-					this.knownFixtures[fixture.id] = fixture;
-
-					if (enableDebugLog === "true") {
-						service.log("DMXr: Discovered " + fixture.name + " (id: " + fixture.id + ", udpIdx: " + i + ")");
-					}
-				} else {
-					// Update UDP index in case fixture order changed
-					var existingCtrl = service.getController(fixture.id);
-					if (existingCtrl) {
-						existingCtrl._udpIndex = i;
+						if (enableDebugLog === "true") {
+							service.log("DMXr: Removed " + fid + " (server gone)");
+						}
 					}
 				}
-			}
+				delete serverRegistry[serverKeys[s]];
 
-			// Remove fixtures no longer on server
-			for (var id in this.knownFixtures) {
-				if (!serverIds[id]) {
-					var existing = service.getController(id);
-
-					if (existing) {
-						service.removeController(existing);
-					}
-
-					delete this.knownFixtures[id];
-
-					if (enableDebugLog === "true") {
-						service.log("DMXr: Removed " + id);
-					}
+				if (enableDebugLog === "true") {
+					service.log("DMXr: Pruned stale server " + serverKeys[s]);
 				}
-			}
-		} catch (e) {
-			if (enableDebugLog === "true") {
-				service.log("DMXr: Poll error - " + e);
 			}
 		}
+
+		// Poll each server
+		serverKeys = Object.keys(serverRegistry);
+		for (var k = 0; k < serverKeys.length; k++) {
+			pollServerFixtures(self, serverRegistry[serverKeys[k]]);
+		}
+
+		// If no servers in registry, try manual fallback
+		if (serverKeys.length === 0) {
+			var host = serverHost || "127.0.0.1";
+			var port = parseInt(serverPort, 10) || 8080;
+			var fallbackId = host + ":" + port;
+			var fallbackSrv = {
+				serverId: fallbackId,
+				serverName: "",
+				host: host,
+				port: port,
+				udpPort: null,
+				lastSeen: now,
+				healthy: true,
+			};
+			pollServerFixtures(self, fallbackSrv);
+		}
 	};
+}
+
+function pollServerFixtures(disco, server) {
+	var url = getServerUrlFor(server, "/fixtures");
+
+	try {
+		var xhr = new XMLHttpRequest();
+		xhr.open("GET", url, false);
+		xhr.send();
+
+		if (xhr.status !== 200) {
+			server.healthy = false;
+			return;
+		}
+
+		server.healthy = true;
+		server.lastSeen = Date.now();
+
+		// Update registry if this server was a fallback
+		if (!serverRegistry[server.serverId]) {
+			serverRegistry[server.serverId] = server;
+		}
+
+		var serverFixtures = JSON.parse(xhr.responseText);
+
+		// Collect all fixture names across all servers for collision detection
+		var nameCountMap = buildNameCountMap(serverFixtures, server.serverId);
+
+		var serverIds = {};
+
+		for (var i = 0; i < serverFixtures.length; i++) {
+			var fixture = serverFixtures[i];
+			var namespacedId = server.serverId + "/" + fixture.id;
+			serverIds[namespacedId] = true;
+
+			if (!disco.knownFixtures[namespacedId]) {
+				// Check if another server has a fixture with the same name
+				var displayName = fixture.name;
+				if (nameCountMap[fixture.name] > 1 && server.serverName) {
+					displayName = fixture.name + " (" + server.serverName + ")";
+				}
+
+				var bridge = new DMXrBridge(fixture, i, server, displayName);
+				service.addController(bridge);
+				service.announceController(bridge);
+				disco.knownFixtures[namespacedId] = server.serverId;
+
+				if (enableDebugLog === "true") {
+					service.log("DMXr: Discovered " + displayName +
+						" (id: " + namespacedId + ", udpIdx: " + i +
+						", server: " + (server.serverName || server.serverId.slice(0, 8)) + ")");
+				}
+			} else {
+				// Update UDP index in case fixture order changed
+				var existingCtrl = service.getController(namespacedId);
+				if (existingCtrl) {
+					existingCtrl._udpIndex = i;
+				}
+			}
+		}
+
+		// Remove fixtures no longer on this server
+		for (var id in disco.knownFixtures) {
+			if (disco.knownFixtures[id] === server.serverId && !serverIds[id]) {
+				var existing = service.getController(id);
+
+				if (existing) {
+					service.removeController(existing);
+				}
+
+				delete disco.knownFixtures[id];
+
+				if (enableDebugLog === "true") {
+					service.log("DMXr: Removed " + id);
+				}
+			}
+		}
+	} catch (e) {
+		server.healthy = false;
+
+		if (enableDebugLog === "true") {
+			service.log("DMXr: Poll error for " +
+				(server.serverName || server.serverId.slice(0, 8)) + " - " + e);
+		}
+	}
+}
+
+// Build a map of fixture name -> count across all servers for collision detection
+function buildNameCountMap(currentFixtures, currentServerId) {
+	var counts = {};
+
+	// Count names from other servers' known fixtures
+	var allKeys = Object.keys(serverRegistry);
+	for (var s = 0; s < allKeys.length; s++) {
+		var sid = allKeys[s];
+		if (sid === currentServerId) continue;
+
+		// Check existing controllers for name collisions
+		for (var fid in serverRegistry) {
+			// We only know names of fixtures we've already discovered
+			var ctrl = service.getController(sid + "/" + fid);
+			if (ctrl) {
+				var baseName = ctrl.fixtureConfig ? ctrl.fixtureConfig.name : ctrl.name;
+				counts[baseName] = (counts[baseName] || 0) + 1;
+			}
+		}
+	}
+
+	// Count names from current server's fixtures
+	for (var i = 0; i < currentFixtures.length; i++) {
+		var name = currentFixtures[i].name;
+		counts[name] = (counts[name] || 0) + 1;
+	}
+
+	return counts;
 }
 
 // --------------------------------<( Bridge Data Class )>--------------------------------
 // Data-only object passed to service.addController(). Device operations happen in
 // the top-level Initialize/Render/Shutdown exports, not here.
 
-function DMXrBridge(fixture, udpIndex) {
-	this.id = fixture.id;
-	this.name = fixture.name;
+function DMXrBridge(fixture, udpIndex, server, displayName) {
+	this.id = server.serverId + "/" + fixture.id;
+	this.name = displayName || fixture.name;
 	this.width = 1;
 	this.height = 1;
 
-	this.ledNames = [fixture.name];
+	this.ledNames = [this.name];
 	this.ledPositions = [[0, 0]];
 
 	this.fixtureConfig = fixture;
+
+	// Original fixture ID for API calls (not namespaced)
+	this._fixtureId = fixture.id;
+
+	// Reference to the server registry entry for routing
+	this._server = server;
 
 	// UDP fixture index (position in server's fixture array)
 	this._udpIndex = typeof udpIndex === "number" ? udpIndex : -1;

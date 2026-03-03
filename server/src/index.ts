@@ -37,6 +37,8 @@ async function main() {
   const serverVersion = await readServerVersion();
   const settingsStore = createSettingsStore("./config/settings.json");
   const persistedSettings = await settingsStore.load();
+  // serverId is auto-generated on first load if missing
+  const { serverId, serverName } = persistedSettings;
   const config = loadConfig(persistedSettings);
   const startTime = Date.now();
 
@@ -128,6 +130,8 @@ async function main() {
     serverVersion,
     latencyTracker,
     udpServer,
+    serverId,
+    serverName,
   });
 
   let mdnsAdvertiser: MdnsAdvertiser | undefined;
@@ -180,7 +184,12 @@ async function main() {
   const boundUdpPort = await udpServer.start(udpPortTarget, finalConfig.host);
 
   if (finalConfig.mdnsEnabled) {
-    mdnsAdvertiser = createMdnsAdvertiser(boundPort, boundUdpPort);
+    mdnsAdvertiser = createMdnsAdvertiser({
+      port: boundPort,
+      udpPort: boundUdpPort,
+      serverId,
+      serverName,
+    });
   }
 
   // Startup banner
@@ -189,12 +198,15 @@ async function main() {
       ? finalConfig.dmxDevicePath
       : `${finalConfig.dmxDevicePath} (auto-detected)`;
 
+  const serverLabel = serverName || "DMXr-" + serverId.slice(0, 8);
+
   process.stdout.write(
     "\n" +
     "  ╔══════════════════════════════════════╗\n" +
     `  ║  DMXr Server v${serverVersion.padEnd(22)}║\n` +
     "  ╚══════════════════════════════════════╝\n" +
     "\n" +
+    `  Server ID:   ${serverId.slice(0, 8)} (${serverLabel})\n` +
     `  HTTP Port:   ${boundPort}\n` +
     `  UDP Port:    ${boundUdpPort}\n` +
     `  DMX Driver:  ${finalConfig.dmxDriver}\n` +

@@ -33,6 +33,8 @@ export interface HealthResponse {
   readonly udpActive?: boolean;
   readonly udpPacketsReceived?: number;
   readonly latencyAvgMs?: number;
+  readonly serverId?: string;
+  readonly serverName?: string;
 }
 
 /** A single DMX channel within a fixture (derived from OFL definition) */

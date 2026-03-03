@@ -53,6 +53,35 @@ describe("GET /health", () => {
     await customApp.close();
   });
 
+  it("includes serverId and serverName in response", async () => {
+    const manager = createUniverseManager(createMockUniverse());
+    const identityApp = await buildServer({
+      config: createTestConfig(),
+      manager,
+      driver: "null",
+      startTime: Date.now(),
+      fixtureStore: createTestFixtureStore(),
+      oflClient: createMockOflClient(),
+      registry: createMockRegistry(),
+      serverId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+      serverName: "Studio A",
+    });
+
+    const res = await identityApp.inject({ method: "GET", url: "/health" });
+    const body = res.json();
+    expect(body.serverId).toBe("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
+    expect(body.serverName).toBe("Studio A");
+
+    await identityApp.close();
+  });
+
+  it("omits serverId/serverName when not configured", async () => {
+    const res = await app.inject({ method: "GET", url: "/health" });
+    const body = res.json();
+    expect(body.serverId).toBeUndefined();
+    expect(body.serverName).toBeUndefined();
+  });
+
   it("reports active channel count after updates", async () => {
     const manager = createUniverseManager(createMockUniverse());
     const testApp = await buildServer({

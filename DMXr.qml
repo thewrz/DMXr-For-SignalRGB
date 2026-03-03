@@ -5,6 +5,7 @@ Item {
     property string serverPort: service.getSetting("DMXr", "serverPort") || "8080"
     property string connectionStatus: "disconnected"
     property var fixtureList: []
+    property int discoveredServerCount: 0
 
     // Hardware status from /health
     property string dmxDriver: ""
@@ -71,6 +72,15 @@ Item {
                 font.family: "Poppins"
                 font.weight: Font.Bold
                 font.pixelSize: 16
+            }
+
+            Text {
+                visible: discoveredServerCount > 0
+                text: discoveredServerCount + " server" + (discoveredServerCount !== 1 ? "s" : "") + " discovered via mDNS"
+                color: "#88ff88"
+                font.family: "Poppins"
+                font.pixelSize: 12
+                opacity: 0.8
             }
 
             Row {

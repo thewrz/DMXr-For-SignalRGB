@@ -16,6 +16,8 @@ interface HealthDeps {
   readonly dmxDevicePath?: string;
   readonly latencyTracker?: LatencyTracker;
   readonly udpServer?: UdpColorServer;
+  readonly serverId?: string;
+  readonly serverName?: string;
 }
 
 export function registerHealthRoute(
@@ -51,6 +53,8 @@ export function registerHealthRoute(
       latencyAvgMs: latency !== undefined
         ? Math.round((latency.totalProcessing.avg) * 100) / 100
         : undefined,
+      serverId: deps.serverId,
+      serverName: deps.serverName,
     };
   });
 

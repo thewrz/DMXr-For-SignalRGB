@@ -4,7 +4,7 @@ Control your DMX lighting fixtures from [SignalRGB](https://signalrgb.com) — s
 
 > Currently targets SignalRGB (Windows). [OpenRGB](https://openrgb.org) support for native Linux is planned.
 
-[![Add to SignalRGB](https://github.com/SRGBmods/qmk-plugins/raw/main/_images/add-to-signalrgb.png)](https://srgbmods.net/s?p=addon/install?url=https://github.com/thewrz/DMXr)
+[![Add to SignalRGB](https://github.com/SRGBmods/QMK-Images/blob/main/images/add-to-signalrgb.png)](https://srgbmods.net/s?p=addon/install?url=https://github.com/thewrz/DMXr)
 
 ## What it does
 

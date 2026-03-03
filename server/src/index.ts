@@ -19,6 +19,7 @@ import { createLibraryRegistry } from "./libraries/registry.js";
 import { buildServer } from "./server.js";
 import { createUdpColorServer } from "./udp/udp-color-server.js";
 import { createLatencyTracker } from "./metrics/latency-tracker.js";
+import { getFixtureDefaults } from "./fixtures/channel-mapper.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -102,6 +103,15 @@ async function main() {
   await fixtureStore.load();
 
   manager.blackout();
+
+  // Initialize fixture defaults (sets pan/tilt center, strobe open, etc.)
+  // Positional channels are excluded from per-frame color updates,
+  // so they must be set once here at startup.
+  manager.resumeNormal();
+  for (const fixture of fixtureStore.getAll()) {
+    const defaults = getFixtureDefaults(fixture);
+    manager.applyFixtureUpdate({ fixture: fixture.id, channels: defaults });
+  }
 
   const oflClient = createOflClient();
   const { client: ssClient, status: ssStatus } = createSsClientIfConfigured(finalConfig.localDbPath);

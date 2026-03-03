@@ -55,7 +55,7 @@ export async function buildServer(
   });
 
   await app.register(rateLimit, {
-    max: 100,
+    max: 600,
     timeWindow: "1 minute",
   });
 

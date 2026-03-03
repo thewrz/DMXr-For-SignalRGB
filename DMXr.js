@@ -12,6 +12,7 @@ controller:readonly
 discovery:readonly
 serverHost:readonly
 serverPort:readonly
+additionalServers:readonly
 enableDebugLog:readonly
 udp:readonly
 device:readonly
@@ -21,6 +22,7 @@ BIG_ENDIAN:readonly
 
 var serverHost = "127.0.0.1";
 var serverPort = "8080";
+var additionalServers = "";
 var enableDebugLog = "true";
 
 export function ControllableParameters() {
@@ -40,6 +42,13 @@ export function ControllableParameters() {
 			min: "1024",
 			max: "65535",
 			default: "8080",
+		},
+		{
+			property: "additionalServers",
+			group: "server",
+			label: "Additional Servers (ip:port, comma-separated)",
+			type: "textfield",
+			default: "",
 		},
 		{
 			property: "enableDebugLog",
@@ -395,27 +404,16 @@ export function DiscoveryService() {
 			}
 		}
 
+		// Always probe the manual host:port — this is the primary fallback
+		// when mDNS doesn't work (VMs, firewalls, no Bonjour on Windows).
+		// probeManualServer() uses /health to learn the real serverId so it
+		// deduplicates naturally if mDNS also discovers the same server.
+		probeManualServer();
+
 		// Poll each server
 		serverKeys = Object.keys(serverRegistry);
 		for (var k = 0; k < serverKeys.length; k++) {
 			pollServerFixtures(self, serverRegistry[serverKeys[k]]);
-		}
-
-		// If no servers in registry, try manual fallback
-		if (serverKeys.length === 0) {
-			var host = serverHost || "127.0.0.1";
-			var port = parseInt(serverPort, 10) || 8080;
-			var fallbackId = host + ":" + port;
-			var fallbackSrv = {
-				serverId: fallbackId,
-				serverName: "",
-				host: host,
-				port: port,
-				udpPort: null,
-				lastSeen: now,
-				healthy: true,
-			};
-			pollServerFixtures(self, fallbackSrv);
 		}
 	};
 }
@@ -533,6 +531,92 @@ function buildNameCountMap(currentFixtures, currentServerId) {
 	}
 
 	return counts;
+}
+
+// --------------------------------<( Manual Server Probe )>--------------------------------
+// Probes the manual serverHost:serverPort via /health to learn its real serverId.
+// This is the fallback when mDNS doesn't work (Windows without Bonjour, VMs, etc.).
+// If the server is already in the registry (found via mDNS), this is a no-op.
+
+function probeManualServer() {
+	// Build list of host:port pairs to probe
+	var targets = [];
+
+	// Primary manual server
+	var host = serverHost || "127.0.0.1";
+	var port = parseInt(serverPort, 10) || 8080;
+	targets.push({ host: host, port: port });
+
+	// Additional servers (comma-separated "ip:port" entries)
+	if (additionalServers) {
+		var parts = additionalServers.split(",");
+		for (var p = 0; p < parts.length; p++) {
+			var entry = parts[p].replace(/\s/g, "");
+			if (!entry) continue;
+			var colonIdx = entry.lastIndexOf(":");
+			if (colonIdx > 0) {
+				var aHost = entry.substring(0, colonIdx);
+				var aPort = parseInt(entry.substring(colonIdx + 1), 10);
+				if (aHost && aPort > 0) {
+					targets.push({ host: aHost, port: aPort });
+				}
+			} else {
+				// Bare IP — use default port
+				targets.push({ host: entry, port: 8080 });
+			}
+		}
+	}
+
+	for (var t = 0; t < targets.length; t++) {
+		probeOneServer(targets[t].host, targets[t].port);
+	}
+}
+
+function probeOneServer(host, port) {
+	// Skip if this exact host:port is already tracked by a healthy server
+	var keys = Object.keys(serverRegistry);
+	for (var i = 0; i < keys.length; i++) {
+		var existing = serverRegistry[keys[i]];
+		if (existing.host === host && existing.port === port && existing.healthy) {
+			return;
+		}
+	}
+
+	try {
+		var xhr = new XMLHttpRequest();
+		xhr.open("GET", "http://" + host + ":" + port + "/health", false);
+		xhr.send();
+
+		if (xhr.status !== 200) {
+			return;
+		}
+
+		var health = JSON.parse(xhr.responseText);
+		var sid = health.serverId || (host + ":" + port);
+
+		// Don't overwrite an mDNS-discovered entry that has a different address
+		if (serverRegistry[sid] && serverRegistry[sid].healthy) {
+			return;
+		}
+
+		serverRegistry[sid] = {
+			serverId: sid,
+			serverName: health.serverName || "",
+			host: host,
+			port: port,
+			udpPort: null, // unknown from /health, will fall back to port+1
+			lastSeen: Date.now(),
+			healthy: true,
+		};
+
+		if (enableDebugLog === "true") {
+			service.log("DMXr: Manual probe found server " +
+				(health.serverName || sid.slice(0, 8)) +
+				" at " + host + ":" + port);
+		}
+	} catch (e) {
+		// Server unreachable — that's fine, mDNS may find others
+	}
 }
 
 // --------------------------------<( Bridge Data Class )>--------------------------------

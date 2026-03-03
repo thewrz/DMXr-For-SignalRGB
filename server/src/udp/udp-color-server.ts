@@ -99,6 +99,12 @@ export function createUdpColorServer(deps: UdpColorServerDeps): UdpColorServer {
             sock.send(reply, rinfo.port, rinfo.address);
           }
 
+          // Skip color processing while override (blackout/whiteout) is active
+          if (deps.manager.isBlackoutActive()) {
+            packetsProcessed++;
+            return;
+          }
+
           // Map fixture entries to ColorEntry format
           const entries: ColorEntry[] = packet.fixtures.map((f) => ({
             fixtureIndex: f.index,

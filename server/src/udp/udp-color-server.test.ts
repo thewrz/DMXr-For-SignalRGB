@@ -166,6 +166,34 @@ describe("UdpColorServer", () => {
     expect(universe.updateCalls[0][10]).toBe(200);  // Fixture2 Red
   });
 
+  it("drops color packets during active blackout", async () => {
+    // Send a color packet first to confirm it works
+    const pkt1 = makePacket({ sequence: 1, fixtures: [{ index: 0, r: 255, g: 128, b: 64, brightness: 255 }] });
+    await sendUdpPacket(boundPort, encodeColorPacket(pkt1));
+    await waitMs(50);
+    expect(universe.updateCalls.length).toBeGreaterThan(0);
+
+    // Trigger blackout via FLAG_BLACKOUT packet
+    const blackoutPkt = makePacket({ sequence: 2, flags: FLAG_BLACKOUT, fixtures: [] });
+    await sendUdpPacket(boundPort, encodeColorPacket(blackoutPkt));
+    await waitMs(50);
+    expect(universe.updateAllCalls).toContain(0);
+
+    // Clear recorded calls to isolate the next check
+    const updateCountBefore = universe.updateCalls.length;
+
+    // Send another color packet — should be dropped
+    const pkt2 = makePacket({ sequence: 3, fixtures: [{ index: 0, r: 100, g: 50, b: 25, brightness: 255 }] });
+    await sendUdpPacket(boundPort, encodeColorPacket(pkt2));
+    await waitMs(50);
+
+    // No new universe.update calls — color data was dropped
+    expect(universe.updateCalls.length).toBe(updateCountBefore);
+
+    const stats = server.getStats();
+    expect(stats.packetsProcessed).toBe(3); // pkt1 + blackout + pkt2 (dropped but counted)
+  });
+
   it("close is idempotent", async () => {
     await server.close();
     await server.close(); // should not throw

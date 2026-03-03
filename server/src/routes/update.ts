@@ -57,8 +57,9 @@ export function registerUpdateRoute(
   app.post<{ Body: FixtureUpdatePayload }>(
     "/update",
     { schema: updateSchema, config: { rateLimit: { max: 600, timeWindow: "1 minute" } } },
-    async (request): Promise<FixtureUpdateResponse> => {
+    async (request): Promise<FixtureUpdateResponse & { blackoutActive?: boolean }> => {
       const { fixture, channels } = request.body;
+      const blackoutActive = deps.manager.isBlackoutActive();
       const channelsUpdated = deps.manager.applyFixtureUpdate({
         fixture,
         channels,
@@ -73,6 +74,7 @@ export function registerUpdateRoute(
         success: channelsUpdated > 0,
         fixture,
         channelsUpdated,
+        ...(blackoutActive ? { blackoutActive } : {}),
       };
     },
   );
@@ -85,6 +87,7 @@ export function registerUpdateRoute(
         return reply.status(500).send({ error: "Fixture store not available" });
       }
 
+      const blackoutActive = deps.manager.isBlackoutActive();
       const result = processColorBatch(
         request.body.fixtures,
         deps.fixtureStore,
@@ -100,6 +103,7 @@ export function registerUpdateRoute(
         success: result.channelsUpdated > 0,
         fixturesUpdated: result.fixturesMatched,
         channelsUpdated: result.channelsUpdated,
+        ...(blackoutActive ? { blackoutActive } : {}),
       };
     },
   );

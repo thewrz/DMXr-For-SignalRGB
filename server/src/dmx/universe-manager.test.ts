@@ -145,6 +145,75 @@ describe("createUniverseManager", () => {
       manager.blackout();
       expect(manager.getActiveChannelCount()).toBe(0);
     });
+
+    it("drops color updates while blackout is active", () => {
+      manager.blackout();
+      mock.updateCalls.length = 0;
+
+      const count = manager.applyFixtureUpdate({
+        fixture: "test",
+        channels: { "1": 255 },
+      });
+
+      expect(count).toBe(0);
+      expect(mock.updateCalls).toHaveLength(0);
+    });
+
+    it("stays active until resumeNormal is called", () => {
+      manager.blackout();
+      mock.updateCalls.length = 0;
+
+      expect(manager.applyFixtureUpdate({ fixture: "a", channels: { "1": 255 } })).toBe(0);
+      expect(manager.applyFixtureUpdate({ fixture: "b", channels: { "2": 128 } })).toBe(0);
+      expect(manager.applyFixtureUpdate({ fixture: "c", channels: { "3": 64 } })).toBe(0);
+      expect(mock.updateCalls).toHaveLength(0);
+
+      manager.resumeNormal();
+
+      const count = manager.applyFixtureUpdate({ fixture: "d", channels: { "4": 200 } });
+      expect(count).toBe(1);
+      expect(mock.updateCalls).toHaveLength(1);
+    });
+
+    it("allows applyRawUpdate during blackout", () => {
+      manager.blackout();
+      mock.updateCalls.length = 0;
+
+      manager.applyRawUpdate({ 1: 255, 2: 128 });
+
+      expect(mock.updateCalls).toHaveLength(1);
+      expect(mock.updateCalls[0]).toEqual({ 1: 255, 2: 128 });
+    });
+  });
+
+  describe("whiteout", () => {
+    it("drops color updates while whiteout is active", () => {
+      manager.whiteout();
+      mock.updateCalls.length = 0;
+
+      const count = manager.applyFixtureUpdate({
+        fixture: "test",
+        channels: { "1": 100 },
+      });
+
+      expect(count).toBe(0);
+      expect(mock.updateCalls).toHaveLength(0);
+    });
+
+    it("stays active until resumeNormal is called", () => {
+      manager.whiteout();
+      mock.updateCalls.length = 0;
+
+      expect(manager.applyFixtureUpdate({ fixture: "a", channels: { "1": 100 } })).toBe(0);
+      expect(manager.applyFixtureUpdate({ fixture: "b", channels: { "2": 50 } })).toBe(0);
+      expect(mock.updateCalls).toHaveLength(0);
+
+      manager.resumeNormal();
+
+      const count = manager.applyFixtureUpdate({ fixture: "c", channels: { "3": 200 } });
+      expect(count).toBe(1);
+      expect(mock.updateCalls).toHaveLength(1);
+    });
   });
 
   describe("getActiveChannelCount", () => {

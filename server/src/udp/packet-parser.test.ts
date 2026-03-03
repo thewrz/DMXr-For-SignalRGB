@@ -49,10 +49,12 @@ describe("encodeColorPacket", () => {
     expect(buf[5]).toBe(0x34);
   });
 
-  it("encodes timestamp as float64 BE", () => {
+  it("encodes timestamp as uint64 BE", () => {
     const ts = 1709400000000;
     const buf = encodeColorPacket(makePacket({ timestamp: ts }));
-    expect(buf.readDoubleBE(6)).toBe(ts);
+    const high = buf.readUInt32BE(6);
+    const low = buf.readUInt32BE(10);
+    expect(high * 0x100000000 + low).toBe(ts);
   });
 
   it("encodes fixture count", () => {

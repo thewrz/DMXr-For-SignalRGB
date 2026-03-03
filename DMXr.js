@@ -1,5 +1,5 @@
 export function Name() { return "DMXr"; }
-export function Version() { return "1.1.0"; }
+export function Version() { return "1.1.1"; }
 export function Type() { return "network"; }
 export function Publisher() { return "DMXr Project"; }
 export function Size() { return [1, 1]; }
@@ -53,7 +53,7 @@ export function ControllableParameters() {
 
 // --------------------------------<( UDP Protocol )>--------------------------------
 // DMXRC binary protocol: 15-byte header + 5 bytes per fixture
-// Magic "DX" | version | flags | seq(2) | timestamp(8) | count | [idx,r,g,b,br]...
+// Magic "DX" | version | flags | seq(2) | timestamp uint64 BE(8) | count | [idx,r,g,b,br]...
 
 var udpSequence = 0;
 var udpEnabled = false;
@@ -62,9 +62,9 @@ function buildDmxrcPacket(fixtureIndex, r, g, b, brightnessUint8) {
 	var seq = udpSequence;
 	udpSequence = (udpSequence + 1) & 0xFFFF;
 
-	// Encode timestamp (Date.now()) as float64 BE — 8 bytes
+	// Encode timestamp (Date.now()) as uint64 BE — 8 bytes
 	var ts = Date.now();
-	var tsBytes = float64ToBytes(ts);
+	var tsBytes = timestampToBytes(ts);
 
 	var packet = [
 		0x44, 0x58,                 // magic "DX"
@@ -88,7 +88,7 @@ function buildBlackoutPacket() {
 	udpSequence = (udpSequence + 1) & 0xFFFF;
 
 	var ts = Date.now();
-	var tsBytes = float64ToBytes(ts);
+	var tsBytes = timestampToBytes(ts);
 
 	return [
 		0x44, 0x58,
@@ -102,24 +102,22 @@ function buildBlackoutPacket() {
 	];
 }
 
-// Encode a JS number as float64 big-endian (8 bytes)
-// Uses DataView trick via a shared ArrayBuffer
-var _f64buf = new ArrayBuffer(8);
-var _f64view = new DataView(_f64buf);
-var _f64bytes = new Uint8Array(_f64buf);
-
-function float64ToBytes(value) {
-	_f64view.setFloat64(0, value, false); // false = big-endian
-	return [
-		_f64bytes[0], _f64bytes[1], _f64bytes[2], _f64bytes[3],
-		_f64bytes[4], _f64bytes[5], _f64bytes[6], _f64bytes[7]
-	];
+// Encode a JS timestamp (Date.now()) as uint64 big-endian (8 bytes)
+// Uses only basic integer math — no typed arrays (SignalRGB sandbox lacks them)
+function timestampToBytes(ms) {
+	var bytes = [0, 0, 0, 0, 0, 0, 0, 0];
+	for (var i = 7; i >= 0; i--) {
+		bytes[i] = ms & 0xFF;
+		ms = Math.floor(ms / 256);
+	}
+	return bytes;
 }
 
 // --------------------------------<( Per-Controller Lifecycle )>--------------------------------
 // SignalRGB calls these with the `controller` global set to the active DMXrBridge instance.
 
 export function Initialize() {
+	device.log("DMXr: Initialize v1.1.1");
 	device.setName(controller.name);
 
 	device.setSize([1, 1]);

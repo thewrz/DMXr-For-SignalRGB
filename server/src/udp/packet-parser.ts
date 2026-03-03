@@ -7,7 +7,7 @@
  *   2       1     version       0x01
  *   3       1     flags         bit0=ping, bit1=blackout
  *   4       2     sequence      uint16 BE
- *   6       8     timestamp     float64 BE (Date.now())
+ *   6       8     timestamp     uint64 BE (Date.now())
  *   14      1     fixture_count 0-255
  *   15      N×5   fixtures      [index:1][r:1][g:1][b:1][brightness:1]
  *
@@ -60,7 +60,9 @@ export function parseColorPacket(buf: Buffer): ColorPacket | ParseError {
 
   const flags = buf[3];
   const sequence = buf.readUInt16BE(4);
-  const timestamp = buf.readDoubleBE(6);
+  const high = buf.readUInt32BE(6);
+  const low = buf.readUInt32BE(10);
+  const timestamp = high * 0x100000000 + low;
   const fixtureCount = buf[14];
 
   const expectedLength = HEADER_SIZE + fixtureCount * FIXTURE_ENTRY_SIZE;
@@ -95,7 +97,8 @@ export function encodeColorPacket(packet: ColorPacket): Buffer {
   buf[2] = packet.version;
   buf[3] = packet.flags;
   buf.writeUInt16BE(packet.sequence, 4);
-  buf.writeDoubleBE(packet.timestamp, 6);
+  buf.writeUInt32BE(Math.floor(packet.timestamp / 0x100000000), 6);
+  buf.writeUInt32BE(packet.timestamp >>> 0, 10);
   buf[14] = packet.fixtures.length;
 
   for (let i = 0; i < packet.fixtures.length; i++) {

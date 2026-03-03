@@ -59,7 +59,6 @@ describe("settings routes", () => {
       const res = await app.inject({
         method: "GET",
         url: "/settings",
-        remoteAddress: "127.0.0.1",
       });
 
       expect(res.statusCode).toBe(200);
@@ -70,14 +69,14 @@ describe("settings routes", () => {
       expect(body.serverVersion).toBe("0.2.0-test");
     });
 
-    it("rejects non-localhost requests", async () => {
+    it("allows requests from any IP address", async () => {
       const res = await app.inject({
         method: "GET",
         url: "/settings",
         remoteAddress: "192.168.1.50",
       });
 
-      expect(res.statusCode).toBe(403);
+      expect(res.statusCode).toBe(200);
     });
   });
 
@@ -87,7 +86,6 @@ describe("settings routes", () => {
         method: "PATCH",
         url: "/settings",
         payload: { dmxDriver: "enttec-usb-dmx-pro" },
-        remoteAddress: "127.0.0.1",
       });
 
       expect(res.statusCode).toBe(200);
@@ -101,7 +99,6 @@ describe("settings routes", () => {
         method: "PATCH",
         url: "/settings",
         payload: { setupCompleted: true },
-        remoteAddress: "127.0.0.1",
       });
 
       expect(res.statusCode).toBe(200);
@@ -113,7 +110,6 @@ describe("settings routes", () => {
         method: "PATCH",
         url: "/settings",
         payload: { port: 9999 },
-        remoteAddress: "127.0.0.1",
       });
 
       const store2 = createSettingsStore(filePath);
@@ -127,7 +123,6 @@ describe("settings routes", () => {
       const res = await app.inject({
         method: "POST",
         url: "/settings/scan-ports",
-        remoteAddress: "127.0.0.1",
       });
 
       expect(res.statusCode).toBe(200);
@@ -145,7 +140,6 @@ describe("settings routes", () => {
       const res = await app.inject({
         method: "POST",
         url: "/settings/restart",
-        remoteAddress: "127.0.0.1",
       });
 
       expect(res.statusCode).toBe(200);

@@ -141,7 +141,7 @@ describe("mapColor", () => {
     expect(result[2]).toBe(0); // has dimmer → no strobe
   });
 
-  it("excludes positional/generic channels from color output", () => {
+  it("includes generic channels with their defaultValue in color output", () => {
     const fixture = makeFixture([
       { offset: 0, name: "Pan/Tilt Speed", type: "Generic", defaultValue: 128 },
       { offset: 1, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
@@ -151,7 +151,7 @@ describe("mapColor", () => {
 
     const result = mapColor(fixture, 255, 128, 64, 1.0);
 
-    expect(result[1]).toBeUndefined(); // generic excluded from color updates
+    expect(result[1]).toBe(128); // generic gets defaultValue
     expect(result[2]).toBe(255);
   });
 
@@ -218,7 +218,7 @@ describe("mapColor", () => {
     expect(result[1]).toBe(255); // no dimmer, defaultValue=0 → open shutter (255)
   });
 
-  it("excludes Pan from color output (set by getFixtureDefaults instead)", () => {
+  it("includes Pan with defaultValue in color output", () => {
     const fixture = makeFixture([
       { offset: 0, name: "Pan", type: "Pan", defaultValue: 128 },
       { offset: 1, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
@@ -226,11 +226,11 @@ describe("mapColor", () => {
 
     const result = mapColor(fixture, 255, 0, 0, 1.0);
 
-    expect(result[1]).toBeUndefined(); // pan excluded from color updates
-    expect(result[2]).toBe(255);       // red still mapped
+    expect(result[1]).toBe(128); // pan center
+    expect(result[2]).toBe(255); // red still mapped
   });
 
-  it("excludes Tilt from color output", () => {
+  it("includes Tilt with defaultValue in color output", () => {
     const fixture = makeFixture([
       { offset: 0, name: "Tilt", type: "Tilt", defaultValue: 128 },
       { offset: 1, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
@@ -238,8 +238,30 @@ describe("mapColor", () => {
 
     const result = mapColor(fixture, 255, 0, 0, 1.0);
 
-    expect(result[1]).toBeUndefined(); // tilt excluded from color updates
+    expect(result[1]).toBe(128); // tilt center
     expect(result[2]).toBe(255);
+  });
+
+  it("falls back to 128 for Pan coarse when defaultValue is 0", () => {
+    const fixture = makeFixture([
+      { offset: 0, name: "Pan", type: "Pan", defaultValue: 0 },
+      { offset: 1, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
+    ]);
+
+    const result = mapColor(fixture, 255, 0, 0, 1.0);
+
+    expect(result[1]).toBe(128); // 128 fallback for coarse pan
+  });
+
+  it("uses defaultValue for Pan Fine (no 128 fallback)", () => {
+    const fixture = makeFixture([
+      { offset: 0, name: "Pan Fine", type: "Pan", defaultValue: 0 },
+      { offset: 1, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
+    ]);
+
+    const result = mapColor(fixture, 255, 0, 0, 1.0);
+
+    expect(result[1]).toBe(0); // fine channel uses raw defaultValue
   });
 
   it("includes Pan in color output when override is enabled", () => {
@@ -305,9 +327,9 @@ describe("mapColor", () => {
 
     const result = mapColor(fixture, 255, 255, 255, 1.0);
 
-    expect(result[1]).toBe(255);       // dimmer on
-    expect(result[2]).toBe(0);         // strobe = effect mode → 0
-    expect(result[3]).toBeUndefined(); // generic excluded from color updates
+    expect(result[1]).toBe(255); // dimmer on
+    expect(result[2]).toBe(0);   // strobe = effect mode → 0
+    expect(result[3]).toBe(128); // generic gets defaultValue
   });
 
   it("basic strobe + near-white (245,250,248) → normal output", () => {

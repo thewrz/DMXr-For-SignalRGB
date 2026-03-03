@@ -3,11 +3,6 @@ import { analyzeFixture } from "./fixture-capabilities.js";
 
 export const DEFAULT_WHITE_GATE_THRESHOLD = 240;
 
-/** Channel types that represent physical position or mechanical state — not driven by color frames */
-const POSITIONAL_TYPES = new Set([
-  "Pan", "Tilt", "Focus", "Zoom", "Gobo", "Iris", "Prism", "ColorWheel", "Generic", "NoFunction",
-]);
-
 export function isWhiteGateOpen(
   r: number,
   g: number,
@@ -74,11 +69,6 @@ export function mapColor(
       continue;
     }
 
-    // Positional/mechanical channels — skip in color updates (set once at startup via getFixtureDefaults)
-    if (POSITIONAL_TYPES.has(channel.type)) {
-      continue;
-    }
-
     if (channel.type === "ColorIntensity") {
       switch (channel.color) {
         case "Red":
@@ -123,6 +113,14 @@ export function mapColor(
           : channel.defaultValue > 0
             ? channel.defaultValue
             : 255;
+    } else if (channel.type === "Pan" || channel.type === "Tilt") {
+      if (/fine/i.test(channel.name)) {
+        result[addr] = channel.defaultValue;
+      } else {
+        result[addr] = channel.defaultValue > 0 ? channel.defaultValue : 128;
+      }
+    } else {
+      result[addr] = channel.defaultValue;
     }
   }
 
@@ -131,8 +129,7 @@ export function mapColor(
 
 /**
  * Returns default DMX values for ALL channels of a fixture.
- * Used once at startup to set positional channels (pan/tilt center, etc.)
- * that are excluded from per-frame color updates.
+ * Used at startup to initialize all channels before color frames arrive.
  */
 export function getFixtureDefaults(fixture: FixtureConfig): Record<number, number> {
   const result: Record<number, number> = {};

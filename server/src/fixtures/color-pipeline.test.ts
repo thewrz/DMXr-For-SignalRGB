@@ -133,7 +133,7 @@ describe("processColorBatch", () => {
     expect(universe.updateCalls[0]).toEqual({ 1: 100, 2: 50, 3: 25 });
   });
 
-  it("excludes positional channels (pan/tilt) from color batch output", () => {
+  it("includes positional channels (pan/tilt) with defaults in color batch output", () => {
     const universe = createMockUniverse();
     const manager = createUniverseManager(universe);
     const store = createTestFixtureStore();
@@ -160,9 +160,9 @@ describe("processColorBatch", () => {
 
     expect(result.fixturesMatched).toBe(1);
     const update = universe.updateCalls[0];
-    // Pan (addr 1) and Tilt (addr 2) should NOT be in the update
-    expect(update[1]).toBeUndefined();
-    expect(update[2]).toBeUndefined();
+    // Pan and Tilt included with their default values
+    expect(update[1]).toBe(128); // pan center
+    expect(update[2]).toBe(128); // tilt center
     // Color channels should be present
     expect(update[3]).toBe(255); // dimmer
     expect(update[4]).toBe(255); // red

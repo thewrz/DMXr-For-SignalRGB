@@ -541,11 +541,34 @@ function buildNameCountMap(currentFixtures, currentServerId) {
 function probeManualServer() {
 	// Build list of host:port pairs to probe
 	var targets = [];
+	var seen = {};
 
-	// Primary manual server
+	// Helper: add target if not already in list
+	function addTarget(h, p) {
+		var key = h + ":" + p;
+		if (!seen[key]) {
+			seen[key] = true;
+			targets.push({ host: h, port: p });
+		}
+	}
+
+	// Primary manual server (ControllableParameter)
 	var host = serverHost || "127.0.0.1";
 	var port = parseInt(serverPort, 10) || 8080;
-	targets.push({ host: host, port: port });
+	addTarget(host, port);
+
+	// QML-saved settings (service.saveSetting store) — the QML panel saves
+	// serverHost/serverPort separately from ControllableParameters
+	try {
+		var qmlHost = service.getSetting("DMXr", "serverHost");
+		var qmlPort = service.getSetting("DMXr", "serverPort");
+		if (qmlHost && qmlHost !== "") {
+			var qp = parseInt(qmlPort, 10) || 8080;
+			addTarget(qmlHost, qp);
+		}
+	} catch (e) {
+		// service.getSetting may not be available in all contexts
+	}
 
 	// Additional servers (comma-separated "ip:port" entries)
 	if (additionalServers) {
@@ -558,11 +581,11 @@ function probeManualServer() {
 				var aHost = entry.substring(0, colonIdx);
 				var aPort = parseInt(entry.substring(colonIdx + 1), 10);
 				if (aHost && aPort > 0) {
-					targets.push({ host: aHost, port: aPort });
+					addTarget(aHost, aPort);
 				}
 			} else {
 				// Bare IP — use default port
-				targets.push({ host: entry, port: 8080 });
+				addTarget(entry, 8080);
 			}
 		}
 	}

@@ -92,7 +92,8 @@ export function createUniverseManager(
   return {
     applyFixtureUpdate(payload: FixtureUpdatePayload): number {
       if (blackoutActive) {
-        return 0;
+        blackoutActive = false;
+        log?.info("DMX override auto-cleared: color data received");
       }
 
       const dmxUpdate = buildDmxUpdate(payload.channels);

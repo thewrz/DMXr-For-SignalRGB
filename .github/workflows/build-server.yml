@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   release:
-    types: [created]
+    types: [published]
   workflow_dispatch:
 
 permissions:
@@ -84,11 +84,12 @@ jobs:
         if: matrix.node_platform == 'win'
         shell: pwsh
         run: |
-          $url = "https://nssm.cc/release/nssm-2.24.zip"
+          $url = "https://github.com/ONLYOFFICE/nssm/releases/download/v2.24.1/nssm_x64.zip"
           Write-Host "Downloading NSSM from $url"
           Invoke-WebRequest -Uri $url -OutFile nssm.zip
           Expand-Archive -Path nssm.zip -DestinationPath nssm-extracted
-          Copy-Item "nssm-extracted/nssm-2.24/win64/nssm.exe" -Destination nssm.exe
+          $nssm = Get-ChildItem -Path nssm-extracted -Filter nssm.exe -Recurse | Select-Object -First 1
+          Copy-Item $nssm.FullName -Destination nssm.exe
 
       # --- Assemble distribution ---
 

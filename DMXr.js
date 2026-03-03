@@ -1,5 +1,5 @@
 export function Name() { return "DMXr"; }
-export function Version() { return "1.1.1"; }
+export function Version() { return "1.1.2"; }
 export function Type() { return "network"; }
 export function Publisher() { return "DMXr Project"; }
 export function Size() { return [1, 1]; }
@@ -117,7 +117,7 @@ function timestampToBytes(ms) {
 // SignalRGB calls these with the `controller` global set to the active DMXrBridge instance.
 
 export function Initialize() {
-	device.log("DMXr: Initialize v1.1.1");
+	device.log("DMXr: Initialize v1.1.2");
 	device.setName(controller.name);
 
 	device.setSize([1, 1]);
@@ -175,7 +175,7 @@ export function Render() {
 	var brightness = device.getBrightness() / 100;
 
 	// UDP fast path: binary DMXRC packet
-	if (udpEnabled && ctrl._udpIndex >= 0 && discoveredHost) {
+	if (udpEnabled && ctrl._udpIndex >= 0) {
 		var udpPort = discoveredUdpPort || ((parseInt(discoveredPort, 10) || parseInt(serverPort, 10) || 8080) + 1);
 		var ip = discoveredHost || serverHost || "127.0.0.1";
 		var brightnessUint8 = Math.round(brightness * 255);
@@ -229,7 +229,7 @@ export function Shutdown() {
 	var ctrl = controller;
 
 	// UDP blackout (fire-and-forget, best-effort)
-	if (udpEnabled && discoveredHost) {
+	if (udpEnabled) {
 		try {
 			var udpPort = discoveredUdpPort || ((parseInt(discoveredPort, 10) || parseInt(serverPort, 10) || 8080) + 1);
 			var ip = discoveredHost || serverHost || "127.0.0.1";

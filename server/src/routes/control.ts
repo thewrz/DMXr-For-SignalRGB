@@ -11,7 +11,7 @@ interface ControlRouteDeps {
 }
 
 interface TestBody {
-  readonly action: "flash" | "identify";
+  readonly action: "flash" | "flash-hold" | "flash-release" | "identify";
   readonly durationMs?: number;
 }
 
@@ -20,17 +20,38 @@ const testSchema = {
     type: "object" as const,
     required: ["action"],
     properties: {
-      action: { type: "string" as const, enum: ["flash", "identify"] },
+      action: {
+        type: "string" as const,
+        enum: ["flash", "flash-hold", "flash-release", "identify"],
+      },
       durationMs: { type: "integer" as const, minimum: 100, maximum: 5000 },
     },
   },
 };
+
+const FLASH_HOLD_SAFETY_MS = 10_000;
 
 export function registerControlRoutes(
   app: FastifyInstance,
   deps: ControlRouteDeps,
 ): void {
   const activeTimers = new Map<string, NodeJS.Timeout>();
+  const holdSnapshots = new Map<string, Record<number, number>>();
+
+  function restoreAfterFlash(
+    fixture: FixtureConfig,
+    snapshot: Record<number, number>,
+  ): void {
+    if (deps.manager.isBlackoutActive()) {
+      const zeros: Record<number, number> = {};
+      for (const ch of fixture.channels) {
+        zeros[fixture.dmxStartAddress + ch.offset] = 0;
+      }
+      deps.manager.applyRawUpdate(zeros);
+    } else {
+      deps.manager.applyRawUpdate(snapshot);
+    }
+  }
 
   app.post("/control/blackout", async (request) => {
     deps.manager.blackout();
@@ -91,10 +112,6 @@ export function registerControlRoutes(
     "/fixtures/:id/test",
     { schema: testSchema },
     async (request, reply) => {
-      if (deps.manager.isBlackoutActive()) {
-        return reply.status(409).send({ error: "Cannot flash during blackout/whiteout override" });
-      }
-
       const fixture = deps.store.getById(request.params.id);
 
       if (fixture === undefined) {
@@ -106,47 +123,92 @@ export function registerControlRoutes(
       const start = fixture.dmxStartAddress;
       const count = fixture.channelCount;
 
+      // Cancel any existing timer for this fixture (safety or timed flash)
       const existingTimer = activeTimers.get(fixture.id);
       if (existingTimer !== undefined) {
         clearTimeout(existingTimer);
         activeTimers.delete(fixture.id);
       }
 
-      const snapshot = deps.manager.getChannelSnapshot(start, count);
+      if (action === "flash") {
+        const snapshot = deps.manager.getChannelSnapshot(start, count);
+        const flashValues = buildFlashValues(fixture, snapshot);
+        deps.manager.applyRawUpdate(flashValues);
 
-      const flashValues = buildFlashValues(fixture, snapshot);
-      deps.manager.applyRawUpdate(flashValues);
-
-      request.log.info(
-        {
-          action,
-          fixtureId: fixture.id,
-          fixtureName: fixture.name,
-          dmxRange: `${start}-${start + count - 1}`,
-          durationMs,
-          channelValues: flashValues,
-        },
-        `flash: "${fixture.name}" DMX ${start}-${start + count - 1} for ${durationMs}ms`,
-      );
-
-      const timer = setTimeout(() => {
-        deps.manager.applyRawUpdate(snapshot);
         request.log.info(
-          { action: "flash-restore", fixtureId: fixture.id },
-          `flash-restore: "${fixture.name}" restored to snapshot`,
+          {
+            action,
+            fixtureId: fixture.id,
+            fixtureName: fixture.name,
+            dmxRange: `${start}-${start + count - 1}`,
+            durationMs,
+            channelValues: flashValues,
+          },
+          `flash: "${fixture.name}" DMX ${start}-${start + count - 1} for ${durationMs}ms`,
         );
-        activeTimers.delete(fixture.id);
-      }, durationMs);
-      timer.unref();
 
-      activeTimers.set(fixture.id, timer);
+        const timer = setTimeout(() => {
+          restoreAfterFlash(fixture, snapshot);
+          request.log.info(
+            { action: "flash-restore", fixtureId: fixture.id },
+            `flash-restore: "${fixture.name}" restored`,
+          );
+          activeTimers.delete(fixture.id);
+        }, durationMs);
+        timer.unref();
+        activeTimers.set(fixture.id, timer);
 
-      return {
-        success: true,
-        action,
-        fixtureId: fixture.id,
-        durationMs,
-      };
+        return { success: true, action, fixtureId: fixture.id, durationMs };
+      }
+
+      if (action === "flash-hold") {
+        const snapshot = deps.manager.getChannelSnapshot(start, count);
+        holdSnapshots.set(fixture.id, snapshot);
+
+        const flashValues = buildFlashValues(fixture, snapshot);
+        deps.manager.applyRawUpdate(flashValues);
+
+        request.log.info(
+          { action, fixtureId: fixture.id, fixtureName: fixture.name },
+          `flash-hold: "${fixture.name}" held on`,
+        );
+
+        // Safety timeout in case browser disconnects mid-hold
+        const safety = setTimeout(() => {
+          const snap = holdSnapshots.get(fixture.id);
+          if (snap !== undefined) {
+            restoreAfterFlash(fixture, snap);
+            holdSnapshots.delete(fixture.id);
+            request.log.warn(
+              { fixtureId: fixture.id },
+              `flash-hold safety timeout: "${fixture.name}" auto-restored`,
+            );
+          }
+          activeTimers.delete(fixture.id);
+        }, FLASH_HOLD_SAFETY_MS);
+        safety.unref();
+        activeTimers.set(fixture.id, safety);
+
+        return { success: true, action, fixtureId: fixture.id };
+      }
+
+      if (action === "flash-release") {
+        const snapshot =
+          holdSnapshots.get(fixture.id) ??
+          deps.manager.getChannelSnapshot(start, count);
+        restoreAfterFlash(fixture, snapshot);
+        holdSnapshots.delete(fixture.id);
+
+        request.log.info(
+          { action, fixtureId: fixture.id, fixtureName: fixture.name },
+          `flash-release: "${fixture.name}" restored`,
+        );
+
+        return { success: true, action, fixtureId: fixture.id };
+      }
+
+      // identify — passthrough (future)
+      return { success: true, action, fixtureId: fixture.id };
     },
   );
 }

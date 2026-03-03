@@ -337,7 +337,13 @@
                         :title="expandedFixtureId === fixture.id ? 'Collapse channels' : 'Expand channels'">
                   <span x-text="expandedFixtureId === fixture.id ? '\u25B2' : '\u25BC'"></span>
                 </button>
-                <button class="btn btn-sm" @click="flashFixture(fixture.id)">Flash</button>
+                <button class="btn btn-sm"
+                        @mousedown.prevent="flashHold(fixture.id)"
+                        @mouseup="flashRelease(fixture.id)"
+                        @mouseleave="flashRelease(fixture.id)"
+                        @touchstart.prevent="flashHold(fixture.id)"
+                        @touchend="flashRelease(fixture.id)"
+                        @touchcancel="flashRelease(fixture.id)">Flash</button>
                 <button class="btn btn-sm btn-danger" @click="removeFixture(fixture.id)">Remove</button>
               </div>
             </div>

@@ -161,5 +161,195 @@ describe("Control routes", () => {
 
       expect(res.statusCode).toBe(400);
     });
+
+    it("flash-hold applies max brightness values", async () => {
+      const addRes = await app.inject({
+        method: "POST",
+        url: "/fixtures",
+        payload: {
+          name: "Hold PAR",
+          oflKey: "test/test",
+          oflFixtureName: "Test",
+          mode: "3-channel",
+          dmxStartAddress: 10,
+          channelCount: 3,
+          channels: [
+            { offset: 0, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
+            { offset: 1, name: "Green", type: "ColorIntensity", color: "Green", defaultValue: 0 },
+            { offset: 2, name: "Blue", type: "ColorIntensity", color: "Blue", defaultValue: 0 },
+          ],
+        },
+      });
+      const { id } = addRes.json();
+
+      const res = await app.inject({
+        method: "POST",
+        url: `/fixtures/${id}/test`,
+        payload: { action: "flash-hold" },
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json().action).toBe("flash-hold");
+
+      const lastUpdate = mockUniverse.updateCalls[mockUniverse.updateCalls.length - 1];
+      expect(lastUpdate[10]).toBe(255);
+      expect(lastUpdate[11]).toBe(255);
+      expect(lastUpdate[12]).toBe(255);
+    });
+
+    it("flash-release restores channels after hold", async () => {
+      const addRes = await app.inject({
+        method: "POST",
+        url: "/fixtures",
+        payload: {
+          name: "Release PAR",
+          oflKey: "test/test",
+          oflFixtureName: "Test",
+          mode: "3-channel",
+          dmxStartAddress: 20,
+          channelCount: 3,
+          channels: [
+            { offset: 0, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
+            { offset: 1, name: "Green", type: "ColorIntensity", color: "Green", defaultValue: 0 },
+            { offset: 2, name: "Blue", type: "ColorIntensity", color: "Blue", defaultValue: 0 },
+          ],
+        },
+      });
+      const { id } = addRes.json();
+
+      await app.inject({
+        method: "POST",
+        url: `/fixtures/${id}/test`,
+        payload: { action: "flash-hold" },
+      });
+
+      const res = await app.inject({
+        method: "POST",
+        url: `/fixtures/${id}/test`,
+        payload: { action: "flash-release" },
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json().action).toBe("flash-release");
+
+      // Restore should set channels back to 0 (their pre-flash state)
+      const lastUpdate = mockUniverse.updateCalls[mockUniverse.updateCalls.length - 1];
+      expect(lastUpdate[20]).toBe(0);
+      expect(lastUpdate[21]).toBe(0);
+      expect(lastUpdate[22]).toBe(0);
+    });
+
+    it("flash-hold works during blackout", async () => {
+      const addRes = await app.inject({
+        method: "POST",
+        url: "/fixtures",
+        payload: {
+          name: "Blackout PAR",
+          oflKey: "test/test",
+          oflFixtureName: "Test",
+          mode: "3-channel",
+          dmxStartAddress: 30,
+          channelCount: 3,
+          channels: [
+            { offset: 0, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
+            { offset: 1, name: "Green", type: "ColorIntensity", color: "Green", defaultValue: 0 },
+            { offset: 2, name: "Blue", type: "ColorIntensity", color: "Blue", defaultValue: 0 },
+          ],
+        },
+      });
+      const { id } = addRes.json();
+
+      // Activate blackout
+      await app.inject({ method: "POST", url: "/control/blackout" });
+
+      const res = await app.inject({
+        method: "POST",
+        url: `/fixtures/${id}/test`,
+        payload: { action: "flash-hold" },
+      });
+
+      // Should succeed (not 409)
+      expect(res.statusCode).toBe(200);
+      expect(res.json().action).toBe("flash-hold");
+
+      const lastUpdate = mockUniverse.updateCalls[mockUniverse.updateCalls.length - 1];
+      expect(lastUpdate[30]).toBe(255);
+      expect(lastUpdate[31]).toBe(255);
+      expect(lastUpdate[32]).toBe(255);
+    });
+
+    it("flash-release during blackout zeros channels", async () => {
+      const addRes = await app.inject({
+        method: "POST",
+        url: "/fixtures",
+        payload: {
+          name: "Blackout Release PAR",
+          oflKey: "test/test",
+          oflFixtureName: "Test",
+          mode: "3-channel",
+          dmxStartAddress: 40,
+          channelCount: 3,
+          channels: [
+            { offset: 0, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
+            { offset: 1, name: "Green", type: "ColorIntensity", color: "Green", defaultValue: 0 },
+            { offset: 2, name: "Blue", type: "ColorIntensity", color: "Blue", defaultValue: 0 },
+          ],
+        },
+      });
+      const { id } = addRes.json();
+
+      // Activate blackout, then flash-hold, then flash-release
+      await app.inject({ method: "POST", url: "/control/blackout" });
+      await app.inject({
+        method: "POST",
+        url: `/fixtures/${id}/test`,
+        payload: { action: "flash-hold" },
+      });
+
+      const res = await app.inject({
+        method: "POST",
+        url: `/fixtures/${id}/test`,
+        payload: { action: "flash-release" },
+      });
+
+      expect(res.statusCode).toBe(200);
+
+      // During blackout, release should zero channels (not restore snapshot)
+      const lastUpdate = mockUniverse.updateCalls[mockUniverse.updateCalls.length - 1];
+      expect(lastUpdate[40]).toBe(0);
+      expect(lastUpdate[41]).toBe(0);
+      expect(lastUpdate[42]).toBe(0);
+    });
+
+    it("flash-release with no active hold is a no-op", async () => {
+      const addRes = await app.inject({
+        method: "POST",
+        url: "/fixtures",
+        payload: {
+          name: "Noop PAR",
+          oflKey: "test/test",
+          oflFixtureName: "Test",
+          mode: "3-channel",
+          dmxStartAddress: 50,
+          channelCount: 3,
+          channels: [
+            { offset: 0, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
+            { offset: 1, name: "Green", type: "ColorIntensity", color: "Green", defaultValue: 0 },
+            { offset: 2, name: "Blue", type: "ColorIntensity", color: "Blue", defaultValue: 0 },
+          ],
+        },
+      });
+      const { id } = addRes.json();
+
+      const res = await app.inject({
+        method: "POST",
+        url: `/fixtures/${id}/test`,
+        payload: { action: "flash-release" },
+      });
+
+      // Should succeed without error
+      expect(res.statusCode).toBe(200);
+      expect(res.json().action).toBe("flash-release");
+    });
   });
 });

@@ -166,6 +166,30 @@ function dmxrFixtureManager() {
       }
     },
 
+    async flashHold(id) {
+      try {
+        await fetch("/fixtures/" + id + "/test", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "flash-hold" }),
+        });
+      } catch {
+        // ignore
+      }
+    },
+
+    async flashRelease(id) {
+      try {
+        await fetch("/fixtures/" + id + "/test", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "flash-release" }),
+        });
+      } catch {
+        // ignore
+      }
+    },
+
     async blackout() {
       try {
         await fetch("/control/blackout", { method: "POST" });

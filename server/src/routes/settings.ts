@@ -34,31 +34,10 @@ const RESTART_FIELDS: ReadonlySet<keyof PersistedSettings> = new Set([
   "host",
 ]);
 
-function isLocalhostRequest(
-  remoteAddress: string | undefined,
-): boolean {
-  if (!remoteAddress) return false;
-  return (
-    remoteAddress === "127.0.0.1" ||
-    remoteAddress === "::1" ||
-    remoteAddress === "::ffff:127.0.0.1"
-  );
-}
-
 export function registerSettingsRoutes(
   app: FastifyInstance,
   deps: SettingsDeps,
 ): void {
-  app.addHook("onRequest", async (request, reply) => {
-    if (!request.url.startsWith("/settings")) return;
-
-    if (!isLocalhostRequest(request.ip)) {
-      return reply.status(403).send({
-        error: "Settings can only be changed from localhost",
-      });
-    }
-  });
-
   app.get(
     "/settings",
     async (): Promise<GetSettingsResponse> => {

@@ -61,14 +61,21 @@ export function createUdpColorServer(deps: UdpColorServerDeps): UdpColorServer {
             return;
           }
 
-          // Sequence gap detection
+          // Sequence gap detection — track high-water mark.
+          // The plugin shares one sequence counter across all fixtures,
+          // so packets from different fixtures arrive interleaved.
+          // Only count a gap when the sequence jumps backward beyond
+          // normal uint16 wraparound (a true lost-packet signal).
           if (lastSequence >= 0) {
-            const expected = (lastSequence + 1) & 0xffff;
-            if (packet.sequence !== expected) {
+            const diff = (packet.sequence - lastSequence + 0x10000) & 0xffff;
+            // diff=0 means duplicate, diff > 0x8000 means old/reordered packet
+            if (diff > 0x8000) {
               sequenceGaps++;
             }
           }
-          lastSequence = packet.sequence;
+          if (lastSequence < 0 || ((packet.sequence - lastSequence + 0x10000) & 0xffff) <= 0x8000) {
+            lastSequence = packet.sequence;
+          }
 
           // Record network latency (plugin timestamp → server receive)
           if (deps.latencyTracker && packet.timestamp > 0) {

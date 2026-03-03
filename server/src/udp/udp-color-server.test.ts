@@ -120,9 +120,23 @@ describe("UdpColorServer", () => {
     expect(universe.updateAllCalls).toContain(0);
   });
 
-  it("detects sequence gaps", async () => {
+  it("does not count forward jumps as gaps (interleaved fixtures)", async () => {
     const pkt1 = encodeColorPacket(makePacket({ sequence: 1 }));
-    const pkt2 = encodeColorPacket(makePacket({ sequence: 5 })); // gap: 2,3,4 skipped
+    const pkt2 = encodeColorPacket(makePacket({ sequence: 5 })); // forward jump from interleaved fixtures
+
+    await sendUdpPacket(boundPort, pkt1);
+    await waitMs(20);
+    await sendUdpPacket(boundPort, pkt2);
+    await waitMs(50);
+
+    const stats = server.getStats();
+    expect(stats.packetsReceived).toBe(2);
+    expect(stats.sequenceGaps).toBe(0);
+  });
+
+  it("counts reordered packets as gaps", async () => {
+    const pkt1 = encodeColorPacket(makePacket({ sequence: 100 }));
+    const pkt2 = encodeColorPacket(makePacket({ sequence: 50 })); // old packet arrived late
 
     await sendUdpPacket(boundPort, pkt1);
     await waitMs(20);

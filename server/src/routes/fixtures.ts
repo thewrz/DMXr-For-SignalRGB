@@ -3,6 +3,7 @@ import type { FixtureStore } from "../fixtures/fixture-store.js";
 import type { UniverseManager } from "../dmx/universe-manager.js";
 import type { AddFixtureRequest, UpdateFixtureRequest } from "../types/protocol.js";
 import { validateFixtureAddress, validateFixtureChannels } from "../fixtures/fixture-validator.js";
+import { pipeLog, resetSample } from "../logging/pipeline-logger.js";
 
 interface FixtureRouteDeps {
   readonly store: FixtureStore;
@@ -139,19 +140,37 @@ export function registerFixtureRoutes(
       if (updated && request.body.channelOverrides && deps.manager) {
         const base = updated.dmxStartAddress;
         const channels: Record<number, number> = {};
+        const logLines: string[] = [
+          `PATCH override "${updated.name}" (id=${updated.id.slice(0, 8)} base=${base}):`,
+        ];
 
         for (const [offsetStr, override] of Object.entries(request.body.channelOverrides)) {
           const offset = Number(offsetStr);
           const channel = updated.channels.find((ch) => ch.offset === offset);
-          if (!channel) continue;
+          if (!channel) {
+            logLines.push(`  [${offset}] SKIP — no matching channel definition`);
+            continue;
+          }
 
-          channels[base + offset] = override.enabled
+          const value = override.enabled
             ? Math.max(0, Math.min(255, Math.round(override.value)))
             : channel.defaultValue;
+          channels[base + offset] = value;
+
+          logLines.push(
+            `  [${offset}] DMX${base + offset} ${channel.name.padEnd(16)} ` +
+            `type=${channel.type.padEnd(15)} enabled=${override.enabled} ` +
+            `value=${override.value} → DMX=${value}`,
+          );
         }
 
+        pipeLog("info", logLines.join("\n"));
+
         if (Object.keys(channels).length > 0) {
-          deps.manager.applyFixtureUpdate({ fixture: updated.id, channels });
+          const count = deps.manager.applyFixtureUpdate({ fixture: updated.id, channels });
+          pipeLog("info", `PATCH DMX push: ${count} channels sent for "${updated.name}"`);
+          // Force next mapColor sample to log so we can see the override in action
+          resetSample(`mapColor:${updated.id}`);
         }
       }
 

@@ -4,6 +4,7 @@ import { processColorBatch, type ColorEntry } from "../fixtures/color-pipeline.j
 import type { FixtureStore } from "../fixtures/fixture-store.js";
 import type { UniverseManager } from "../dmx/universe-manager.js";
 import type { LatencyTracker } from "../metrics/latency-tracker.js";
+import { pipeLog, shouldSample } from "../logging/pipeline-logger.js";
 
 export interface UdpColorServerDeps {
   readonly fixtureStore: FixtureStore;
@@ -87,6 +88,7 @@ export function createUdpColorServer(deps: UdpColorServerDeps): UdpColorServer {
 
           // Handle blackout flag
           if (packet.flags & FLAG_BLACKOUT) {
+            pipeLog("info", `UDP BLACKOUT packet from ${rinfo.address}:${rinfo.port} seq=${packet.sequence}`);
             deps.manager.blackout();
             packetsProcessed++;
             return;
@@ -94,6 +96,7 @@ export function createUdpColorServer(deps: UdpColorServerDeps): UdpColorServer {
 
           // Handle ping flag — echo the packet back
           if (packet.flags & FLAG_PING) {
+            pipeLog("debug", `UDP PING from ${rinfo.address}:${rinfo.port} seq=${packet.sequence}`);
             const reply = encodeColorPacket({
               ...packet,
               flags: packet.flags & ~FLAG_PING,
@@ -103,6 +106,9 @@ export function createUdpColorServer(deps: UdpColorServerDeps): UdpColorServer {
 
           // Skip color processing while override (blackout/whiteout) is active
           if (deps.manager.isBlackoutActive()) {
+            if (shouldSample("udp:blackout-skip")) {
+              pipeLog("debug", "UDP packet skipped (blackout active)");
+            }
             packetsProcessed++;
             return;
           }
@@ -115,6 +121,17 @@ export function createUdpColorServer(deps: UdpColorServerDeps): UdpColorServer {
             b: f.b,
             brightness: f.brightness / 255,
           }));
+
+          if (shouldSample("udp:packet")) {
+            const fixtureList = packet.fixtures
+              .map((f) => `idx=${f.index} rgb=(${f.r},${f.g},${f.b}) br=${f.brightness}`)
+              .join("; ");
+            pipeLog(
+              "verbose",
+              `UDP packet seq=${packet.sequence} flags=0x${packet.flags.toString(16).padStart(2, "0")} ` +
+              `${packet.fixtures.length} fixtures: ${fixtureList}`,
+            );
+          }
 
           const mapStart = performance.now();
           const result = processColorBatch(entries, deps.fixtureStore, deps.manager);

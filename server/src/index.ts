@@ -20,6 +20,7 @@ import { buildServer } from "./server.js";
 import { createUdpColorServer } from "./udp/udp-color-server.js";
 import { createLatencyTracker } from "./metrics/latency-tracker.js";
 import { getFixtureDefaults } from "./fixtures/channel-mapper.js";
+import { setPipelineLogLevel, parsePipelineLogLevel, pipeLog } from "./logging/pipeline-logger.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -35,6 +36,10 @@ async function readServerVersion(): Promise<string> {
 }
 
 async function main() {
+  const pipelineLevel = parsePipelineLogLevel(process.env["PIPELINE_LOG"]);
+  setPipelineLogLevel(pipelineLevel);
+  pipeLog("info", `Pipeline logging initialized at level: ${pipelineLevel}`);
+
   const serverVersion = await readServerVersion();
   const settingsStore = createSettingsStore("./config/settings.json");
   const persistedSettings = await settingsStore.load();
@@ -102,16 +107,17 @@ async function main() {
   const fixtureStore = createFixtureStore(finalConfig.fixturesPath);
   await fixtureStore.load();
 
+  pipeLog("info", `Loaded ${fixtureStore.getAll().length} fixtures, initializing defaults...`);
   manager.blackout();
 
   // Initialize fixture defaults (sets pan/tilt center, strobe open, etc.)
-  // Positional channels are excluded from per-frame color updates,
-  // so they must be set once here at startup.
   manager.resumeNormal();
   for (const fixture of fixtureStore.getAll()) {
     const defaults = getFixtureDefaults(fixture);
-    manager.applyFixtureUpdate({ fixture: fixture.id, channels: defaults });
+    const count = manager.applyFixtureUpdate({ fixture: fixture.id, channels: defaults });
+    pipeLog("info", `Startup defaults for "${fixture.name}": ${count} channels pushed to DMX`);
   }
+  pipeLog("info", "Fixture defaults initialization complete");
 
   const oflClient = createOflClient();
   const { client: ssClient, status: ssStatus } = createSsClientIfConfigured(finalConfig.localDbPath);

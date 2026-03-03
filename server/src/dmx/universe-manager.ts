@@ -1,5 +1,6 @@
 import type { DmxUniverse } from "./driver-factory.js";
 import type { ChannelMap, FixtureUpdatePayload } from "../types/protocol.js";
+import { pipeLog, shouldSample } from "../logging/pipeline-logger.js";
 
 const MIN_CHANNEL = 1;
 const MAX_CHANNEL = 512;
@@ -92,12 +93,14 @@ export function createUniverseManager(
   return {
     applyFixtureUpdate(payload: FixtureUpdatePayload): number {
       if (blackoutActive) {
+        pipeLog("debug", `applyFixtureUpdate BLOCKED (blackout active) for "${payload.fixture}"`);
         return 0;
       }
 
       const dmxUpdate = buildDmxUpdate(payload.channels);
 
       if (dmxUpdate === null) {
+        pipeLog("warn", `applyFixtureUpdate: no valid channels for "${payload.fixture}"`);
         return 0;
       }
 
@@ -112,7 +115,15 @@ export function createUniverseManager(
 
       const channelCount = Object.keys(dmxUpdate).length;
       safeSend(`fixture-update ${channelCount}ch`, () => universe.update(dmxUpdate));
-      log?.info(`DMX update: ${channelCount} channels sent`);
+
+      if (shouldSample(`dmxUpdate:${payload.fixture}`)) {
+        const addrs = Object.keys(dmxUpdate).map(Number).sort((a, b) => a - b);
+        const snapshot = addrs.map((a) => `${a}:${dmxUpdate[a]}`).join(" ");
+        pipeLog(
+          "verbose",
+          `DMX UPDATE "${payload.fixture}": ${channelCount}ch → ${snapshot}`,
+        );
+      }
 
       return channelCount;
     },
@@ -120,7 +131,9 @@ export function createUniverseManager(
     blackout(): void {
       blackoutActive = true;
       safeSend("blackout", () => universe.updateAll(0));
+      const prevCount = activeChannels.size;
       activeChannels.clear();
+      pipeLog("info", `BLACKOUT: cleared ${prevCount} active channels → all 512 zeroed`);
       log?.info("DMX blackout: all 512 channels → 0 (override active)");
     },
 
@@ -135,6 +148,7 @@ export function createUniverseManager(
 
     resumeNormal(): void {
       blackoutActive = false;
+      pipeLog("info", "RESUME: blackout cleared, normal updates enabled");
       log?.info("DMX override cleared: resuming normal updates");
     },
 
@@ -173,6 +187,11 @@ export function createUniverseManager(
       }
       const count = Object.keys(channels).length;
       safeSend(`raw-update ${count}ch`, () => universe.update(channels));
+      if (shouldSample("rawUpdate")) {
+        const addrs = Object.keys(channels).map(Number).sort((a, b) => a - b);
+        const snapshot = addrs.map((a) => `${a}:${channels[Number(a)]}`).join(" ");
+        pipeLog("verbose", `RAW UPDATE: ${count}ch → ${snapshot}`);
+      }
     },
 
     getDmxSendStatus(): DmxSendStatus {

@@ -39,6 +39,12 @@ export interface UniverseManager {
    *  These are restored immediately after blackout/whiteout to prevent
    *  motors from slamming to mechanical limits at DMX 0 or 255. */
   readonly registerSafePositions: (channels: Record<number, number>) => void;
+  /** Lock DMX addresses so applyFixtureUpdate and blackout/whiteout skip them. */
+  readonly lockChannels: (addresses: readonly number[]) => void;
+  /** Unlock DMX addresses so normal writes resume. */
+  readonly unlockChannels: (addresses: readonly number[]) => void;
+  /** Returns true if any channels are currently locked. */
+  readonly hasLockedChannels: () => boolean;
 }
 
 function clampValue(value: number): number {
@@ -75,6 +81,7 @@ export function createUniverseManager(
 ): UniverseManager {
   const activeChannels = new Map<number, number>();
   const safePositions = new Map<number, number>();
+  const lockedChannels = new Set<number>();
   const log = options.logger;
   let lastSendTime: number | null = null;
   let lastSendError: string | null = null;
@@ -109,6 +116,18 @@ export function createUniverseManager(
         return 0;
       }
 
+      // Filter out locked channels (flash takes priority)
+      if (lockedChannels.size > 0) {
+        for (const key of Object.keys(dmxUpdate)) {
+          if (lockedChannels.has(Number(key))) {
+            delete dmxUpdate[Number(key)];
+          }
+        }
+        if (Object.keys(dmxUpdate).length === 0) {
+          return 0;
+        }
+      }
+
       for (const [ch, val] of Object.entries(dmxUpdate)) {
         const chNum = Number(ch);
         if (val > 0) {
@@ -136,14 +155,25 @@ export function createUniverseManager(
     blackout(): void {
       blackoutActive = true;
       const prevCount = activeChannels.size;
+
+      // Preserve locked channel values before clearing
+      const lockedValues = new Map<number, number>();
+      for (const ch of lockedChannels) {
+        lockedValues.set(ch, activeChannels.get(ch) ?? 0);
+      }
+
       activeChannels.clear();
 
-      if (safePositions.size > 0) {
-        // Selective blackout: zero everything EXCEPT motor channels in a
-        // single atomic update so pan/tilt values never change at all.
+      // Always use selective update when we have safe positions or locked channels
+      if (safePositions.size > 0 || lockedChannels.size > 0) {
         const selective: Record<number, number> = {};
         for (let ch = MIN_CHANNEL; ch <= MAX_CHANNEL; ch++) {
-          if (safePositions.has(ch)) {
+          if (lockedChannels.has(ch)) {
+            // Locked channels (flash) keep their current value
+            const val = lockedValues.get(ch) ?? 0;
+            selective[ch] = val;
+            if (val > 0) activeChannels.set(ch, val);
+          } else if (safePositions.has(ch)) {
             selective[ch] = safePositions.get(ch)!;
             activeChannels.set(ch, safePositions.get(ch)!);
           } else {
@@ -151,13 +181,10 @@ export function createUniverseManager(
           }
         }
         safeSend(`blackout-selective ${MAX_CHANNEL}ch`, () => universe.update(selective));
-        const snapshot = [...safePositions.entries()]
-          .sort(([a], [b]) => a - b)
-          .map(([ch, val]) => `${ch}:${val}`)
-          .join(" ");
+        const preserved = safePositions.size + lockedChannels.size;
         pipeLog("info",
-          `BLACKOUT: zeroed ${MAX_CHANNEL - safePositions.size} channels, ` +
-          `preserved ${safePositions.size} motor channels: ${snapshot}`,
+          `BLACKOUT: zeroed ${MAX_CHANNEL - preserved} channels, ` +
+          `preserved ${safePositions.size} motor + ${lockedChannels.size} locked`,
         );
       } else {
         safeSend("blackout", () => universe.updateAll(0));
@@ -168,14 +195,24 @@ export function createUniverseManager(
 
     whiteout(): void {
       blackoutActive = true;
+
+      // Preserve locked channel values before clearing
+      const lockedValues = new Map<number, number>();
+      for (const ch of lockedChannels) {
+        lockedValues.set(ch, activeChannels.get(ch) ?? 0);
+      }
+
       activeChannels.clear();
 
-      if (safePositions.size > 0) {
-        // Selective whiteout: set everything to 255 EXCEPT motor channels
-        // in a single atomic update so pan/tilt values never change at all.
+      // Always use selective update when we have safe positions or locked channels
+      if (safePositions.size > 0 || lockedChannels.size > 0) {
         const selective: Record<number, number> = {};
         for (let ch = MIN_CHANNEL; ch <= MAX_CHANNEL; ch++) {
-          if (safePositions.has(ch)) {
+          if (lockedChannels.has(ch)) {
+            const val = lockedValues.get(ch) ?? 0;
+            selective[ch] = val;
+            if (val > 0) activeChannels.set(ch, val);
+          } else if (safePositions.has(ch)) {
             selective[ch] = safePositions.get(ch)!;
             activeChannels.set(ch, safePositions.get(ch)!);
           } else {
@@ -184,13 +221,10 @@ export function createUniverseManager(
           }
         }
         safeSend(`whiteout-selective ${MAX_CHANNEL}ch`, () => universe.update(selective));
-        const snapshot = [...safePositions.entries()]
-          .sort(([a], [b]) => a - b)
-          .map(([ch, val]) => `${ch}:${val}`)
-          .join(" ");
+        const preserved = safePositions.size + lockedChannels.size;
         pipeLog("info",
-          `WHITEOUT: set ${MAX_CHANNEL - safePositions.size} channels to 255, ` +
-          `preserved ${safePositions.size} motor channels: ${snapshot}`,
+          `WHITEOUT: set ${MAX_CHANNEL - preserved} channels to 255, ` +
+          `preserved ${safePositions.size} motor + ${lockedChannels.size} locked`,
         );
       } else {
         safeSend("whiteout", () => universe.updateAll(MAX_VALUE));
@@ -266,6 +300,24 @@ export function createUniverseManager(
         .map(([ch, val]) => `${ch}:${val}`)
         .join(" ");
       pipeLog("info", `Registered ${safePositions.size} motor safe positions: ${snapshot}`);
+    },
+
+    lockChannels(addresses: readonly number[]): void {
+      for (const addr of addresses) {
+        if (isValidChannel(addr)) {
+          lockedChannels.add(addr);
+        }
+      }
+    },
+
+    unlockChannels(addresses: readonly number[]): void {
+      for (const addr of addresses) {
+        lockedChannels.delete(addr);
+      }
+    },
+
+    hasLockedChannels(): boolean {
+      return lockedChannels.size > 0;
     },
   };
 }

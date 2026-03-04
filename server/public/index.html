@@ -341,12 +341,12 @@
                   <span x-text="expandedFixtureId === fixture.id ? '\u25B2' : '\u25BC'"></span>
                 </button>
                 <button class="btn btn-sm"
-                        @mousedown.prevent="flashHold(fixture.id)"
-                        @mouseup="flashRelease(fixture.id)"
-                        @mouseleave="flashRelease(fixture.id)"
-                        @touchstart.prevent="flashHold(fixture.id)"
-                        @touchend="flashRelease(fixture.id)"
-                        @touchcancel="flashRelease(fixture.id)">Flash</button>
+                        @mousedown.prevent="flashStart(fixture.id)"
+                        @mouseup="flashEnd(fixture.id)"
+                        @mouseleave="flashEnd(fixture.id)"
+                        @touchstart.prevent="flashStart(fixture.id)"
+                        @touchend="flashEnd(fixture.id)"
+                        @touchcancel="flashEnd(fixture.id)">Flash</button>
                 <button class="btn btn-sm btn-reset"
                         x-show="hasResetChannel(fixture)"
                         @click="resetFixture(fixture.id)"

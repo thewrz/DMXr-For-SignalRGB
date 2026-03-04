@@ -276,11 +276,34 @@ function dmxrFixtureManager() {
     },
 
     // Motor guard helpers
+    _motorTypes: ["Pan", "Tilt", "Focus", "Zoom"],
+
+    _isMotorChannel(fixture, ch) {
+      return fixture.motorGuardEnabled !== false &&
+             this._motorTypes.indexOf(ch.type) !== -1;
+    },
+
     hasMotorChannels(fixture) {
-      var motorTypes = ["Pan", "Tilt", "Focus", "Zoom"];
+      var self = this;
       return fixture.channels.some(function(ch) {
-        return motorTypes.indexOf(ch.type) !== -1;
+        return self._motorTypes.indexOf(ch.type) !== -1;
       });
+    },
+
+    getSliderMin(fixture, ch) {
+      if (this._isMotorChannel(fixture, ch)) {
+        var buffer = fixture.motorGuardBuffer ?? 4;
+        return Math.max(ch.rangeMin || 0, Math.floor(buffer / 2));
+      }
+      return ch.rangeMin || 0;
+    },
+
+    getSliderMax(fixture, ch) {
+      if (this._isMotorChannel(fixture, ch)) {
+        var buffer = fixture.motorGuardBuffer ?? 4;
+        return Math.min(ch.rangeMax || 255, 255 - Math.ceil(buffer / 2));
+      }
+      return ch.rangeMax || 255;
     },
 
     async toggleMotorGuard(fixtureId, enabled) {
@@ -342,9 +365,18 @@ function dmxrFixtureManager() {
       // Update local state immediately for responsiveness
       var fixture = self.fixtures.find(function(f) { return f.id === fixtureId; });
       if (fixture) {
+        var ch = fixture.channels.find(function(c) { return c.offset === offset; });
+        var parsed = parseInt(value, 10);
+        // Clamp to motor guard range if applicable
+        if (ch && self._isMotorChannel(fixture, ch)) {
+          var buffer = fixture.motorGuardBuffer ?? 4;
+          var min = Math.floor(buffer / 2);
+          var max = 255 - Math.ceil(buffer / 2);
+          parsed = Math.max(min, Math.min(max, parsed));
+        }
         if (!fixture.channelOverrides) fixture.channelOverrides = {};
         var current = fixture.channelOverrides[offset] || { value: 0, enabled: false };
-        fixture.channelOverrides[offset] = { value: parseInt(value, 10), enabled: current.enabled };
+        fixture.channelOverrides[offset] = { value: parsed, enabled: current.enabled };
       }
 
       self.overrideTimers[key] = setTimeout(function() {

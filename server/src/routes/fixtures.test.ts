@@ -356,6 +356,29 @@ describe("Fixture routes", () => {
       expect(universe.updateCalls[0][42]).toBe(128);
     });
 
+    it("uses safe center for motor channels when override disabled and defaultValue is 0", async () => {
+      const addRes = await app.inject({
+        method: "POST",
+        url: "/fixtures",
+        payload: movingHeadBody,
+      });
+      const { id } = addRes.json();
+
+      universe.updateCalls.length = 0;
+
+      // Pan Fine (offset 1) has defaultValue=0 and type=Pan
+      // Motor guard should clamp to 2 (min with buffer 4), not send 0
+      await app.inject({
+        method: "PATCH",
+        url: `/fixtures/${id}`,
+        payload: { channelOverrides: { "1": { value: 50, enabled: false } } },
+      });
+
+      expect(universe.updateCalls).toHaveLength(1);
+      // Pan Fine defaultValue=0 → clamped to motor guard min (2)
+      expect(universe.updateCalls[0][41]).toBe(2);
+    });
+
     it("pushes multiple override channels in one update", async () => {
       const addRes = await app.inject({
         method: "POST",

@@ -154,14 +154,27 @@ export function registerFixtureRoutes(
             continue;
           }
 
-          const isMotor = channel.type === "Pan" || channel.type === "Tilt" ||
-            channel.type === "Focus" || channel.type === "Zoom";
+          const motorGuardOn = updated.motorGuardEnabled !== false;
+          const isMotor = motorGuardOn && (
+            channel.type === "Pan" || channel.type === "Tilt" ||
+            channel.type === "Focus" || channel.type === "Zoom");
           const motorBuffer = updated.motorGuardBuffer ?? 4;
           const min = isMotor ? Math.floor(motorBuffer / 2) : 0;
           const max = isMotor ? 255 - Math.ceil(motorBuffer / 2) : 255;
-          const value = override.enabled
-            ? Math.max(min, Math.min(max, Math.round(override.value)))
-            : Math.max(min, Math.min(max, channel.defaultValue));
+
+          let value: number;
+          if (override.enabled) {
+            value = Math.max(min, Math.min(max, Math.round(override.value)));
+          } else if (isMotor) {
+            // Auto mode on motor channels: use safe center (128) if
+            // defaultValue is 0 — same logic as mapColor to prevent
+            // motors from slamming to mechanical limits.
+            const isFine = /fine/i.test(channel.name);
+            const raw = isFine ? channel.defaultValue : (channel.defaultValue > 0 ? channel.defaultValue : 128);
+            value = Math.max(min, Math.min(max, raw));
+          } else {
+            value = Math.max(min, Math.min(max, channel.defaultValue));
+          }
           channels[base + offset] = value;
 
           logLines.push(

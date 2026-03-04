@@ -386,8 +386,8 @@
                     <span x-text="isOverrideEnabled(fixture, ch.offset) ? 'Locked' : 'Auto'"></span>
                   </label>
                   <input type="range" class="override-slider"
-                         :min="ch.rangeMin || 0"
-                         :max="ch.rangeMax || 255"
+                         :min="getSliderMin(fixture, ch)"
+                         :max="getSliderMax(fixture, ch)"
                          :value="getOverrideValue(fixture, ch.offset)"
                          :disabled="!isOverrideEnabled(fixture, ch.offset)"
                          @input="setChannelOverrideValue(fixture.id, ch.offset, $event.target.value)">

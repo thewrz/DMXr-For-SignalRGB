@@ -397,6 +397,118 @@ describe("Control routes", () => {
       expect(mockUniverse.updateCalls[0][74]).toBe(200);
     });
 
+    it("flash-click applies max brightness and returns 2s duration", async () => {
+      const addRes = await app.inject({
+        method: "POST",
+        url: "/fixtures",
+        payload: {
+          name: "Click PAR",
+          oflKey: "test/test",
+          oflFixtureName: "Test",
+          mode: "3-channel",
+          dmxStartAddress: 80,
+          channelCount: 3,
+          channels: [
+            { offset: 0, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
+            { offset: 1, name: "Green", type: "ColorIntensity", color: "Green", defaultValue: 0 },
+            { offset: 2, name: "Blue", type: "ColorIntensity", color: "Blue", defaultValue: 0 },
+          ],
+        },
+      });
+      const { id } = addRes.json();
+
+      const res = await app.inject({
+        method: "POST",
+        url: `/fixtures/${id}/test`,
+        payload: { action: "flash-click" },
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json().action).toBe("flash-click");
+      expect(res.json().durationMs).toBe(2000);
+
+      const lastUpdate = mockUniverse.updateCalls[mockUniverse.updateCalls.length - 1];
+      expect(lastUpdate[80]).toBe(255);
+      expect(lastUpdate[81]).toBe(255);
+      expect(lastUpdate[82]).toBe(255);
+    });
+
+    it("flash-click overrides active blackout via channel locking", async () => {
+      const addRes = await app.inject({
+        method: "POST",
+        url: "/fixtures",
+        payload: {
+          name: "Override PAR",
+          oflKey: "test/test",
+          oflFixtureName: "Test",
+          mode: "3-channel",
+          dmxStartAddress: 90,
+          channelCount: 3,
+          channels: [
+            { offset: 0, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
+            { offset: 1, name: "Green", type: "ColorIntensity", color: "Green", defaultValue: 0 },
+            { offset: 2, name: "Blue", type: "ColorIntensity", color: "Blue", defaultValue: 0 },
+          ],
+        },
+      });
+      const { id } = addRes.json();
+
+      // Activate blackout first
+      await app.inject({ method: "POST", url: "/control/blackout" });
+
+      // Flash-click should still work
+      const res = await app.inject({
+        method: "POST",
+        url: `/fixtures/${id}/test`,
+        payload: { action: "flash-click" },
+      });
+
+      expect(res.statusCode).toBe(200);
+
+      const lastUpdate = mockUniverse.updateCalls[mockUniverse.updateCalls.length - 1];
+      expect(lastUpdate[90]).toBe(255);
+      expect(lastUpdate[91]).toBe(255);
+      expect(lastUpdate[92]).toBe(255);
+    });
+
+    it("flash-click cancels existing flash-hold safety timer", async () => {
+      const addRes = await app.inject({
+        method: "POST",
+        url: "/fixtures",
+        payload: {
+          name: "Cancel PAR",
+          oflKey: "test/test",
+          oflFixtureName: "Test",
+          mode: "3-channel",
+          dmxStartAddress: 100,
+          channelCount: 3,
+          channels: [
+            { offset: 0, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
+            { offset: 1, name: "Green", type: "ColorIntensity", color: "Green", defaultValue: 0 },
+            { offset: 2, name: "Blue", type: "ColorIntensity", color: "Blue", defaultValue: 0 },
+          ],
+        },
+      });
+      const { id } = addRes.json();
+
+      // Start a hold
+      await app.inject({
+        method: "POST",
+        url: `/fixtures/${id}/test`,
+        payload: { action: "flash-hold" },
+      });
+
+      // Immediately send flash-click (should cancel hold timer)
+      const res = await app.inject({
+        method: "POST",
+        url: `/fixtures/${id}/test`,
+        payload: { action: "flash-click" },
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json().action).toBe("flash-click");
+    });
+
     it("flash-release with no active hold is a no-op", async () => {
       const addRes = await app.inject({
         method: "POST",

@@ -36,7 +36,7 @@ interface ControlRouteDeps {
 }
 
 interface TestBody {
-  readonly action: "flash" | "flash-hold" | "flash-release" | "identify";
+  readonly action: "flash" | "flash-hold" | "flash-release" | "flash-click" | "identify";
   readonly durationMs?: number;
 }
 
@@ -47,7 +47,7 @@ const testSchema = {
     properties: {
       action: {
         type: "string" as const,
-        enum: ["flash", "flash-hold", "flash-release", "identify"],
+        enum: ["flash", "flash-hold", "flash-release", "flash-click", "identify"],
       },
       durationMs: { type: "integer" as const, minimum: 100, maximum: 5000 },
     },
@@ -55,6 +55,11 @@ const testSchema = {
 };
 
 const FLASH_HOLD_SAFETY_MS = 10_000;
+const FLASH_CLICK_SUSTAIN_MS = 2_000;
+
+function getFixtureAddresses(fixture: FixtureConfig): number[] {
+  return fixture.channels.map((ch) => fixture.dmxStartAddress + ch.offset);
+}
 
 export function registerControlRoutes(
   app: FastifyInstance,
@@ -63,19 +68,25 @@ export function registerControlRoutes(
   const activeTimers = new Map<string, NodeJS.Timeout>();
   const holdSnapshots = new Map<string, Record<number, number>>();
 
-  function restoreAfterFlash(
+  function releaseFlash(
     fixture: FixtureConfig,
     snapshot: Record<number, number>,
   ): void {
+    const addresses = getFixtureAddresses(fixture);
+    deps.manager.unlockChannels(addresses);
+
     if (deps.manager.isBlackoutActive()) {
+      // Deferred per-fixture blackout: now that flash is over, apply blackout
       const zeros: Record<number, number> = {};
-      for (const ch of fixture.channels) {
-        zeros[fixture.dmxStartAddress + ch.offset] = 0;
+      for (const addr of addresses) {
+        zeros[addr] = 0;
       }
       deps.manager.applyRawUpdate(zeros);
     } else {
       deps.manager.applyRawUpdate(snapshot);
     }
+
+    holdSnapshots.delete(fixture.id);
   }
 
   app.post("/control/blackout", async (request) => {
@@ -222,7 +233,7 @@ export function registerControlRoutes(
         );
 
         const timer = setTimeout(() => {
-          restoreAfterFlash(fixture, snapshot);
+          releaseFlash(fixture, snapshot);
           request.log.info(
             { action: "flash-restore", fixtureId: fixture.id },
             `flash-restore: "${fixture.name}" restored`,
@@ -240,19 +251,20 @@ export function registerControlRoutes(
         holdSnapshots.set(fixture.id, snapshot);
 
         const flashValues = buildFlashValues(fixture, snapshot);
+        const addresses = getFixtureAddresses(fixture);
         deps.manager.applyRawUpdate(flashValues);
+        deps.manager.lockChannels(addresses);
 
         request.log.info(
           { action, fixtureId: fixture.id, fixtureName: fixture.name },
-          `flash-hold: "${fixture.name}" held on`,
+          `flash-hold: "${fixture.name}" held on (${addresses.length} channels locked)`,
         );
 
         // Safety timeout in case browser disconnects mid-hold
         const safety = setTimeout(() => {
           const snap = holdSnapshots.get(fixture.id);
           if (snap !== undefined) {
-            restoreAfterFlash(fixture, snap);
-            holdSnapshots.delete(fixture.id);
+            releaseFlash(fixture, snap);
             request.log.warn(
               { fixtureId: fixture.id },
               `flash-hold safety timeout: "${fixture.name}" auto-restored`,
@@ -266,12 +278,38 @@ export function registerControlRoutes(
         return { success: true, action, fixtureId: fixture.id };
       }
 
+      if (action === "flash-click") {
+        const snapshot = deps.manager.getChannelSnapshot(start, count);
+        holdSnapshots.set(fixture.id, snapshot);
+
+        const flashValues = buildFlashValues(fixture, snapshot);
+        const addresses = getFixtureAddresses(fixture);
+        deps.manager.applyRawUpdate(flashValues);
+        deps.manager.lockChannels(addresses);
+
+        request.log.info(
+          { action, fixtureId: fixture.id, fixtureName: fixture.name },
+          `flash-click: "${fixture.name}" sustain ${FLASH_CLICK_SUSTAIN_MS}ms`,
+        );
+
+        const timer = setTimeout(() => {
+          const snap = holdSnapshots.get(fixture.id);
+          if (snap !== undefined) {
+            releaseFlash(fixture, snap);
+          }
+          activeTimers.delete(fixture.id);
+        }, FLASH_CLICK_SUSTAIN_MS);
+        timer.unref();
+        activeTimers.set(fixture.id, timer);
+
+        return { success: true, action, fixtureId: fixture.id, durationMs: FLASH_CLICK_SUSTAIN_MS };
+      }
+
       if (action === "flash-release") {
         const snapshot =
           holdSnapshots.get(fixture.id) ??
           deps.manager.getChannelSnapshot(start, count);
-        restoreAfterFlash(fixture, snapshot);
-        holdSnapshots.delete(fixture.id);
+        releaseFlash(fixture, snapshot);
 
         request.log.info(
           { action, fixtureId: fixture.id, fixtureName: fixture.name },

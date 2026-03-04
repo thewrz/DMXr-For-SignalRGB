@@ -32,6 +32,7 @@
       </button>
       <img src="/images/DMXr-logo.svg" alt="DMXr" class="header-logo">
       <span class="header-title">Fixture Manager</span>
+      <span class="header-server-name" x-show="settingsServerName" x-text="settingsServerName" x-cloak></span>
     </div>
     <div class="header-right">
       <button class="btn btn-sm" @click="openLatency()" title="Latency Dashboard">
@@ -340,12 +341,12 @@
                   <span x-text="expandedFixtureId === fixture.id ? '\u25B2' : '\u25BC'"></span>
                 </button>
                 <button class="btn btn-sm"
-                        @mousedown.prevent="flashHold(fixture.id)"
-                        @mouseup="flashRelease(fixture.id)"
-                        @mouseleave="flashRelease(fixture.id)"
-                        @touchstart.prevent="flashHold(fixture.id)"
-                        @touchend="flashRelease(fixture.id)"
-                        @touchcancel="flashRelease(fixture.id)">Flash</button>
+                        @mousedown.prevent="flashStart(fixture.id)"
+                        @mouseup="flashEnd(fixture.id)"
+                        @mouseleave="flashEnd(fixture.id)"
+                        @touchstart.prevent="flashStart(fixture.id)"
+                        @touchend="flashEnd(fixture.id)"
+                        @touchcancel="flashEnd(fixture.id)">Flash</button>
                 <button class="btn btn-sm btn-reset"
                         x-show="hasResetChannel(fixture)"
                         @click="resetFixture(fixture.id)"
@@ -420,6 +421,9 @@
       <p class="validation-error" x-show="settingsError" x-text="settingsError"></p>
 
       <div x-show="!settingsLoading && !settingsError">
+        <label>Server Name</label>
+        <input type="text" x-model="settingsServerName" placeholder="e.g. Studio A">
+
         <label>DMX Driver</label>
         <select x-model="settingsDriver">
           <option value="null">None (test mode)</option>

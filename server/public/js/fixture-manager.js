@@ -166,9 +166,11 @@ function dmxrFixtureManager() {
       }
     },
 
-    async flashHold(id) {
+    flashStart(id) {
+      this._flashStartTime = Date.now();
+      this._flashId = id;
       try {
-        await fetch("/fixtures/" + id + "/test", {
+        fetch("/fixtures/" + id + "/test", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action: "flash-hold" }),
@@ -178,15 +180,30 @@ function dmxrFixtureManager() {
       }
     },
 
-    async flashRelease(id) {
-      try {
-        await fetch("/fixtures/" + id + "/test", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "flash-release" }),
-        });
-      } catch {
-        // ignore
+    flashEnd(id) {
+      var held = Date.now() - (this._flashStartTime || 0);
+      if (held < 200) {
+        // Short click: server handles 2s sustain with channel locking
+        try {
+          fetch("/fixtures/" + id + "/test", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "flash-click" }),
+          });
+        } catch {
+          // ignore
+        }
+      } else {
+        // Long hold: release immediately
+        try {
+          fetch("/fixtures/" + id + "/test", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "flash-release" }),
+          });
+        } catch {
+          // ignore
+        }
       }
     },
 

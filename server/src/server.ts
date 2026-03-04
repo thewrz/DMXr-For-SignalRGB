@@ -8,6 +8,7 @@ import helmet from "@fastify/helmet";
 import type { ServerConfig } from "./config/server-config.js";
 import type { UniverseManager } from "./dmx/universe-manager.js";
 import type { FixtureStore } from "./fixtures/fixture-store.js";
+import type { UserFixtureStore } from "./fixtures/user-fixture-store.js";
 import type { OflClient } from "./ofl/ofl-client.js";
 import type { LibraryRegistry } from "./libraries/types.js";
 import type { ConnectionStatus } from "./dmx/connection-state.js";
@@ -22,6 +23,7 @@ import { registerSignalRgbRoutes } from "./routes/signalrgb.js";
 import { registerSearchRoutes } from "./routes/search.js";
 import { registerSettingsRoutes } from "./routes/settings.js";
 import { registerMetricsRoute } from "./routes/metrics.js";
+import { registerUserFixtureRoutes } from "./routes/user-fixtures.js";
 import { registerApiKeyAuth } from "./middleware/api-key-auth.js";
 import type { LatencyTracker } from "./metrics/latency-tracker.js";
 import type { MdnsAdvertiser } from "./mdns/advertiser.js";
@@ -35,6 +37,7 @@ interface BuildServerDeps {
   readonly driver: string;
   readonly startTime: number;
   readonly fixtureStore: FixtureStore;
+  readonly userFixtureStore?: UserFixtureStore;
   readonly oflClient: OflClient;
   readonly registry: LibraryRegistry;
   readonly getConnectionStatus?: () => ConnectionStatus;
@@ -142,6 +145,12 @@ export async function buildServer(
   registerSignalRgbRoutes(app, {
     store: deps.fixtureStore,
   });
+
+  if (deps.userFixtureStore) {
+    registerUserFixtureRoutes(app, {
+      store: deps.userFixtureStore,
+    });
+  }
 
   registerSearchRoutes(app, {
     oflClient: deps.oflClient,

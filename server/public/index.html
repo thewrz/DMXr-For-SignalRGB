@@ -16,6 +16,7 @@
   <script src="/js/settings.js"></script>
   <script src="/js/latency.js"></script>
   <script src="/js/setup-wizard.js"></script>
+  <script src="/js/custom-fixture.js"></script>
   <script src="/js/app.js"></script>
 </head>
 <body x-data="dmxrApp()" x-init="init()">
@@ -101,10 +102,12 @@
         <div class="source-tabs">
           <button class="tab" :class="{ active: browseSource === 'ofl' }"
                   @click="switchBrowseSource('ofl')">OFL</button>
-          <template x-for="lib in getNonOflLibraries()" :key="lib.id">
+          <template x-for="lib in getNonOflLibraries().filter(l => l.id !== 'custom')" :key="lib.id">
             <button class="tab" :class="{ active: browseSource === lib.id }"
                     @click="switchBrowseSource(lib.id)" x-text="lib.displayName"></button>
           </template>
+          <button class="tab tab-custom" :class="{ active: browseSource === 'custom' }"
+                  @click="switchBrowseSource('custom'); loadCustomTemplates()">Custom</button>
         </div>
 
         <!-- OFL Browse -->
@@ -163,8 +166,129 @@
           </div>
         </template>
 
+        <!-- Custom Fixture Builder -->
+        <template x-if="browseSource === 'custom'">
+          <div>
+            <!-- Step 0: Template list -->
+            <div x-show="customStep === 0">
+              <button class="btn btn-primary btn-block" @click="startCustomCreate()">+ Create New Fixture</button>
+              <div class="custom-template-list" x-show="customTemplates.length > 0">
+                <template x-for="tpl in customTemplates" :key="tpl.id">
+                  <div class="custom-template-item">
+                    <div class="custom-template-info" @click="stageCustomTemplate(tpl)">
+                      <strong x-text="tpl.name"></strong>
+                      <span class="custom-template-meta"
+                            x-text="tpl.manufacturer + ' &middot; ' + (tpl.modes[0]?.channels.length || 0) + ' ch'"></span>
+                    </div>
+                    <div class="custom-template-actions">
+                      <button class="btn btn-sm" @click.stop="startCustomEdit(tpl)" title="Edit">&#9998;</button>
+                      <button class="btn btn-sm btn-danger" @click.stop="deleteCustomTemplate(tpl.id)" title="Delete">&times;</button>
+                    </div>
+                  </div>
+                </template>
+              </div>
+              <div class="sidebar-hint" x-show="customTemplates.length === 0">
+                No custom fixtures yet. Create one to get started.
+              </div>
+            </div>
+
+            <!-- Step 1: Fixture Info -->
+            <div x-show="customStep === 1">
+              <button class="btn btn-sm btn-back" @click="customStep = 0">&larr; My Fixtures</button>
+              <h4 x-text="customEditId ? 'Edit Fixture' : 'New Custom Fixture'"></h4>
+              <p class="validation-error" x-show="customError" x-text="customError"></p>
+
+              <label>Fixture Name</label>
+              <input type="text" x-model="customName" placeholder="e.g. My RGB PAR">
+
+              <label>Manufacturer</label>
+              <input type="text" x-model="customManufacturer" placeholder="e.g. DIY">
+
+              <label>Category</label>
+              <select x-model="customCategory">
+                <template x-for="cat in fixtureCategories" :key="cat">
+                  <option :value="cat" x-text="cat"></option>
+                </template>
+              </select>
+
+              <button class="btn btn-primary" @click="customInfoNext()">Next: Channels</button>
+            </div>
+
+            <!-- Step 2: Channel Builder -->
+            <div x-show="customStep === 2">
+              <button class="btn btn-sm btn-back" @click="customStep = 1">&larr; Info</button>
+              <h4>Channel Builder</h4>
+              <p class="validation-error" x-show="customError" x-text="customError"></p>
+
+              <label>Mode Name</label>
+              <input type="text" x-model="customModeName" :placeholder="customChannels.length + '-channel'">
+
+              <div class="channel-builder">
+                <template x-for="(ch, idx) in customChannels" :key="idx">
+                  <div class="channel-row">
+                    <span class="channel-offset" x-text="idx + 1"></span>
+                    <input type="text" class="channel-name-input" x-model="customChannels[idx].name"
+                           placeholder="Channel name">
+                    <select class="channel-type-select" x-model="customChannels[idx].type"
+                            @change="onCustomTypeChange(idx)">
+                      <template x-for="t in channelTypes" :key="t">
+                        <option :value="t" x-text="t"></option>
+                      </template>
+                    </select>
+                    <select class="channel-color-select" x-model="customChannels[idx].color"
+                            x-show="customChannels[idx].type === 'ColorIntensity'">
+                      <template x-for="c in channelColors" :key="c">
+                        <option :value="c" x-text="c"></option>
+                      </template>
+                    </select>
+                    <input type="number" class="channel-default-input" x-model.number="customChannels[idx].defaultValue"
+                           min="0" max="255" title="Default value (0-255)">
+                    <div class="channel-row-actions">
+                      <button class="btn btn-sm" @click="moveCustomChannel(idx, -1)"
+                              :disabled="idx === 0" title="Move up">&uarr;</button>
+                      <button class="btn btn-sm" @click="moveCustomChannel(idx, 1)"
+                              :disabled="idx === customChannels.length - 1" title="Move down">&darr;</button>
+                      <button class="btn btn-sm btn-danger" @click="removeCustomChannel(idx)" title="Remove">&times;</button>
+                    </div>
+                  </div>
+                </template>
+              </div>
+
+              <button class="btn btn-sm" @click="addCustomChannel()">+ Add Channel</button>
+
+              <button class="btn btn-primary" @click="customChannelsNext()"
+                      :disabled="customChannels.length === 0"
+                      style="margin-top: 0.5rem">Next: Review</button>
+            </div>
+
+            <!-- Step 3: Review -->
+            <div x-show="customStep === 3">
+              <button class="btn btn-sm btn-back" @click="customStep = 2">&larr; Channels</button>
+              <h4>Review</h4>
+              <p class="validation-error" x-show="customError" x-text="customError"></p>
+
+              <div class="review-summary">
+                <div class="review-row"><span class="review-label">Name:</span> <span x-text="customName"></span></div>
+                <div class="review-row"><span class="review-label">Manufacturer:</span> <span x-text="customManufacturer"></span></div>
+                <div class="review-row"><span class="review-label">Category:</span> <span x-text="customCategory"></span></div>
+                <div class="review-row"><span class="review-label">Mode:</span> <span x-text="customModeName || (customChannels.length + '-channel')"></span></div>
+                <div class="review-row"><span class="review-label">Channels:</span> <span x-text="customChannels.length"></span></div>
+              </div>
+
+              <div class="channel-preview">
+                <template x-for="ch in customChannels" :key="ch.offset">
+                  <span class="badge" :class="'badge-' + (ch.color || ch.type).toLowerCase()"
+                        x-text="ch.name + ' (' + ch.type + ')'"></span>
+                </template>
+              </div>
+
+              <button class="btn btn-primary btn-stage" @click="saveCustomFixture()">Save &amp; Stage</button>
+            </div>
+          </div>
+        </template>
+
         <!-- Library Browse (non-OFL) -->
-        <template x-if="browseSource !== 'ofl'">
+        <template x-if="browseSource !== 'ofl' && browseSource !== 'custom'">
           <div>
             <template x-if="!isLibAvailable(browseSource) && getLibStatus(browseSource)">
               <div class="library-status-message">

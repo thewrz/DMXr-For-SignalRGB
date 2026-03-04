@@ -116,6 +116,47 @@ describe("settings routes", () => {
       const reloaded = await store2.load();
       expect(reloaded.port).toBe(9999);
     });
+
+    it("updates serverName and persists it", async () => {
+      const res = await app.inject({
+        method: "PATCH",
+        url: "/settings",
+        payload: { serverName: "Studio A" },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.settings.serverName).toBe("Studio A");
+      expect(body.requiresRestart).toBe(false);
+
+      const store2 = createSettingsStore(filePath);
+      const reloaded = await store2.load();
+      expect(reloaded.serverName).toBe("Studio A");
+    });
+
+    it("triggers mDNS republish when serverName changes", async () => {
+      const republishMock = vi.fn();
+      const mockAdvertiser = { unpublishAll: vi.fn(), republish: republishMock };
+
+      // Re-create app with mDNS advertiser
+      await app.close();
+      app = Fastify({ logger: false });
+      registerSettingsRoutes(app, {
+        settingsStore: store,
+        serverVersion: "0.2.0-test",
+        getMdnsAdvertiser: () => mockAdvertiser,
+      });
+      await app.ready();
+
+      await app.inject({
+        method: "PATCH",
+        url: "/settings",
+        payload: { serverName: "New Name" },
+      });
+
+      expect(republishMock).toHaveBeenCalledOnce();
+      expect(republishMock).toHaveBeenCalledWith({ serverName: "New Name" });
+    });
   });
 
   describe("POST /settings/scan-ports", () => {

@@ -121,4 +121,45 @@ describe("createMdnsAdvertiser", () => {
     expect(unpublishAllMock).toHaveBeenCalledOnce();
     expect(destroyMock).toHaveBeenCalledOnce();
   });
+
+  it("republish updates mDNS with new serverName", () => {
+    const advertiser = createMdnsAdvertiser({
+      port: 8080,
+      serverId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+      serverName: "Old Name",
+    });
+
+    expect(publishMock).toHaveBeenCalledOnce();
+    const firstOpts = publishMock.mock.calls[0][0];
+    expect(firstOpts.name).toBe("Old Name");
+
+    advertiser.republish({ serverName: "New Name" });
+
+    // Should have destroyed old and re-published
+    expect(unpublishAllMock).toHaveBeenCalledOnce();
+    expect(destroyMock).toHaveBeenCalledOnce();
+    expect(publishMock).toHaveBeenCalledTimes(2);
+
+    const secondOpts = publishMock.mock.calls[1][0];
+    expect(secondOpts.name).toBe("New Name");
+    expect(secondOpts.txt.serverName).toBe("New Name");
+    expect(secondOpts.port).toBe(8080);
+    expect(secondOpts.txt.serverId).toBe("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
+  });
+
+  it("republish preserves existing options when partially updating", () => {
+    const advertiser = createMdnsAdvertiser({
+      port: 9090,
+      udpPort: 9091,
+      serverId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+      serverName: "Studio A",
+    });
+
+    advertiser.republish({ serverName: "Studio B" });
+
+    const opts = publishMock.mock.calls[1][0];
+    expect(opts.name).toBe("Studio B");
+    expect(opts.port).toBe(9090);
+    expect(opts.txt.udpPort).toBe("9091");
+  });
 });

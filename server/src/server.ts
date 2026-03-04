@@ -24,6 +24,7 @@ import { registerSettingsRoutes } from "./routes/settings.js";
 import { registerMetricsRoute } from "./routes/metrics.js";
 import { registerApiKeyAuth } from "./middleware/api-key-auth.js";
 import type { LatencyTracker } from "./metrics/latency-tracker.js";
+import type { MdnsAdvertiser } from "./mdns/advertiser.js";
 import type { UdpColorServer } from "./udp/udp-color-server.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -43,6 +44,7 @@ interface BuildServerDeps {
   readonly udpServer?: UdpColorServer;
   readonly serverId?: string;
   readonly serverName?: string;
+  readonly getMdnsAdvertiser?: () => MdnsAdvertiser | undefined;
 }
 
 export async function buildServer(
@@ -150,6 +152,7 @@ export async function buildServer(
     registerSettingsRoutes(app, {
       settingsStore: deps.settingsStore,
       serverVersion: deps.serverVersion ?? "0.0.0",
+      getMdnsAdvertiser: deps.getMdnsAdvertiser,
     });
   }
 

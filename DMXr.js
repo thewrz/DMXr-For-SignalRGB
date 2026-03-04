@@ -128,7 +128,7 @@ function timestampToBytes(ms) {
 var serverRegistry = {};
 // serverRegistry[serverId] = { serverId, serverName, host, port, udpPort, lastSeen, healthy }
 
-var STALE_TIMEOUT_MS = 30000; // prune servers not seen in 30s
+var STALE_TIMEOUT_MS = 300000; // prune servers not seen in 5 minutes
 
 function getServerUrlFor(server, path) {
 	return "http://" + server.host + ":" + server.port + path;

@@ -168,6 +168,7 @@ async function main() {
     udpServer,
     serverId,
     serverName,
+    getMdnsAdvertiser: () => mdnsAdvertiser,
   });
 
   let mdnsAdvertiser: MdnsAdvertiser | undefined;

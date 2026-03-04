@@ -6,6 +6,7 @@ function dmxrSettings() {
     settingsSaved: false,
 
     // Settings form
+    settingsServerName: "",
     settingsDriver: "null",
     settingsDevicePath: "auto",
     settingsPort: 8080,
@@ -38,6 +39,7 @@ function dmxrSettings() {
         }
         var data = await res.json();
         var s = data.settings;
+        this.settingsServerName = s.serverName || "";
         this.settingsDriver = s.dmxDriver;
         this.settingsDevicePath = s.dmxDevicePath;
         this.settingsPort = s.port;
@@ -63,6 +65,7 @@ function dmxrSettings() {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            serverName: this.settingsServerName,
             dmxDriver: this.settingsDriver,
             dmxDevicePath: this.settingsDevicePath,
             port: this.settingsPort,
@@ -134,6 +137,18 @@ function dmxrSettings() {
           // still restarting
         }
       }.bind(this), 2000);
+    },
+
+    async loadServerName() {
+      try {
+        var res = await fetch("/settings");
+        if (res.ok) {
+          var data = await res.json();
+          this.settingsServerName = data.settings.serverName || "";
+        }
+      } catch {
+        // ignore
+      }
     },
 
     openSettings() {

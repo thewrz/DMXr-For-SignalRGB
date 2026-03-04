@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { DmxUniverse } from "./dmx/driver-factory.js";
 import type { ServerConfig } from "./config/server-config.js";
 import type { OflClient, OflSearchResult } from "./ofl/ofl-client.js";
@@ -5,6 +6,10 @@ import { createFixtureStore } from "./fixtures/fixture-store.js";
 import type { FixtureStore } from "./fixtures/fixture-store.js";
 import type { LibraryRegistry } from "./libraries/types.js";
 import { createLibraryRegistry } from "./libraries/registry.js";
+
+function uniqueFixturesPath(): string {
+  return `/tmp/dmxr-test-fixtures-${randomUUID()}.json`;
+}
 
 export function createMockUniverse(): DmxUniverse & {
   updateCalls: Array<Record<number, number>>;
@@ -33,7 +38,7 @@ export function createTestConfig(overrides: Partial<ServerConfig> = {}): ServerC
     dmxDriver: "null",
     dmxDevicePath: "",
     logLevel: "silent",
-    fixturesPath: "/tmp/dmxr-test-fixtures.json",
+    fixturesPath: uniqueFixturesPath(),
     mdnsEnabled: false,
     portRangeSize: 10,
     ...overrides,
@@ -41,7 +46,7 @@ export function createTestConfig(overrides: Partial<ServerConfig> = {}): ServerC
 }
 
 export function createTestFixtureStore(): FixtureStore {
-  return createFixtureStore("/tmp/dmxr-test-fixtures.json");
+  return createFixtureStore(uniqueFixturesPath());
 }
 
 export function createMockOflClient(): OflClient {

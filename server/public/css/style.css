@@ -39,6 +39,7 @@ header {
 
 .header-logo { height: 28px; width: auto; }
 .header-title { font-size: 1.1rem; font-weight: 600; opacity: 0.7; }
+.header-server-name { font-size: 0.85rem; opacity: 0.5; margin-left: 0.5rem; }
 
 .sidebar-toggle {
   display: flex;

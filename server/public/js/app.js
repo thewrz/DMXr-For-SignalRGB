@@ -69,6 +69,7 @@ function dmxrApp() {
       await this.loadFixtures();
       await this.loadManufacturers();
       await this.loadLibraries();
+      this.loadServerName();
       this.pollFixtures();
       await this.checkWizardNeeded();
     },

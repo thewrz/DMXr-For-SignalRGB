@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import type { SettingsStore } from "../config/settings-store.js";
 import type { PersistedSettings } from "../config/settings-store.js";
+import type { MdnsAdvertiser } from "../mdns/advertiser.js";
 import {
   listSerialPorts,
   type SerialPortInfo,
@@ -9,6 +10,7 @@ import {
 interface SettingsDeps {
   readonly settingsStore: SettingsStore;
   readonly serverVersion: string;
+  readonly getMdnsAdvertiser?: () => MdnsAdvertiser | undefined;
 }
 
 interface GetSettingsResponse {
@@ -61,6 +63,10 @@ export function registerSettingsRoutes(
     const settings = await deps.settingsStore.update(body);
     const changedKeys = Object.keys(body) as (keyof PersistedSettings)[];
     const requiresRestart = changedKeys.some((k) => RESTART_FIELDS.has(k));
+
+    if ("serverName" in body) {
+      deps.getMdnsAdvertiser?.()?.republish({ serverName: settings.serverName });
+    }
 
     const response: PatchSettingsResponse = { settings, requiresRestart };
     return response;

@@ -2,9 +2,11 @@ import { describe, it, expect } from "vitest";
 import { mapColor, isWhiteGateOpen, DEFAULT_WHITE_GATE_THRESHOLD, getFixtureDefaults } from "./channel-mapper.js";
 import type { FixtureConfig, FixtureChannel, ChannelOverride } from "../types/protocol.js";
 
-interface MutableFixture extends Omit<FixtureConfig, "channelOverrides" | "whiteGateThreshold"> {
+interface MutableFixture extends Omit<FixtureConfig, "channelOverrides" | "whiteGateThreshold" | "motorGuardEnabled" | "motorGuardBuffer"> {
   channelOverrides?: Record<number, ChannelOverride>;
   whiteGateThreshold?: number;
+  motorGuardEnabled?: boolean;
+  motorGuardBuffer?: number;
 }
 
 function makeFixture(
@@ -261,7 +263,7 @@ describe("mapColor", () => {
 
     const result = mapColor(fixture, 255, 0, 0, 1.0);
 
-    expect(result[1]).toBe(0); // fine channel uses raw defaultValue
+    expect(result[1]).toBe(2); // fine channel: defaultValue 0 → motor-safe clamp min (buffer=4, min=2)
   });
 
   it("includes Pan in color output when override is enabled", () => {
@@ -275,6 +277,46 @@ describe("mapColor", () => {
 
     expect(result[1]).toBe(64);  // override applied
     expect(result[2]).toBe(255);
+  });
+
+  it("motor guard clamps Pan/Tilt override to 2-253 by default", () => {
+    const fixture = makeFixture([
+      { offset: 0, name: "Pan", type: "Pan", defaultValue: 128 },
+      { offset: 1, name: "Tilt", type: "Tilt", defaultValue: 128 },
+    ]);
+    fixture.channelOverrides = {
+      0: { value: 0, enabled: true },
+      1: { value: 255, enabled: true },
+    };
+
+    const result = mapColor(fixture, 0, 0, 0, 1.0);
+
+    expect(result[1]).toBe(2);   // Pan clamped from 0 → 2
+    expect(result[2]).toBe(253); // Tilt clamped from 255 → 253
+  });
+
+  it("motor guard can be disabled per fixture", () => {
+    const fixture = makeFixture([
+      { offset: 0, name: "Pan", type: "Pan", defaultValue: 128 },
+    ]);
+    fixture.motorGuardEnabled = false;
+    fixture.channelOverrides = { 0: { value: 0, enabled: true } };
+
+    const result = mapColor(fixture, 0, 0, 0, 1.0);
+
+    expect(result[1]).toBe(0); // no motor guard → full range
+  });
+
+  it("motor guard respects custom buffer size", () => {
+    const fixture = makeFixture([
+      { offset: 0, name: "Tilt", type: "Tilt", defaultValue: 128 },
+    ]);
+    fixture.motorGuardBuffer = 10;
+    fixture.channelOverrides = { 0: { value: 0, enabled: true } };
+
+    const result = mapColor(fixture, 0, 0, 0, 1.0);
+
+    expect(result[1]).toBe(5); // buffer=10 → min=5, max=250
   });
 
   it("maps Cyan as subtractive (255 - Red)", () => {
@@ -594,7 +636,7 @@ describe("getFixtureDefaults", () => {
 
     const result = getFixtureDefaults(fixture);
 
-    expect(result[1]).toBe(255); // clamped from 300
+    expect(result[1]).toBe(253); // clamped from 300 → motor-safe max (buffer=4, max=253)
   });
 
   it("uses correct absolute DMX addresses", () => {

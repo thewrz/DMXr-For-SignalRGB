@@ -71,6 +71,13 @@ export interface FixtureConfig {
   readonly channels: readonly FixtureChannel[];
   readonly channelOverrides?: Readonly<Record<number, ChannelOverride>>;
   readonly whiteGateThreshold?: number;
+  /** Motor guard: clamp Pan/Tilt/Focus/Zoom to prevent mechanical extremes.
+   *  Default true. When enabled, motor channels are clamped to
+   *  [buffer/2 .. 255-buffer/2] instead of [0..255]. */
+  readonly motorGuardEnabled?: boolean;
+  /** Motor guard buffer size (total DMX values excluded from each end).
+   *  Default 4 → clamp range 2-253. */
+  readonly motorGuardBuffer?: number;
 }
 
 /** POST /fixtures request body */
@@ -91,6 +98,8 @@ export interface UpdateFixtureRequest {
   readonly dmxStartAddress?: number;
   readonly channelOverrides?: Readonly<Record<number, ChannelOverride>>;
   readonly whiteGateThreshold?: number;
+  readonly motorGuardEnabled?: boolean;
+  readonly motorGuardBuffer?: number;
 }
 
 /** POST /update/colors request body */

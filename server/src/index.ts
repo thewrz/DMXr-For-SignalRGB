@@ -108,6 +108,26 @@ async function main() {
   await fixtureStore.load();
 
   pipeLog("info", `Loaded ${fixtureStore.getAll().length} fixtures, initializing defaults...`);
+
+  // Register safe positions for motor channels (Pan/Tilt/Focus/Zoom etc.)
+  // These are restored after blackout/whiteout to prevent motors from
+  // slamming to mechanical limits at DMX 0 or 255.
+  const MOTOR_TYPES = new Set(["Pan", "Tilt", "Focus", "Zoom", "Gobo", "Iris", "Prism"]);
+  const motorSafePositions: Record<number, number> = {};
+  for (const fixture of fixtureStore.getAll()) {
+    const base = fixture.dmxStartAddress;
+    for (const ch of fixture.channels) {
+      if (MOTOR_TYPES.has(ch.type)) {
+        const addr = base + ch.offset;
+        const override = fixture.channelOverrides?.[ch.offset];
+        motorSafePositions[addr] = override?.enabled
+          ? override.value
+          : (ch.defaultValue > 0 ? ch.defaultValue : 128);
+      }
+    }
+  }
+  manager.registerSafePositions(motorSafePositions);
+
   manager.blackout();
 
   // Initialize fixture defaults (sets pan/tilt center, strobe open, etc.)

@@ -186,6 +186,37 @@ describe("createUniverseManager", () => {
     });
   });
 
+  describe("registerSafePositions", () => {
+    it("restores motor channels after blackout", () => {
+      manager.registerSafePositions({ 54: 128, 56: 128 });
+      manager.blackout();
+
+      // updateAll(0) is called, then safe positions restore
+      expect(mock.updateAllCalls).toEqual([0]);
+      expect(mock.updateCalls).toHaveLength(1);
+      expect(mock.updateCalls[0]).toEqual({ 54: 128, 56: 128 });
+    });
+
+    it("restores motor channels after whiteout", () => {
+      manager.registerSafePositions({ 54: 128, 56: 128 });
+      manager.whiteout();
+
+      expect(mock.updateAllCalls).toEqual([255]);
+      expect(mock.updateCalls).toHaveLength(1);
+      expect(mock.updateCalls[0]).toEqual({ 54: 128, 56: 128 });
+    });
+
+    it("tracks safe position channels as active after blackout", () => {
+      manager.registerSafePositions({ 54: 128, 56: 128 });
+      manager.applyFixtureUpdate({ fixture: "t", channels: { "1": 255, "54": 100, "56": 100 } });
+      expect(manager.getActiveChannelCount()).toBe(3);
+
+      manager.blackout();
+      // Only the 2 safe positions remain active
+      expect(manager.getActiveChannelCount()).toBe(2);
+    });
+  });
+
   describe("whiteout", () => {
     it("drops color updates while whiteout is active", () => {
       manager.whiteout();

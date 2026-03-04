@@ -35,6 +35,10 @@ export interface UniverseManager {
   readonly getFullSnapshot: () => Record<number, number>;
   readonly applyRawUpdate: (channels: Record<number, number>) => void;
   readonly getDmxSendStatus: () => DmxSendStatus;
+  /** Register safe center positions for motor channels (Pan/Tilt/etc).
+   *  These are restored immediately after blackout/whiteout to prevent
+   *  motors from slamming to mechanical limits at DMX 0 or 255. */
+  readonly registerSafePositions: (channels: Record<number, number>) => void;
 }
 
 function clampValue(value: number): number {
@@ -70,6 +74,7 @@ export function createUniverseManager(
   options: UniverseManagerOptions = {},
 ): UniverseManager {
   const activeChannels = new Map<number, number>();
+  const safePositions = new Map<number, number>();
   const log = options.logger;
   let lastSendTime: number | null = null;
   let lastSendError: string | null = null;
@@ -133,8 +138,28 @@ export function createUniverseManager(
       safeSend("blackout", () => universe.updateAll(0));
       const prevCount = activeChannels.size;
       activeChannels.clear();
-      pipeLog("info", `BLACKOUT: cleared ${prevCount} active channels → all 512 zeroed`);
-      log?.info("DMX blackout: all 512 channels → 0 (override active)");
+
+      // Restore motor channels to safe center positions immediately
+      // to prevent Pan/Tilt from slamming to mechanical limits at DMX 0
+      if (safePositions.size > 0) {
+        const safeUpdate: Record<number, number> = {};
+        for (const [ch, val] of safePositions) {
+          safeUpdate[ch] = val;
+          activeChannels.set(ch, val);
+        }
+        safeSend(`blackout-safe-positions ${safePositions.size}ch`, () => universe.update(safeUpdate));
+        const snapshot = [...safePositions.entries()]
+          .sort(([a], [b]) => a - b)
+          .map(([ch, val]) => `${ch}:${val}`)
+          .join(" ");
+        pipeLog("info",
+          `BLACKOUT: cleared ${prevCount} active channels → zeroed, ` +
+          `restored ${safePositions.size} motor channels: ${snapshot}`,
+        );
+      } else {
+        pipeLog("info", `BLACKOUT: cleared ${prevCount} active channels → all 512 zeroed`);
+      }
+      log?.info("DMX blackout: all 512 channels → 0 (motor-safe override active)");
     },
 
     whiteout(): void {
@@ -143,7 +168,25 @@ export function createUniverseManager(
       for (let ch = MIN_CHANNEL; ch <= MAX_CHANNEL; ch++) {
         activeChannels.set(ch, MAX_VALUE);
       }
-      log?.info("DMX whiteout: all 512 channels → 255 (override active)");
+
+      // Restore motor channels to safe center positions immediately
+      // to prevent Pan/Tilt from slamming to mechanical limits at DMX 255
+      if (safePositions.size > 0) {
+        const safeUpdate: Record<number, number> = {};
+        for (const [ch, val] of safePositions) {
+          safeUpdate[ch] = val;
+          activeChannels.set(ch, val);
+        }
+        safeSend(`whiteout-safe-positions ${safePositions.size}ch`, () => universe.update(safeUpdate));
+        const snapshot = [...safePositions.entries()]
+          .sort(([a], [b]) => a - b)
+          .map(([ch, val]) => `${ch}:${val}`)
+          .join(" ");
+        pipeLog("info",
+          `WHITEOUT: all 512 → 255, restored ${safePositions.size} motor channels: ${snapshot}`,
+        );
+      }
+      log?.info("DMX whiteout: all 512 channels → 255 (motor-safe override active)");
     },
 
     resumeNormal(): void {
@@ -196,6 +239,20 @@ export function createUniverseManager(
 
     getDmxSendStatus(): DmxSendStatus {
       return { lastSendTime, lastSendError };
+    },
+
+    registerSafePositions(channels: Record<number, number>): void {
+      for (const [key, value] of Object.entries(channels)) {
+        const ch = parseInt(key, 10);
+        if (isValidChannel(ch)) {
+          safePositions.set(ch, clampValue(value));
+        }
+      }
+      const snapshot = [...safePositions.entries()]
+        .sort(([a], [b]) => a - b)
+        .map(([ch, val]) => `${ch}:${val}`)
+        .join(" ");
+      pipeLog("info", `Registered ${safePositions.size} motor safe positions: ${snapshot}`);
     },
   };
 }

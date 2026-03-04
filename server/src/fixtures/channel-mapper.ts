@@ -29,6 +29,8 @@ export function mapColor(
   const result: Record<number, number> = {};
   const base = fixture.dmxStartAddress;
   const caps = analyzeFixture(fixture.channels);
+  const motorGuardOn = fixture.motorGuardEnabled !== false; // default true
+  const motorBuffer = fixture.motorGuardBuffer ?? DEFAULT_MOTOR_GUARD_BUFFER;
   const trace = shouldSample(`mapColor:${fixture.id}`);
   const reasons: string[] = [];
 
@@ -92,9 +94,11 @@ export function mapColor(
     const override = fixture.channelOverrides?.[channel.offset];
     let reason = "";
 
+    const isMotor = motorGuardOn && MOTOR_CHANNEL_TYPES.has(channel.type);
+
     if (override?.enabled) {
-      result[addr] = clamp(override.value);
-      reason = `OVERRIDE(${override.value})`;
+      result[addr] = isMotor ? clampMotor(override.value, motorBuffer) : clamp(override.value);
+      reason = `OVERRIDE(${override.value}${isMotor ? ",motor-safe" : ""})`;
     } else if (channel.type === "ColorIntensity") {
       switch (channel.color) {
         case "Red":
@@ -153,12 +157,18 @@ export function mapColor(
       reason = `strobe(mode=${caps.strobeMode},default=${channel.defaultValue})`;
     } else if (channel.type === "Pan" || channel.type === "Tilt") {
       if (/fine/i.test(channel.name)) {
-        result[addr] = channel.defaultValue;
-        reason = `${channel.type}Fine(default=${channel.defaultValue})`;
+        const raw = channel.defaultValue;
+        result[addr] = isMotor ? clampMotor(raw, motorBuffer) : clamp(raw);
+        reason = `${channel.type}Fine(default=${raw}${isMotor ? ",motor-safe" : ""})`;
       } else {
-        result[addr] = channel.defaultValue > 0 ? channel.defaultValue : 128;
-        reason = `${channel.type}Coarse(default=${channel.defaultValue}→${result[addr]})`;
+        const raw = channel.defaultValue > 0 ? channel.defaultValue : 128;
+        result[addr] = isMotor ? clampMotor(raw, motorBuffer) : clamp(raw);
+        reason = `${channel.type}Coarse(default=${channel.defaultValue}→${result[addr]}${isMotor ? ",motor-safe" : ""})`;
       }
+    } else if (channel.type === "Focus" || channel.type === "Zoom") {
+      const raw = channel.defaultValue > 0 ? channel.defaultValue : 128;
+      result[addr] = isMotor ? clampMotor(raw, motorBuffer) : clamp(raw);
+      reason = `${channel.type}(default=${channel.defaultValue}${isMotor ? ",motor-safe" : ""})`;
     } else {
       result[addr] = channel.defaultValue;
       reason = `generic(default=${channel.defaultValue})`;
@@ -202,16 +212,23 @@ export function getFixtureDefaults(fixture: FixtureConfig): Record<number, numbe
     `getFixtureDefaults "${fixture.name}" (id=${fixture.id.slice(0, 8)} base=${base}):`,
   ];
 
+  const motorGuardOn = fixture.motorGuardEnabled !== false;
+  const motorBuffer = fixture.motorGuardBuffer ?? DEFAULT_MOTOR_GUARD_BUFFER;
+
   for (const channel of fixture.channels) {
     const override = fixture.channelOverrides?.[channel.offset];
+    const isMotor = motorGuardOn && MOTOR_CHANNEL_TYPES.has(channel.type);
+    const doClamp = isMotor
+      ? (v: number) => clampMotor(v, motorBuffer)
+      : clamp;
     const value = override?.enabled
-      ? clamp(override.value)
-      : channel.defaultValue;
+      ? doClamp(override.value)
+      : doClamp(channel.defaultValue);
     result[base + channel.offset] = value;
 
     const src = override?.enabled
-      ? `OVERRIDE(${override.value})`
-      : `default(${channel.defaultValue})`;
+      ? `OVERRIDE(${override.value}${isMotor ? ",motor-safe" : ""})`
+      : `default(${channel.defaultValue}${isMotor ? ",motor-safe" : ""})`;
     lines.push(
       `  [${channel.offset}] DMX${base + channel.offset} ${channel.name.padEnd(16)} ` +
       `type=${channel.type.padEnd(15)} → ${String(value).padStart(3)} (${src})`,
@@ -226,3 +243,15 @@ export function getFixtureDefaults(fixture: FixtureConfig): Record<number, numbe
 function clamp(value: number): number {
   return Math.max(0, Math.min(255, Math.round(value)));
 }
+
+const DEFAULT_MOTOR_GUARD_BUFFER = 4;
+
+/** Motor-safe clamp: prevents DMX extremes that can jam cheap fixture
+ *  motors at mechanical limits. Buffer of 4 → clamps to 2-253. */
+function clampMotor(value: number, buffer = DEFAULT_MOTOR_GUARD_BUFFER): number {
+  const min = Math.floor(buffer / 2);
+  const max = 255 - Math.ceil(buffer / 2);
+  return Math.max(min, Math.min(max, Math.round(value)));
+}
+
+const MOTOR_CHANNEL_TYPES = new Set(["Pan", "Tilt", "Focus", "Zoom"]);

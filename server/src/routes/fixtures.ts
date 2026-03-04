@@ -111,6 +111,8 @@ export function registerFixtureRoutes(
               },
             },
             whiteGateThreshold: { type: "integer" as const, minimum: 0, maximum: 255 },
+            motorGuardEnabled: { type: "boolean" as const },
+            motorGuardBuffer: { type: "integer" as const, minimum: 0, maximum: 20 },
           },
         },
       },
@@ -152,9 +154,14 @@ export function registerFixtureRoutes(
             continue;
           }
 
+          const isMotor = channel.type === "Pan" || channel.type === "Tilt" ||
+            channel.type === "Focus" || channel.type === "Zoom";
+          const motorBuffer = updated.motorGuardBuffer ?? 4;
+          const min = isMotor ? Math.floor(motorBuffer / 2) : 0;
+          const max = isMotor ? 255 - Math.ceil(motorBuffer / 2) : 255;
           const value = override.enabled
-            ? Math.max(0, Math.min(255, Math.round(override.value)))
-            : channel.defaultValue;
+            ? Math.max(min, Math.min(max, Math.round(override.value)))
+            : Math.max(min, Math.min(max, channel.defaultValue));
           channels[base + offset] = value;
 
           logLines.push(

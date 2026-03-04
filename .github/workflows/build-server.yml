@@ -138,7 +138,7 @@ jobs:
 
       - name: Upload workflow artifact
         if: github.event_name != 'release' && !startsWith(github.ref, 'refs/tags/v')
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: DMXr-Server-${{ matrix.target }}
           path: DMXr-Server-${{ matrix.target }}.${{ matrix.archive }}

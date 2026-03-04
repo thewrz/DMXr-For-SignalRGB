@@ -286,6 +286,37 @@ export function registerControlRoutes(
     },
   );
 
+  // ── Raw DMX channel write (debug / probing) ──
+  app.post<{ Body: { channels: Record<string, number> } }>(
+    "/debug/raw",
+    {
+      schema: {
+        body: {
+          type: "object" as const,
+          required: ["channels"],
+          properties: {
+            channels: {
+              type: "object" as const,
+              additionalProperties: { type: "integer" as const, minimum: 0, maximum: 255 },
+            },
+          },
+        },
+      },
+    },
+    async (request) => {
+      const updates: Record<number, number> = {};
+      for (const [addr, val] of Object.entries(request.body.channels)) {
+        const dmxAddr = Number(addr);
+        if (dmxAddr >= 1 && dmxAddr <= 512) {
+          updates[dmxAddr] = val;
+        }
+      }
+      deps.manager.applyRawUpdate(updates);
+      pipeLog("info", `DEBUG raw DMX write: ${JSON.stringify(updates)}`);
+      return { success: true, channelsSet: Object.keys(updates).length, updates };
+    },
+  );
+
   // ── Fixture DMX Reset ──
   // Sends a reset command to the fixture's maintenance/reset channel,
   // holds for a configurable duration, then returns to 0.

@@ -38,3 +38,20 @@ jobs:
       - name: Run tests with coverage
         working-directory: server
         run: npm run test:coverage
+
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Security audit
+        working-directory: server
+        run: npm audit --audit-level=high

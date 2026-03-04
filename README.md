@@ -14,15 +14,20 @@ Control your DMX lighting fixtures from [SignalRGB](https://signalrgb.com) — s
 - Per-channel overrides let you lock individual channels (strobe speed, gobo, macros) from the web UI while SignalRGB drives everything else
 - Motor guard protects pan/tilt channels on moving heads during blackout/whiteout
 - Multi-server — run multiple DMXr instances on different machines; the plugin discovers and manages all of them
+ - Tested over Wi-Fi with a RaspberryPi 5 with sub 30ms latency and no UDP packet loss! 
 - UDP color transport for lower-latency updates (falls back to HTTP automatically)
 - Resilient USB connection — survives unplug/replug with automatic reconnect and state replay
 - Guaranteed blackout on shutdown
 
 ## Hardware & fixture support
 
-Tested with an **ENTTEC DMX USB Pro** and **Open DMX USB** (FTDI-based) adapters.
+Tested with an **ENTTEC DMX USB Pro** and **Open DMX USB** (FTDI-based) adapters. However the low cost FTDI adapters that don't address DMX timing natively are very finnicky. Devices in the class of the ENTTEC DMX USB Pro are worth their money.
 
 Fixture-wise, I've only tested with what I own: a couple of RGB PAR cans, two moving heads (color only — pan/tilt isn't driven yet), and a strobe. It works well for RGB color mapping, but fixtures like lasers and movers that need interpreted movement/pattern data are still a work in progress. If you try it with something else and it works (or doesn't), let me know.
+
+## Why DMX and not Artnet or RDM / more modern protocols
+
+There's tons of lower cost DMX light fixtures out there, IP based, Artnet etc. are getting better supported, but I'm just focused on my own DMX fixtures I have kicking around my studio.
 
 ## Architecture
 

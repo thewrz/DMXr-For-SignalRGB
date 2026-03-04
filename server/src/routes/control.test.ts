@@ -321,6 +321,82 @@ describe("Control routes", () => {
       expect(lastUpdate[42]).toBe(0);
     });
 
+    it("returns 404 for reset on unknown fixture", async () => {
+      const res = await app.inject({
+        method: "POST",
+        url: "/fixtures/nonexistent/reset",
+      });
+      expect(res.statusCode).toBe(404);
+    });
+
+    it("returns 400 when fixture has no reset channel", async () => {
+      const addRes = await app.inject({
+        method: "POST",
+        url: "/fixtures",
+        payload: {
+          name: "No Reset PAR",
+          oflKey: "test/test",
+          oflFixtureName: "Test",
+          mode: "3-channel",
+          dmxStartAddress: 60,
+          channelCount: 3,
+          channels: [
+            { offset: 0, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
+            { offset: 1, name: "Green", type: "ColorIntensity", color: "Green", defaultValue: 0 },
+            { offset: 2, name: "Blue", type: "ColorIntensity", color: "Blue", defaultValue: 0 },
+          ],
+        },
+      });
+      const { id } = addRes.json();
+
+      const res = await app.inject({
+        method: "POST",
+        url: `/fixtures/${id}/reset`,
+      });
+      expect(res.statusCode).toBe(400);
+      expect(res.json().error).toBe("No reset channel detected");
+    });
+
+    it("sends reset value to auto-detected reset channel", async () => {
+      const addRes = await app.inject({
+        method: "POST",
+        url: "/fixtures",
+        payload: {
+          name: "Moving Head",
+          oflKey: "test/mover",
+          oflFixtureName: "Mover",
+          mode: "5ch",
+          dmxStartAddress: 70,
+          channelCount: 5,
+          channels: [
+            { offset: 0, name: "Pan", type: "Pan", defaultValue: 128 },
+            { offset: 1, name: "Tilt", type: "Tilt", defaultValue: 128 },
+            { offset: 2, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
+            { offset: 3, name: "Green", type: "ColorIntensity", color: "Green", defaultValue: 0 },
+            { offset: 4, name: "Auto Mode", type: "Generic", defaultValue: 0 },
+          ],
+        },
+      });
+      const { id } = addRes.json();
+
+      mockUniverse.updateCalls.length = 0;
+
+      const res = await app.inject({
+        method: "POST",
+        url: `/fixtures/${id}/reset`,
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json().success).toBe(true);
+      expect(res.json().channel).toBe("Auto Mode");
+      expect(res.json().dmxAddress).toBe(74); // base 70 + offset 4
+      expect(res.json().value).toBe(200);
+
+      // DMX addr 74 should have been sent value 200
+      expect(mockUniverse.updateCalls.length).toBeGreaterThanOrEqual(1);
+      expect(mockUniverse.updateCalls[0][74]).toBe(200);
+    });
+
     it("flash-release with no active hold is a no-op", async () => {
       const addRes = await app.inject({
         method: "POST",

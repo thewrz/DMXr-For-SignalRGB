@@ -113,6 +113,16 @@ export function registerFixtureRoutes(
             whiteGateThreshold: { type: "integer" as const, minimum: 0, maximum: 255 },
             motorGuardEnabled: { type: "boolean" as const },
             motorGuardBuffer: { type: "integer" as const, minimum: 0, maximum: 20 },
+            resetConfig: {
+              type: "object" as const,
+              required: ["channelOffset", "value", "holdMs"],
+              properties: {
+                channelOffset: { type: "integer" as const, minimum: 0 },
+                value: { type: "integer" as const, minimum: 0, maximum: 255 },
+                holdMs: { type: "integer" as const, minimum: 1000, maximum: 15000 },
+              },
+              additionalProperties: false,
+            },
           },
         },
       },

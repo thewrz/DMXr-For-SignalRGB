@@ -75,6 +75,7 @@ export function createFixtureStore(filePath: string): FixtureStore {
         ...(changes.whiteGateThreshold !== undefined ? { whiteGateThreshold: changes.whiteGateThreshold } : {}),
         ...(changes.motorGuardEnabled !== undefined ? { motorGuardEnabled: changes.motorGuardEnabled } : {}),
         ...(changes.motorGuardBuffer !== undefined ? { motorGuardBuffer: changes.motorGuardBuffer } : {}),
+        ...(changes.resetConfig !== undefined ? { resetConfig: changes.resetConfig } : {}),
       };
 
       fixtures = fixtures.map((f, i) => (i === index ? updated : f));

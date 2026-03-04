@@ -78,6 +78,15 @@ export interface FixtureConfig {
   /** Motor guard buffer size (total DMX values excluded from each end).
    *  Default 4 → clamp range 2-253. */
   readonly motorGuardBuffer?: number;
+  /** DMX reset configuration for moving heads / intelligent fixtures.
+   *  channelOffset: which channel triggers the reset (e.g., 12 for "Auto Mode")
+   *  value: DMX value to send (e.g., 200)
+   *  holdMs: how long to hold before returning to 0 (e.g., 5000) */
+  readonly resetConfig?: {
+    readonly channelOffset: number;
+    readonly value: number;
+    readonly holdMs: number;
+  };
 }
 
 /** POST /fixtures request body */
@@ -100,6 +109,11 @@ export interface UpdateFixtureRequest {
   readonly whiteGateThreshold?: number;
   readonly motorGuardEnabled?: boolean;
   readonly motorGuardBuffer?: number;
+  readonly resetConfig?: {
+    readonly channelOffset: number;
+    readonly value: number;
+    readonly holdMs: number;
+  };
 }
 
 /** POST /update/colors request body */

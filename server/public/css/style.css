@@ -836,6 +836,15 @@ header h1 { font-size: 1.4rem; }
   background: #8e44ad;
 }
 
+.btn-reset {
+  background: #6c3483;
+  color: #fff;
+}
+.btn-reset:disabled {
+  background: #4a235a;
+  opacity: 0.6;
+}
+
 .btn-expand {
   padding: 0.2rem 0.5rem;
   font-size: 0.7rem;

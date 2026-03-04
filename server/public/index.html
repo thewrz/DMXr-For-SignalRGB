@@ -344,6 +344,13 @@
                         @touchstart.prevent="flashHold(fixture.id)"
                         @touchend="flashRelease(fixture.id)"
                         @touchcancel="flashRelease(fixture.id)">Flash</button>
+                <button class="btn btn-sm btn-reset"
+                        x-show="hasResetChannel(fixture)"
+                        @click="resetFixture(fixture.id)"
+                        :disabled="isResetting(fixture.id)"
+                        :title="'Send DMX reset command (' + getResetChannelName(fixture) + ')'">
+                  <span x-text="isResetting(fixture.id) ? 'Resetting...' : 'Reset'"></span>
+                </button>
                 <button class="btn btn-sm btn-danger" @click="removeFixture(fixture.id)">Remove</button>
               </div>
             </div>

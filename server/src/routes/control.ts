@@ -1,10 +1,34 @@
 import type { FastifyInstance } from "fastify";
 import type { UniverseManager } from "../dmx/universe-manager.js";
 import type { FixtureStore } from "../fixtures/fixture-store.js";
-import type { FixtureConfig } from "../types/protocol.js";
+import type { FixtureConfig, FixtureChannel } from "../types/protocol.js";
 import { mapColor } from "../fixtures/channel-mapper.js";
 import { analyzeFixture } from "../fixtures/fixture-capabilities.js";
 import { pipeLog } from "../logging/pipeline-logger.js";
+
+/** Name patterns that indicate a channel capable of triggering a fixture reset.
+ *  Checked case-insensitively against the channel name. */
+const RESET_CHANNEL_PATTERNS = [
+  /\breset\b/i,
+  /\bmaintenance\b/i,
+  /\blamp\s*control\b/i,
+  /\bspecial\b/i,
+  /\bauto\s*mode\b/i,
+  /\bcontrol\s*ch/i,
+];
+
+const DEFAULT_RESET_VALUE = 200;
+const DEFAULT_RESET_HOLD_MS = 5000;
+
+/** Auto-detect a likely reset channel from the fixture's channel list. */
+function detectResetChannel(channels: readonly FixtureChannel[]): FixtureChannel | undefined {
+  // Prefer exact "reset" match, then fall back to broader patterns
+  for (const pattern of RESET_CHANNEL_PATTERNS) {
+    const match = channels.find((ch) => pattern.test(ch.name) && ch.type === "Generic");
+    if (match) return match;
+  }
+  return undefined;
+}
 
 interface ControlRouteDeps {
   readonly manager: UniverseManager;
@@ -259,6 +283,100 @@ export function registerControlRoutes(
 
       // identify — passthrough (future)
       return { success: true, action, fixtureId: fixture.id };
+    },
+  );
+
+  // ── Fixture DMX Reset ──
+  // Sends a reset command to the fixture's maintenance/reset channel,
+  // holds for a configurable duration, then returns to 0.
+  app.post<{ Params: { id: string } }>(
+    "/fixtures/:id/reset",
+    async (request, reply) => {
+      const fixture = deps.store.getById(request.params.id);
+      if (!fixture) {
+        return reply.status(404).send({ error: "Fixture not found" });
+      }
+
+      // Use explicit config if set, otherwise auto-detect
+      const config = fixture.resetConfig;
+      const resetChannel = config
+        ? fixture.channels.find((ch) => ch.offset === config.channelOffset)
+        : detectResetChannel(fixture.channels);
+
+      if (!resetChannel) {
+        return reply.status(400).send({
+          error: "No reset channel detected",
+          hint: "Configure resetConfig on this fixture via PATCH",
+        });
+      }
+
+      const resetValue = config?.value ?? DEFAULT_RESET_VALUE;
+      const holdMs = config?.holdMs ?? DEFAULT_RESET_HOLD_MS;
+      const dmxAddr = fixture.dmxStartAddress + resetChannel.offset;
+
+      // Cancel any existing reset timer for this fixture
+      const existingTimer = activeTimers.get(`reset:${fixture.id}`);
+      if (existingTimer) {
+        clearTimeout(existingTimer);
+        activeTimers.delete(`reset:${fixture.id}`);
+      }
+
+      // Send reset value
+      deps.manager.applyRawUpdate({ [dmxAddr]: resetValue });
+
+      pipeLog("info",
+        `RESET "${fixture.name}": DMX${dmxAddr} (${resetChannel.name}) → ${resetValue}, ` +
+        `hold ${holdMs}ms then restore to 0`,
+      );
+
+      // Hold, then return to 0
+      const timer = setTimeout(() => {
+        deps.manager.applyRawUpdate({ [dmxAddr]: 0 });
+        activeTimers.delete(`reset:${fixture.id}`);
+        pipeLog("info", `RESET "${fixture.name}": DMX${dmxAddr} restored to 0`);
+      }, holdMs);
+      timer.unref();
+      activeTimers.set(`reset:${fixture.id}`, timer);
+
+      return {
+        success: true,
+        action: "reset",
+        fixtureId: fixture.id,
+        channel: resetChannel.name,
+        dmxAddress: dmxAddr,
+        value: resetValue,
+        holdMs,
+      };
+    },
+  );
+
+  // ── Reset channel detection (GET) ──
+  // Returns info about the detected reset channel for a fixture.
+  app.get<{ Params: { id: string } }>(
+    "/fixtures/:id/reset-info",
+    async (request, reply) => {
+      const fixture = deps.store.getById(request.params.id);
+      if (!fixture) {
+        return reply.status(404).send({ error: "Fixture not found" });
+      }
+
+      const config = fixture.resetConfig;
+      const resetChannel = config
+        ? fixture.channels.find((ch) => ch.offset === config.channelOffset)
+        : detectResetChannel(fixture.channels);
+
+      return {
+        fixtureId: fixture.id,
+        hasReset: resetChannel !== undefined,
+        configured: config !== undefined,
+        channel: resetChannel ? {
+          offset: resetChannel.offset,
+          name: resetChannel.name,
+          dmxAddress: fixture.dmxStartAddress + resetChannel.offset,
+        } : null,
+        value: config?.value ?? DEFAULT_RESET_VALUE,
+        holdMs: config?.holdMs ?? DEFAULT_RESET_HOLD_MS,
+      };
     },
   );
 }

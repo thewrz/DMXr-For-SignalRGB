@@ -415,6 +415,25 @@ export function DiscoveryService() {
 		for (var k = 0; k < serverKeys.length; k++) {
 			pollServerFixtures(self, serverRegistry[serverKeys[k]]);
 		}
+
+		// Serialize registry snapshot for QML settings panel consumption
+		try {
+			var snapshot = {};
+			var skeys = Object.keys(serverRegistry);
+			for (var r = 0; r < skeys.length; r++) {
+				var entry = serverRegistry[skeys[r]];
+				snapshot[skeys[r]] = {
+					serverId: entry.serverId,
+					serverName: entry.serverName,
+					host: entry.host,
+					port: entry.port,
+					udpPort: entry.udpPort,
+					healthy: entry.healthy,
+					fixtureCount: entry.fixtureCount || 0,
+				};
+			}
+			service.saveSetting("DMXr", "serverRegistry", JSON.stringify(snapshot));
+		} catch (e) { /* saveSetting may not exist in all JS contexts */ }
 	};
 }
 
@@ -440,6 +459,7 @@ function pollServerFixtures(disco, server) {
 		}
 
 		var serverFixtures = JSON.parse(xhr.responseText);
+		server.fixtureCount = serverFixtures.length;
 
 		// Collect all fixture names across all servers for collision detection
 		var nameCountMap = buildNameCountMap(serverFixtures, server.serverId);

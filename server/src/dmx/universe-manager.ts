@@ -135,58 +135,71 @@ export function createUniverseManager(
 
     blackout(): void {
       blackoutActive = true;
-      safeSend("blackout", () => universe.updateAll(0));
       const prevCount = activeChannels.size;
       activeChannels.clear();
 
-      // Restore motor channels to safe center positions immediately
-      // to prevent Pan/Tilt from slamming to mechanical limits at DMX 0
       if (safePositions.size > 0) {
-        const safeUpdate: Record<number, number> = {};
-        for (const [ch, val] of safePositions) {
-          safeUpdate[ch] = val;
-          activeChannels.set(ch, val);
+        // Selective blackout: zero everything EXCEPT motor channels in a
+        // single atomic update so pan/tilt values never change at all.
+        const selective: Record<number, number> = {};
+        for (let ch = MIN_CHANNEL; ch <= MAX_CHANNEL; ch++) {
+          if (safePositions.has(ch)) {
+            selective[ch] = safePositions.get(ch)!;
+            activeChannels.set(ch, safePositions.get(ch)!);
+          } else {
+            selective[ch] = 0;
+          }
         }
-        safeSend(`blackout-safe-positions ${safePositions.size}ch`, () => universe.update(safeUpdate));
+        safeSend(`blackout-selective ${MAX_CHANNEL}ch`, () => universe.update(selective));
         const snapshot = [...safePositions.entries()]
           .sort(([a], [b]) => a - b)
           .map(([ch, val]) => `${ch}:${val}`)
           .join(" ");
         pipeLog("info",
-          `BLACKOUT: cleared ${prevCount} active channels → zeroed, ` +
-          `restored ${safePositions.size} motor channels: ${snapshot}`,
+          `BLACKOUT: zeroed ${MAX_CHANNEL - safePositions.size} channels, ` +
+          `preserved ${safePositions.size} motor channels: ${snapshot}`,
         );
       } else {
+        safeSend("blackout", () => universe.updateAll(0));
         pipeLog("info", `BLACKOUT: cleared ${prevCount} active channels → all 512 zeroed`);
       }
-      log?.info("DMX blackout: all 512 channels → 0 (motor-safe override active)");
+      log?.info("DMX blackout active");
     },
 
     whiteout(): void {
       blackoutActive = true;
-      safeSend("whiteout", () => universe.updateAll(MAX_VALUE));
-      for (let ch = MIN_CHANNEL; ch <= MAX_CHANNEL; ch++) {
-        activeChannels.set(ch, MAX_VALUE);
-      }
+      activeChannels.clear();
 
-      // Restore motor channels to safe center positions immediately
-      // to prevent Pan/Tilt from slamming to mechanical limits at DMX 255
       if (safePositions.size > 0) {
-        const safeUpdate: Record<number, number> = {};
-        for (const [ch, val] of safePositions) {
-          safeUpdate[ch] = val;
-          activeChannels.set(ch, val);
+        // Selective whiteout: set everything to 255 EXCEPT motor channels
+        // in a single atomic update so pan/tilt values never change at all.
+        const selective: Record<number, number> = {};
+        for (let ch = MIN_CHANNEL; ch <= MAX_CHANNEL; ch++) {
+          if (safePositions.has(ch)) {
+            selective[ch] = safePositions.get(ch)!;
+            activeChannels.set(ch, safePositions.get(ch)!);
+          } else {
+            selective[ch] = MAX_VALUE;
+            activeChannels.set(ch, MAX_VALUE);
+          }
         }
-        safeSend(`whiteout-safe-positions ${safePositions.size}ch`, () => universe.update(safeUpdate));
+        safeSend(`whiteout-selective ${MAX_CHANNEL}ch`, () => universe.update(selective));
         const snapshot = [...safePositions.entries()]
           .sort(([a], [b]) => a - b)
           .map(([ch, val]) => `${ch}:${val}`)
           .join(" ");
         pipeLog("info",
-          `WHITEOUT: all 512 → 255, restored ${safePositions.size} motor channels: ${snapshot}`,
+          `WHITEOUT: set ${MAX_CHANNEL - safePositions.size} channels to 255, ` +
+          `preserved ${safePositions.size} motor channels: ${snapshot}`,
         );
+      } else {
+        safeSend("whiteout", () => universe.updateAll(MAX_VALUE));
+        for (let ch = MIN_CHANNEL; ch <= MAX_CHANNEL; ch++) {
+          activeChannels.set(ch, MAX_VALUE);
+        }
+        pipeLog("info", "WHITEOUT: all 512 channels → 255");
       }
-      log?.info("DMX whiteout: all 512 channels → 255 (motor-safe override active)");
+      log?.info("DMX whiteout active");
     },
 
     resumeNormal(): void {

@@ -358,6 +358,23 @@
               </span>
             </div>
             <div class="channel-overrides" x-show="expandedFixtureId === fixture.id" x-cloak>
+              <div class="motor-guard-row" x-show="hasMotorChannels(fixture)">
+                <span class="motor-guard-label">Motor Guard</span>
+                <label class="toggle-switch" title="Clamp motor channels to avoid mechanical extremes">
+                  <input type="checkbox"
+                         :checked="fixture.motorGuardEnabled !== false"
+                         @change="toggleMotorGuard(fixture.id, $event.target.checked)">
+                  <span class="toggle-track"></span>
+                </label>
+                <span class="motor-guard-buffer-label">Buffer</span>
+                <input type="range" class="motor-guard-slider"
+                       min="0" max="20" step="2"
+                       :value="fixture.motorGuardBuffer ?? 4"
+                       :disabled="fixture.motorGuardEnabled === false"
+                       @input="setMotorGuardBuffer(fixture.id, $event.target.value)">
+                <span class="motor-guard-value"
+                      x-text="(fixture.motorGuardBuffer ?? 4)"></span>
+              </div>
               <template x-for="ch in fixture.channels" :key="'ov-' + ch.offset">
                 <div class="channel-override-row" :class="{ 'override-active': isOverrideEnabled(fixture, ch.offset) }">
                   <span class="override-badge" :class="'badge-' + (ch.color || ch.type).toLowerCase()"

@@ -187,23 +187,39 @@ describe("createUniverseManager", () => {
   });
 
   describe("registerSafePositions", () => {
-    it("restores motor channels after blackout", () => {
+    it("preserves motor channels during blackout (no updateAll)", () => {
       manager.registerSafePositions({ 54: 128, 56: 128 });
       manager.blackout();
 
-      // updateAll(0) is called, then safe positions restore
-      expect(mock.updateAllCalls).toEqual([0]);
+      // updateAll should NOT be called — selective update used instead
+      expect(mock.updateAllCalls).toHaveLength(0);
+      // A single selective update covers all 512 channels
       expect(mock.updateCalls).toHaveLength(1);
-      expect(mock.updateCalls[0]).toEqual({ 54: 128, 56: 128 });
+      const update = mock.updateCalls[0];
+      // Motor channels preserved at safe values
+      expect(update[54]).toBe(128);
+      expect(update[56]).toBe(128);
+      // Non-motor channels zeroed
+      expect(update[1]).toBe(0);
+      expect(update[100]).toBe(0);
+      expect(update[512]).toBe(0);
     });
 
-    it("restores motor channels after whiteout", () => {
+    it("preserves motor channels during whiteout (no updateAll)", () => {
       manager.registerSafePositions({ 54: 128, 56: 128 });
       manager.whiteout();
 
-      expect(mock.updateAllCalls).toEqual([255]);
+      // updateAll should NOT be called — selective update used instead
+      expect(mock.updateAllCalls).toHaveLength(0);
       expect(mock.updateCalls).toHaveLength(1);
-      expect(mock.updateCalls[0]).toEqual({ 54: 128, 56: 128 });
+      const update = mock.updateCalls[0];
+      // Motor channels preserved at safe values
+      expect(update[54]).toBe(128);
+      expect(update[56]).toBe(128);
+      // Non-motor channels set to 255
+      expect(update[1]).toBe(255);
+      expect(update[100]).toBe(255);
+      expect(update[512]).toBe(255);
     });
 
     it("tracks safe position channels as active after blackout", () => {

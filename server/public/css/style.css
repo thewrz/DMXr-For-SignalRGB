@@ -723,6 +723,119 @@ header h1 { font-size: 1.4rem; }
   color: var(--text-dim);
 }
 
+/* Motor guard settings row */
+.motor-guard-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0.5rem;
+  margin-bottom: 0.35rem;
+  background: rgba(142, 68, 173, 0.08);
+  border: 1px solid rgba(142, 68, 173, 0.2);
+  border-radius: 4px;
+  font-size: 0.8rem;
+}
+
+.motor-guard-label {
+  font-weight: 600;
+  font-size: 0.75rem;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.motor-guard-buffer-label {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  margin-left: 0.5rem;
+  white-space: nowrap;
+}
+
+.motor-guard-slider {
+  width: 80px;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--surface2);
+  border-radius: 2px;
+  outline: none;
+  flex-shrink: 0;
+}
+
+.motor-guard-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #8e44ad;
+  cursor: pointer;
+}
+
+.motor-guard-slider:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.motor-guard-slider:disabled::-webkit-slider-thumb {
+  background: var(--text-dim);
+  cursor: not-allowed;
+}
+
+.motor-guard-value {
+  font-family: monospace;
+  font-size: 0.75rem;
+  min-width: 20px;
+  text-align: right;
+  color: var(--text-dim);
+}
+
+/* Toggle switch */
+.toggle-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.toggle-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-track {
+  width: 32px;
+  height: 16px;
+  background: var(--surface2);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  position: relative;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.toggle-track::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 10px;
+  height: 10px;
+  background: var(--text-dim);
+  border-radius: 50%;
+  transition: transform 0.2s, background 0.2s;
+}
+
+.toggle-switch input:checked + .toggle-track {
+  background: rgba(142, 68, 173, 0.3);
+  border-color: #8e44ad;
+}
+
+.toggle-switch input:checked + .toggle-track::after {
+  transform: translateX(16px);
+  background: #8e44ad;
+}
+
 .btn-expand {
   padding: 0.2rem 0.5rem;
   font-size: 0.7rem;

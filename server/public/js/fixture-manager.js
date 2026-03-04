@@ -275,6 +275,34 @@ function dmxrFixtureManager() {
       }
     },
 
+    // Motor guard helpers
+    hasMotorChannels(fixture) {
+      var motorTypes = ["Pan", "Tilt", "Focus", "Zoom"];
+      return fixture.channels.some(function(ch) {
+        return motorTypes.indexOf(ch.type) !== -1;
+      });
+    },
+
+    async toggleMotorGuard(fixtureId, enabled) {
+      await this.patchFixture(fixtureId, { motorGuardEnabled: enabled });
+    },
+
+    setMotorGuardBuffer(fixtureId, value) {
+      var self = this;
+      var key = "mg:" + fixtureId;
+      if (self.overrideTimers[key]) {
+        clearTimeout(self.overrideTimers[key]);
+      }
+      var fixture = self.fixtures.find(function(f) { return f.id === fixtureId; });
+      if (fixture) {
+        fixture.motorGuardBuffer = parseInt(value, 10);
+      }
+      self.overrideTimers[key] = setTimeout(function() {
+        delete self.overrideTimers[key];
+        self.patchFixture(fixtureId, { motorGuardBuffer: parseInt(value, 10) });
+      }, 250);
+    },
+
     // Channel override methods
     toggleFixtureExpand(fixtureId) {
       this.expandedFixtureId = this.expandedFixtureId === fixtureId ? null : fixtureId;

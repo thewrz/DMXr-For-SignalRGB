@@ -363,4 +363,100 @@ describe("createUniverseManager", () => {
       expect(mgr.getDmxSendStatus().lastSendError).toBeNull();
     });
   });
+
+  describe("channel locking", () => {
+    it("lockChannels prevents applyFixtureUpdate from writing locked addresses", () => {
+      manager.lockChannels([1, 2]);
+      mock.updateCalls.length = 0;
+
+      const count = manager.applyFixtureUpdate({
+        fixture: "test",
+        channels: { "1": 255, "2": 128, "3": 64 },
+      });
+
+      // Only channel 3 should be written
+      expect(count).toBe(1);
+      expect(mock.updateCalls).toHaveLength(1);
+      expect(mock.updateCalls[0]).toEqual({ 3: 64 });
+    });
+
+    it("unlockChannels allows writes again", () => {
+      manager.lockChannels([1, 2]);
+      manager.unlockChannels([1, 2]);
+      mock.updateCalls.length = 0;
+
+      const count = manager.applyFixtureUpdate({
+        fixture: "test",
+        channels: { "1": 255, "2": 128 },
+      });
+
+      expect(count).toBe(2);
+      expect(mock.updateCalls[0]).toEqual({ 1: 255, 2: 128 });
+    });
+
+    it("blackout skips locked channels", () => {
+      // Set some values first
+      manager.applyFixtureUpdate({
+        fixture: "test",
+        channels: { "1": 255, "2": 128, "3": 64 },
+      });
+
+      // Lock channels 1 and 2
+      manager.lockChannels([1, 2]);
+      mock.updateCalls.length = 0;
+
+      manager.blackout();
+
+      // Should use selective update (not updateAll)
+      expect(mock.updateAllCalls).toHaveLength(0);
+      expect(mock.updateCalls).toHaveLength(1);
+
+      const update = mock.updateCalls[0];
+      // Locked channels preserved at their values
+      expect(update[1]).toBe(255);
+      expect(update[2]).toBe(128);
+      // Non-locked channels zeroed
+      expect(update[3]).toBe(0);
+      expect(update[100]).toBe(0);
+    });
+
+    it("whiteout skips locked channels", () => {
+      manager.applyFixtureUpdate({
+        fixture: "test",
+        channels: { "1": 100, "2": 50 },
+      });
+      manager.lockChannels([1, 2]);
+      mock.updateCalls.length = 0;
+
+      manager.whiteout();
+
+      expect(mock.updateAllCalls).toHaveLength(0);
+      expect(mock.updateCalls).toHaveLength(1);
+
+      const update = mock.updateCalls[0];
+      expect(update[1]).toBe(100);
+      expect(update[2]).toBe(50);
+      expect(update[3]).toBe(255);
+      expect(update[100]).toBe(255);
+    });
+
+    it("hasLockedChannels returns correct state", () => {
+      expect(manager.hasLockedChannels()).toBe(false);
+      manager.lockChannels([1]);
+      expect(manager.hasLockedChannels()).toBe(true);
+      manager.unlockChannels([1]);
+      expect(manager.hasLockedChannels()).toBe(false);
+    });
+
+    it("returns 0 when all channels are locked", () => {
+      manager.lockChannels([1, 2, 3]);
+
+      const count = manager.applyFixtureUpdate({
+        fixture: "test",
+        channels: { "1": 255, "2": 128, "3": 64 },
+      });
+
+      expect(count).toBe(0);
+    });
+  });
 });

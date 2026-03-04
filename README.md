@@ -1,6 +1,10 @@
-# DMXr
+<p align="center">
+  <img src="docs/images/DMXr-logo.svg" alt="DMXr" width="300">
+</p>
 
-Control your DMX lighting fixtures from [SignalRGB](https://signalrgb.com) — sync stage lights, PARs, moving heads, and strobes with your PC lighting effects.
+<p align="center">
+  Control your DMX lighting fixtures from <a href="https://signalrgb.com">SignalRGB</a> — sync stage lights, PARs, moving heads, and strobes with your PC lighting effects.
+</p>
 
 > Currently targets SignalRGB (Windows). [OpenRGB](https://openrgb.org) support for native Linux is planned.
 

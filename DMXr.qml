@@ -36,12 +36,10 @@ Item {
             spacing: 16
 
             // --- Header ---
-            Text {
-                text: "DMXr Configuration"
-                color: theme.primarytextcolor
-                font.family: "Poppins"
-                font.weight: Font.Bold
-                font.pixelSize: 22
+            Image {
+                source: "DMXr-logo.png"
+                width: 180
+                fillMode: Image.PreserveAspectFit
             }
 
             Text {

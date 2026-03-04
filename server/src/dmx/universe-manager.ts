@@ -1,5 +1,6 @@
 import type { DmxUniverse } from "./driver-factory.js";
 import type { ChannelMap, FixtureUpdatePayload } from "../types/protocol.js";
+import { pipeLog, shouldSample } from "../logging/pipeline-logger.js";
 
 const MIN_CHANNEL = 1;
 const MAX_CHANNEL = 512;
@@ -34,6 +35,10 @@ export interface UniverseManager {
   readonly getFullSnapshot: () => Record<number, number>;
   readonly applyRawUpdate: (channels: Record<number, number>) => void;
   readonly getDmxSendStatus: () => DmxSendStatus;
+  /** Register safe center positions for motor channels (Pan/Tilt/etc).
+   *  These are restored immediately after blackout/whiteout to prevent
+   *  motors from slamming to mechanical limits at DMX 0 or 255. */
+  readonly registerSafePositions: (channels: Record<number, number>) => void;
 }
 
 function clampValue(value: number): number {
@@ -69,6 +74,7 @@ export function createUniverseManager(
   options: UniverseManagerOptions = {},
 ): UniverseManager {
   const activeChannels = new Map<number, number>();
+  const safePositions = new Map<number, number>();
   const log = options.logger;
   let lastSendTime: number | null = null;
   let lastSendError: string | null = null;
@@ -92,12 +98,14 @@ export function createUniverseManager(
   return {
     applyFixtureUpdate(payload: FixtureUpdatePayload): number {
       if (blackoutActive) {
+        pipeLog("debug", `applyFixtureUpdate BLOCKED (blackout active) for "${payload.fixture}"`);
         return 0;
       }
 
       const dmxUpdate = buildDmxUpdate(payload.channels);
 
       if (dmxUpdate === null) {
+        pipeLog("warn", `applyFixtureUpdate: no valid channels for "${payload.fixture}"`);
         return 0;
       }
 
@@ -112,29 +120,91 @@ export function createUniverseManager(
 
       const channelCount = Object.keys(dmxUpdate).length;
       safeSend(`fixture-update ${channelCount}ch`, () => universe.update(dmxUpdate));
-      log?.info(`DMX update: ${channelCount} channels sent`);
+
+      if (shouldSample(`dmxUpdate:${payload.fixture}`)) {
+        const addrs = Object.keys(dmxUpdate).map(Number).sort((a, b) => a - b);
+        const snapshot = addrs.map((a) => `${a}:${dmxUpdate[a]}`).join(" ");
+        pipeLog(
+          "verbose",
+          `DMX UPDATE "${payload.fixture}": ${channelCount}ch → ${snapshot}`,
+        );
+      }
 
       return channelCount;
     },
 
     blackout(): void {
       blackoutActive = true;
-      safeSend("blackout", () => universe.updateAll(0));
+      const prevCount = activeChannels.size;
       activeChannels.clear();
-      log?.info("DMX blackout: all 512 channels → 0 (override active)");
+
+      if (safePositions.size > 0) {
+        // Selective blackout: zero everything EXCEPT motor channels in a
+        // single atomic update so pan/tilt values never change at all.
+        const selective: Record<number, number> = {};
+        for (let ch = MIN_CHANNEL; ch <= MAX_CHANNEL; ch++) {
+          if (safePositions.has(ch)) {
+            selective[ch] = safePositions.get(ch)!;
+            activeChannels.set(ch, safePositions.get(ch)!);
+          } else {
+            selective[ch] = 0;
+          }
+        }
+        safeSend(`blackout-selective ${MAX_CHANNEL}ch`, () => universe.update(selective));
+        const snapshot = [...safePositions.entries()]
+          .sort(([a], [b]) => a - b)
+          .map(([ch, val]) => `${ch}:${val}`)
+          .join(" ");
+        pipeLog("info",
+          `BLACKOUT: zeroed ${MAX_CHANNEL - safePositions.size} channels, ` +
+          `preserved ${safePositions.size} motor channels: ${snapshot}`,
+        );
+      } else {
+        safeSend("blackout", () => universe.updateAll(0));
+        pipeLog("info", `BLACKOUT: cleared ${prevCount} active channels → all 512 zeroed`);
+      }
+      log?.info("DMX blackout active");
     },
 
     whiteout(): void {
       blackoutActive = true;
-      safeSend("whiteout", () => universe.updateAll(MAX_VALUE));
-      for (let ch = MIN_CHANNEL; ch <= MAX_CHANNEL; ch++) {
-        activeChannels.set(ch, MAX_VALUE);
+      activeChannels.clear();
+
+      if (safePositions.size > 0) {
+        // Selective whiteout: set everything to 255 EXCEPT motor channels
+        // in a single atomic update so pan/tilt values never change at all.
+        const selective: Record<number, number> = {};
+        for (let ch = MIN_CHANNEL; ch <= MAX_CHANNEL; ch++) {
+          if (safePositions.has(ch)) {
+            selective[ch] = safePositions.get(ch)!;
+            activeChannels.set(ch, safePositions.get(ch)!);
+          } else {
+            selective[ch] = MAX_VALUE;
+            activeChannels.set(ch, MAX_VALUE);
+          }
+        }
+        safeSend(`whiteout-selective ${MAX_CHANNEL}ch`, () => universe.update(selective));
+        const snapshot = [...safePositions.entries()]
+          .sort(([a], [b]) => a - b)
+          .map(([ch, val]) => `${ch}:${val}`)
+          .join(" ");
+        pipeLog("info",
+          `WHITEOUT: set ${MAX_CHANNEL - safePositions.size} channels to 255, ` +
+          `preserved ${safePositions.size} motor channels: ${snapshot}`,
+        );
+      } else {
+        safeSend("whiteout", () => universe.updateAll(MAX_VALUE));
+        for (let ch = MIN_CHANNEL; ch <= MAX_CHANNEL; ch++) {
+          activeChannels.set(ch, MAX_VALUE);
+        }
+        pipeLog("info", "WHITEOUT: all 512 channels → 255");
       }
-      log?.info("DMX whiteout: all 512 channels → 255 (override active)");
+      log?.info("DMX whiteout active");
     },
 
     resumeNormal(): void {
       blackoutActive = false;
+      pipeLog("info", "RESUME: blackout cleared, normal updates enabled");
       log?.info("DMX override cleared: resuming normal updates");
     },
 
@@ -173,10 +243,29 @@ export function createUniverseManager(
       }
       const count = Object.keys(channels).length;
       safeSend(`raw-update ${count}ch`, () => universe.update(channels));
+      if (shouldSample("rawUpdate")) {
+        const addrs = Object.keys(channels).map(Number).sort((a, b) => a - b);
+        const snapshot = addrs.map((a) => `${a}:${channels[Number(a)]}`).join(" ");
+        pipeLog("verbose", `RAW UPDATE: ${count}ch → ${snapshot}`);
+      }
     },
 
     getDmxSendStatus(): DmxSendStatus {
       return { lastSendTime, lastSendError };
+    },
+
+    registerSafePositions(channels: Record<number, number>): void {
+      for (const [key, value] of Object.entries(channels)) {
+        const ch = parseInt(key, 10);
+        if (isValidChannel(ch)) {
+          safePositions.set(ch, clampValue(value));
+        }
+      }
+      const snapshot = [...safePositions.entries()]
+        .sort(([a], [b]) => a - b)
+        .map(([ch, val]) => `${ch}:${val}`)
+        .join(" ");
+      pipeLog("info", `Registered ${safePositions.size} motor safe positions: ${snapshot}`);
     },
   };
 }

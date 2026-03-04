@@ -3,6 +3,7 @@ import { buildServer } from "../server.js";
 import { createUniverseManager } from "../dmx/universe-manager.js";
 import { createMockUniverse, createTestConfig, createTestFixtureStore, createMockOflClient, createMockRegistry } from "../test-helpers.js";
 import type { FastifyInstance } from "fastify";
+import type { UdpColorServer } from "../udp/udp-color-server.js";
 
 describe("GET /health", () => {
   let app: FastifyInstance;
@@ -51,6 +52,66 @@ describe("GET /health", () => {
     expect(res.json().driver).toBe("enttec-usb-dmx-pro");
 
     await customApp.close();
+  });
+
+  it("includes serverId and serverName in response", async () => {
+    const manager = createUniverseManager(createMockUniverse());
+    const identityApp = await buildServer({
+      config: createTestConfig(),
+      manager,
+      driver: "null",
+      startTime: Date.now(),
+      fixtureStore: createTestFixtureStore(),
+      oflClient: createMockOflClient(),
+      registry: createMockRegistry(),
+      serverId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+      serverName: "Studio A",
+    });
+
+    const res = await identityApp.inject({ method: "GET", url: "/health" });
+    const body = res.json();
+    expect(body.serverId).toBe("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
+    expect(body.serverName).toBe("Studio A");
+
+    await identityApp.close();
+  });
+
+  it("omits serverId/serverName when not configured", async () => {
+    const res = await app.inject({ method: "GET", url: "/health" });
+    const body = res.json();
+    expect(body.serverId).toBeUndefined();
+    expect(body.serverName).toBeUndefined();
+  });
+
+  it("includes udpPort when UDP server is provided", async () => {
+    const mockUdpServer: UdpColorServer = {
+      start: async () => 8081,
+      close: async () => {},
+      getStats: () => ({ packetsReceived: 0, packetsProcessed: 0, parseErrors: 0, lastSequence: -1, sequenceGaps: 0 }),
+      getPort: () => 8081,
+    };
+
+    const manager = createUniverseManager(createMockUniverse());
+    const udpApp = await buildServer({
+      config: createTestConfig(),
+      manager,
+      driver: "null",
+      startTime: Date.now(),
+      fixtureStore: createTestFixtureStore(),
+      oflClient: createMockOflClient(),
+      registry: createMockRegistry(),
+      udpServer: mockUdpServer,
+    });
+
+    const res = await udpApp.inject({ method: "GET", url: "/health" });
+    expect(res.json().udpPort).toBe(8081);
+
+    await udpApp.close();
+  });
+
+  it("omits udpPort when UDP server is not provided", async () => {
+    const res = await app.inject({ method: "GET", url: "/health" });
+    expect(res.json().udpPort).toBeUndefined();
   });
 
   it("reports active channel count after updates", async () => {

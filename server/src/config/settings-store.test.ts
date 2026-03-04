@@ -24,37 +24,47 @@ describe("createSettingsStore", () => {
   });
 
   describe("load", () => {
-    it("returns defaults when file does not exist", async () => {
+    it("returns defaults with auto-generated serverId when file does not exist", async () => {
       const settings = await store.load();
+      const defaults = getDefaults();
 
-      expect(settings).toEqual(getDefaults());
+      expect(settings.dmxDriver).toBe(defaults.dmxDriver);
+      expect(settings.port).toBe(defaults.port);
+      expect(settings.host).toBe(defaults.host);
+      expect(settings.mdnsEnabled).toBe(defaults.mdnsEnabled);
+      expect(settings.setupCompleted).toBe(defaults.setupCompleted);
+      expect(settings.serverName).toBe("");
+      expect(settings.serverId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
     });
 
-    it("returns defaults when file contains invalid JSON", async () => {
+    it("returns defaults with auto-generated serverId when file contains invalid JSON", async () => {
       await mkdir(dirname(filePath), { recursive: true });
       await writeFile(filePath, "not-json", "utf-8");
 
       const settings = await store.load();
 
-      expect(settings).toEqual(getDefaults());
+      expect(settings.dmxDriver).toBe(getDefaults().dmxDriver);
+      expect(settings.serverId).toMatch(/^[0-9a-f]{8}-/);
     });
 
-    it("returns defaults when file contains non-object JSON", async () => {
+    it("returns defaults with auto-generated serverId when file contains non-object JSON", async () => {
       await mkdir(dirname(filePath), { recursive: true });
       await writeFile(filePath, '"just a string"', "utf-8");
 
       const settings = await store.load();
 
-      expect(settings).toEqual(getDefaults());
+      expect(settings.dmxDriver).toBe(getDefaults().dmxDriver);
+      expect(settings.serverId).toMatch(/^[0-9a-f]{8}-/);
     });
 
-    it("returns defaults when file contains invalid field types", async () => {
+    it("returns defaults with auto-generated serverId when file contains invalid field types", async () => {
       await mkdir(dirname(filePath), { recursive: true });
       await writeFile(filePath, JSON.stringify({ port: "not-a-number" }), "utf-8");
 
       const settings = await store.load();
 
-      expect(settings).toEqual(getDefaults());
+      expect(settings.dmxDriver).toBe(getDefaults().dmxDriver);
+      expect(settings.serverId).toMatch(/^[0-9a-f]{8}-/);
     });
 
     it("merges partial settings with defaults", async () => {
@@ -68,16 +78,19 @@ describe("createSettingsStore", () => {
       expect(settings.host).toBe("0.0.0.0");
       expect(settings.mdnsEnabled).toBe(true);
       expect(settings.setupCompleted).toBe(false);
+      expect(settings.serverId).toMatch(/^[0-9a-f]{8}-/);
     });
 
     it("loads fully saved settings", async () => {
-      const full: PersistedSettings = {
+      const full = {
         dmxDriver: "enttec-usb-dmx-pro",
         dmxDevicePath: "COM3",
         port: 9090,
         host: "192.168.1.100",
         mdnsEnabled: false,
         setupCompleted: true,
+        serverId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+        serverName: "Studio A",
       };
       await mkdir(dirname(filePath), { recursive: true });
       await writeFile(filePath, JSON.stringify(full), "utf-8");
@@ -85,6 +98,37 @@ describe("createSettingsStore", () => {
       const settings = await store.load();
 
       expect(settings).toEqual({ ...full, udpPort: 0 });
+    });
+
+    it("auto-generates serverId on first load and persists it", async () => {
+      const settings = await store.load();
+
+      expect(settings.serverId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+
+      // Verify it was persisted
+      const raw = await readFile(filePath, "utf-8");
+      const parsed = JSON.parse(raw);
+      expect(parsed.serverId).toBe(settings.serverId);
+    });
+
+    it("preserves existing serverId across reloads", async () => {
+      const existingId = "11111111-2222-3333-4444-555555555555";
+      await mkdir(dirname(filePath), { recursive: true });
+      await writeFile(filePath, JSON.stringify({ serverId: existingId }), "utf-8");
+
+      const settings = await store.load();
+
+      expect(settings.serverId).toBe(existingId);
+    });
+
+    it("generates stable serverId across reloads", async () => {
+      const first = await store.load();
+      const firstId = first.serverId;
+
+      const store2 = createSettingsStore(filePath);
+      const second = await store2.load();
+
+      expect(second.serverId).toBe(firstId);
     });
   });
 
@@ -160,5 +204,7 @@ describe("getDefaults", () => {
     expect(defaults.host).toBe("0.0.0.0");
     expect(defaults.mdnsEnabled).toBe(true);
     expect(defaults.setupCompleted).toBe(false);
+    expect(defaults.serverId).toBe("");
+    expect(defaults.serverName).toBe("");
   });
 });

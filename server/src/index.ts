@@ -19,6 +19,8 @@ import { createLibraryRegistry } from "./libraries/registry.js";
 import { buildServer } from "./server.js";
 import { createUdpColorServer } from "./udp/udp-color-server.js";
 import { createLatencyTracker } from "./metrics/latency-tracker.js";
+import { getFixtureDefaults } from "./fixtures/channel-mapper.js";
+import { setPipelineLogLevel, parsePipelineLogLevel, pipeLog } from "./logging/pipeline-logger.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -34,9 +36,15 @@ async function readServerVersion(): Promise<string> {
 }
 
 async function main() {
+  const pipelineLevel = parsePipelineLogLevel(process.env["PIPELINE_LOG"]);
+  setPipelineLogLevel(pipelineLevel);
+  pipeLog("info", `Pipeline logging initialized at level: ${pipelineLevel}`);
+
   const serverVersion = await readServerVersion();
   const settingsStore = createSettingsStore("./config/settings.json");
   const persistedSettings = await settingsStore.load();
+  // serverId is auto-generated on first load if missing
+  const { serverId, serverName } = persistedSettings;
   const config = loadConfig(persistedSettings);
   const startTime = Date.now();
 
@@ -99,7 +107,37 @@ async function main() {
   const fixtureStore = createFixtureStore(finalConfig.fixturesPath);
   await fixtureStore.load();
 
+  pipeLog("info", `Loaded ${fixtureStore.getAll().length} fixtures, initializing defaults...`);
+
+  // Register safe positions for motor channels (Pan/Tilt/Focus/Zoom etc.)
+  // These are restored after blackout/whiteout to prevent motors from
+  // slamming to mechanical limits at DMX 0 or 255.
+  const MOTOR_TYPES = new Set(["Pan", "Tilt", "Focus", "Zoom", "Gobo", "Iris", "Prism"]);
+  const motorSafePositions: Record<number, number> = {};
+  for (const fixture of fixtureStore.getAll()) {
+    const base = fixture.dmxStartAddress;
+    for (const ch of fixture.channels) {
+      if (MOTOR_TYPES.has(ch.type)) {
+        const addr = base + ch.offset;
+        const override = fixture.channelOverrides?.[ch.offset];
+        motorSafePositions[addr] = override?.enabled
+          ? override.value
+          : (ch.defaultValue > 0 ? ch.defaultValue : 128);
+      }
+    }
+  }
+  manager.registerSafePositions(motorSafePositions);
+
   manager.blackout();
+
+  // Initialize fixture defaults (sets pan/tilt center, strobe open, etc.)
+  manager.resumeNormal();
+  for (const fixture of fixtureStore.getAll()) {
+    const defaults = getFixtureDefaults(fixture);
+    const count = manager.applyFixtureUpdate({ fixture: fixture.id, channels: defaults });
+    pipeLog("info", `Startup defaults for "${fixture.name}": ${count} channels pushed to DMX`);
+  }
+  pipeLog("info", "Fixture defaults initialization complete");
 
   const oflClient = createOflClient();
   const { client: ssClient, status: ssStatus } = createSsClientIfConfigured(finalConfig.localDbPath);
@@ -128,6 +166,8 @@ async function main() {
     serverVersion,
     latencyTracker,
     udpServer,
+    serverId,
+    serverName,
   });
 
   let mdnsAdvertiser: MdnsAdvertiser | undefined;
@@ -180,7 +220,12 @@ async function main() {
   const boundUdpPort = await udpServer.start(udpPortTarget, finalConfig.host);
 
   if (finalConfig.mdnsEnabled) {
-    mdnsAdvertiser = createMdnsAdvertiser(boundPort, boundUdpPort);
+    mdnsAdvertiser = createMdnsAdvertiser({
+      port: boundPort,
+      udpPort: boundUdpPort,
+      serverId,
+      serverName,
+    });
   }
 
   // Startup banner
@@ -189,12 +234,15 @@ async function main() {
       ? finalConfig.dmxDevicePath
       : `${finalConfig.dmxDevicePath} (auto-detected)`;
 
+  const serverLabel = serverName || "DMXr-" + serverId.slice(0, 8);
+
   process.stdout.write(
     "\n" +
     "  ╔══════════════════════════════════════╗\n" +
     `  ║  DMXr Server v${serverVersion.padEnd(22)}║\n` +
     "  ╚══════════════════════════════════════╝\n" +
     "\n" +
+    `  Server ID:   ${serverId.slice(0, 8)} (${serverLabel})\n` +
     `  HTTP Port:   ${boundPort}\n` +
     `  UDP Port:    ${boundUdpPort}\n` +
     `  DMX Driver:  ${finalConfig.dmxDriver}\n` +

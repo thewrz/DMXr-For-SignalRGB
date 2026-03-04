@@ -101,6 +101,35 @@ export async function createDmxConnection(
     };
   }
 
+  if (config.dmxDriver === "enttec-open-usb-dmx") {
+    const { EnttecOpenUSBDMXDriver } = (await import(
+      "dmx-ts/dist/src/drivers/enttec-open-usb-dmx.js"
+    )) as unknown as {
+      EnttecOpenUSBDMXDriver: new (port: string, options?: object) => SerialDriver;
+    };
+    const driver = new EnttecOpenUSBDMXDriver(config.dmxDevicePath);
+    await dmx.addUniverse(UNIVERSE_NAME, driver);
+
+    return {
+      universe: {
+        update: (channels) => dmx.update(UNIVERSE_NAME, channels),
+        updateAll: (value) => dmx.updateAll(UNIVERSE_NAME, value),
+      },
+      driver: config.dmxDriver,
+      close: () => flushAndClose(dmx, driver),
+      onDisconnect: (callback) => {
+        driver.serialPort.on("close", (err?: Error) => {
+          const disconnected =
+            err !== undefined &&
+            (err as unknown as Record<string, unknown>)["disconnected"] === true;
+          if (disconnected) {
+            callback(err);
+          }
+        });
+      },
+    };
+  }
+
   if (config.dmxDriver === "null") {
     const { NullDriver } = (await import(
       "dmx-ts/dist/src/drivers/null.js"

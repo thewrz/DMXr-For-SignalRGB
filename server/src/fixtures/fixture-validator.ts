@@ -51,6 +51,12 @@ export function validateFixtureChannels(
     if (!KNOWN_CHANNEL_TYPES.has(ch.type)) {
       warnings.push(`Unknown channel type "${ch.type}" on channel "${ch.name}"`);
     }
+    if (ch.rangeMin !== undefined && (ch.rangeMin < 0 || ch.rangeMin > 255)) {
+      warnings.push(`Channel "${ch.name}" has rangeMin ${ch.rangeMin} outside 0-255`);
+    }
+    if (ch.rangeMax !== undefined && (ch.rangeMax < 0 || ch.rangeMax > 255)) {
+      warnings.push(`Channel "${ch.name}" has rangeMax ${ch.rangeMax} outside 0-255`);
+    }
   }
 
   return {

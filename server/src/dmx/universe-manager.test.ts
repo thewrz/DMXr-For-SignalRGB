@@ -186,6 +186,53 @@ describe("createUniverseManager", () => {
     });
   });
 
+  describe("registerSafePositions", () => {
+    it("preserves motor channels during blackout (no updateAll)", () => {
+      manager.registerSafePositions({ 54: 128, 56: 128 });
+      manager.blackout();
+
+      // updateAll should NOT be called — selective update used instead
+      expect(mock.updateAllCalls).toHaveLength(0);
+      // A single selective update covers all 512 channels
+      expect(mock.updateCalls).toHaveLength(1);
+      const update = mock.updateCalls[0];
+      // Motor channels preserved at safe values
+      expect(update[54]).toBe(128);
+      expect(update[56]).toBe(128);
+      // Non-motor channels zeroed
+      expect(update[1]).toBe(0);
+      expect(update[100]).toBe(0);
+      expect(update[512]).toBe(0);
+    });
+
+    it("preserves motor channels during whiteout (no updateAll)", () => {
+      manager.registerSafePositions({ 54: 128, 56: 128 });
+      manager.whiteout();
+
+      // updateAll should NOT be called — selective update used instead
+      expect(mock.updateAllCalls).toHaveLength(0);
+      expect(mock.updateCalls).toHaveLength(1);
+      const update = mock.updateCalls[0];
+      // Motor channels preserved at safe values
+      expect(update[54]).toBe(128);
+      expect(update[56]).toBe(128);
+      // Non-motor channels set to 255
+      expect(update[1]).toBe(255);
+      expect(update[100]).toBe(255);
+      expect(update[512]).toBe(255);
+    });
+
+    it("tracks safe position channels as active after blackout", () => {
+      manager.registerSafePositions({ 54: 128, 56: 128 });
+      manager.applyFixtureUpdate({ fixture: "t", channels: { "1": 255, "54": 100, "56": 100 } });
+      expect(manager.getActiveChannelCount()).toBe(3);
+
+      manager.blackout();
+      // Only the 2 safe positions remain active
+      expect(manager.getActiveChannelCount()).toBe(2);
+    });
+  });
+
   describe("whiteout", () => {
     it("drops color updates while whiteout is active", () => {
       manager.whiteout();

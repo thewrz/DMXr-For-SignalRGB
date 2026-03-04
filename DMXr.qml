@@ -1,20 +1,17 @@
 Item {
     anchors.fill: parent
 
+    // Manual fallback config (kept for when mDNS doesn't work)
     property string serverHost: service.getSetting("DMXr", "serverHost") || "127.0.0.1"
     property string serverPort: service.getSetting("DMXr", "serverPort") || "8080"
-    property string connectionStatus: "disconnected"
-    property var fixtureList: []
 
-    // Hardware status from /health
-    property string dmxDriver: ""
-    property string dmxDevicePath: ""
-    property string dmxConnectionState: ""
-    property string dmxLastError: ""
-    property string dmxLastErrorTitle: ""
-    property string dmxLastErrorSuggestion: ""
-    property int dmxReconnectAttempts: 0
-    property string serverVersion: ""
+    // Multi-server state
+    property var serverList: []              // Array of server objects from registry
+    property int discoveredServerCount: 0
+    property var healthData: ({})            // healthData[serverId] = { health, fixtures }
+
+    // Manual connection test state
+    property string manualTestStatus: ""     // "", "connected", "error"
 
     Flickable {
         anchors.fill: parent
@@ -48,7 +45,7 @@ Item {
             }
 
             Text {
-                text: "Connect to your DMXr server to sync DMX fixtures with SignalRGB."
+                text: "DMX lighting fixtures synced with SignalRGB via DMXr servers."
                 color: theme.primarytextcolor
                 font.family: "Poppins"
                 font.pixelSize: 13
@@ -64,13 +61,401 @@ Item {
                 color: "#444444"
             }
 
-            // --- Server Connection ---
+            // --- Servers Section Header ---
             Text {
-                text: "Server Connection"
+                text: "Servers"
                 color: theme.primarytextcolor
                 font.family: "Poppins"
                 font.weight: Font.Bold
                 font.pixelSize: 16
+            }
+
+            Text {
+                text: discoveredServerCount > 0
+                    ? discoveredServerCount + " server" + (discoveredServerCount !== 1 ? "s" : "") + " discovered"
+                    : "No servers discovered yet"
+                color: discoveredServerCount > 0 ? "#88ff88" : theme.primarytextcolor
+                font.family: "Poppins"
+                font.pixelSize: 12
+                opacity: discoveredServerCount > 0 ? 0.8 : 0.5
+            }
+
+            // --- Server Cards ---
+            Repeater {
+                model: serverList
+
+                Rectangle {
+                    id: serverCard
+                    width: mainColumn.width - 40
+                    height: serverCardColumn.height + 20
+                    radius: 4
+                    color: "#1a1a24"
+                    border.color: getServerBorderColor(modelData)
+                    border.width: 2
+
+                    // Left accent bar
+                    Rectangle {
+                        x: 0
+                        y: 0
+                        width: 4
+                        height: parent.height
+                        radius: 2
+                        color: getServerBorderColor(modelData)
+                    }
+
+                    Column {
+                        id: serverCardColumn
+                        x: 16
+                        y: 10
+                        width: parent.width - 32
+                        spacing: 8
+
+                        // Server name + status dot + host:port
+                        Row {
+                            spacing: 8
+                            width: parent.width
+
+                            Rectangle {
+                                width: 10
+                                height: 10
+                                radius: width / 2
+                                anchors.verticalCenter: parent.verticalCenter
+                                color: getServerBorderColor(modelData)
+                            }
+
+                            Text {
+                                text: getServerDisplayName(modelData)
+                                color: theme.primarytextcolor
+                                font.family: "Poppins"
+                                font.weight: Font.Bold
+                                font.pixelSize: 14
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
+
+                            Text {
+                                text: modelData.host + ":" + modelData.port
+                                color: theme.primarytextcolor
+                                font.family: "Poppins"
+                                font.pixelSize: 12
+                                opacity: 0.5
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
+                        }
+
+                        // DMX hardware status line
+                        Text {
+                            text: getDmxStatusText(modelData)
+                            color: getDmxStatusColor(modelData)
+                            font.family: "Poppins"
+                            font.pixelSize: 12
+                            width: parent.width
+                            wrapMode: Text.WordWrap
+                        }
+
+                        // Fixture count + version
+                        Row {
+                            spacing: 16
+
+                            Text {
+                                text: getFixtureCountText(modelData)
+                                color: theme.primarytextcolor
+                                font.family: "Poppins"
+                                font.pixelSize: 12
+                                opacity: 0.6
+                            }
+
+                            Text {
+                                visible: getServerVersion(modelData) !== ""
+                                text: "v" + getServerVersion(modelData)
+                                color: theme.primarytextcolor
+                                font.family: "Poppins"
+                                font.pixelSize: 12
+                                opacity: 0.4
+                            }
+                        }
+
+                        // Reconnect attempts (if reconnecting)
+                        Text {
+                            visible: getReconnectAttempts(modelData) > 0
+                            text: "Reconnect attempt " + getReconnectAttempts(modelData) + "..."
+                            color: "#ffd060"
+                            font.family: "Poppins"
+                            font.pixelSize: 11
+                            opacity: 0.7
+                        }
+
+                        // Error details (if disconnected/reconnecting)
+                        Text {
+                            visible: getErrorSuggestion(modelData) !== ""
+                            text: getErrorSuggestion(modelData)
+                            color: theme.primarytextcolor
+                            font.family: "Poppins"
+                            font.pixelSize: 11
+                            opacity: 0.6
+                            width: parent.width
+                            wrapMode: Text.WordWrap
+                        }
+
+                        // Open Web Manager button
+                        Row {
+                            spacing: 8
+
+                            Item {
+                                visible: modelData.healthy !== false
+                                width: 140
+                                height: 26
+
+                                Rectangle {
+                                    anchors.fill: parent
+                                    color: "#6a3d9a"
+                                    radius: 2
+                                }
+
+                                ToolButton {
+                                    width: parent.width
+                                    height: parent.height
+                                    font.family: "Poppins"
+                                    font.bold: true
+                                    font.pixelSize: 11
+                                    text: "Open Web Manager"
+
+                                    onClicked: {
+                                        Qt.openUrlExternally("http://" + modelData.host + ":" + modelData.port);
+                                    }
+
+                                    contentItem: Text {
+                                        text: parent.text
+                                        color: "#ffffff"
+                                        font: parent.font
+                                        horizontalAlignment: Text.AlignHCenter
+                                        verticalAlignment: Text.AlignVCenter
+                                    }
+
+                                    background: Item {}
+                                }
+                            }
+                        }
+
+                        // --- Nested Fixture Cards ---
+                        Repeater {
+                            model: getServerFixtures(modelData)
+
+                            Rectangle {
+                                width: serverCardColumn.width
+                                height: fixtureCardContent.height + 14
+                                radius: 3
+                                color: "#141e2a"
+                                border.color: "#1e2e3e"
+                                border.width: 1
+
+                                Column {
+                                    id: fixtureCardContent
+                                    x: 12
+                                    y: 7
+                                    spacing: 2
+
+                                    Text {
+                                        text: modelData.name || "Unknown"
+                                        color: theme.primarytextcolor
+                                        font.family: "Poppins"
+                                        font.weight: Font.Bold
+                                        font.pixelSize: 12
+                                    }
+
+                                    Row {
+                                        spacing: 12
+
+                                        Text {
+                                            text: "DMX " + (modelData.dmxStartAddress || "?")
+                                            color: theme.primarytextcolor
+                                            font.family: "Poppins"
+                                            font.pixelSize: 11
+                                            opacity: 0.5
+                                        }
+
+                                        Text {
+                                            text: (modelData.channelCount || "?") + " ch"
+                                            color: theme.primarytextcolor
+                                            font.family: "Poppins"
+                                            font.pixelSize: 11
+                                            opacity: 0.5
+                                        }
+
+                                        Text {
+                                            text: modelData.manufacturer || ""
+                                            color: theme.primarytextcolor
+                                            font.family: "Poppins"
+                                            font.pixelSize: 11
+                                            opacity: 0.5
+                                            visible: text !== ""
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // --- No Servers Found Guide ---
+            Column {
+                visible: discoveredServerCount === 0
+                width: parent.width - 40
+                spacing: 10
+
+                Rectangle {
+                    width: parent.width
+                    height: noServersContent.height + 24
+                    radius: 4
+                    color: "#1a1a2a"
+                    border.color: "#4060a0"
+                    border.width: 1
+
+                    Column {
+                        id: noServersContent
+                        x: 16
+                        y: 12
+                        width: parent.width - 32
+                        spacing: 8
+
+                        Text {
+                            text: "Getting Started with DMXr"
+                            color: "#8888ff"
+                            font.family: "Poppins"
+                            font.weight: Font.Bold
+                            font.pixelSize: 14
+                        }
+
+                        Text {
+                            text: "No DMXr servers were discovered on your network. Servers are found automatically via mDNS, or you can add one manually below."
+                            color: theme.primarytextcolor
+                            font.family: "Poppins"
+                            font.pixelSize: 12
+                            opacity: 0.8
+                            width: parent.width
+                            wrapMode: Text.WordWrap
+                        }
+
+                        Text {
+                            text: "1. Download DMXr Server from the latest release"
+                            color: theme.primarytextcolor
+                            font.family: "Poppins"
+                            font.pixelSize: 12
+                            opacity: 0.8
+                            width: parent.width
+                            wrapMode: Text.WordWrap
+                        }
+
+                        Row {
+                            spacing: 12
+
+                            Item {
+                                width: 170
+                                height: 28
+
+                                Rectangle {
+                                    anchors.fill: parent
+                                    color: "#009000"
+                                    radius: 2
+                                }
+
+                                ToolButton {
+                                    width: parent.width
+                                    height: parent.height
+                                    font.family: "Poppins"
+                                    font.bold: true
+                                    font.pixelSize: 11
+                                    text: "Download DMXr Server"
+
+                                    onClicked: {
+                                        Qt.openUrlExternally("https://github.com/thewrz/DMXr/releases/latest");
+                                    }
+
+                                    contentItem: Text {
+                                        text: parent.text
+                                        color: "#ffffff"
+                                        font: parent.font
+                                        horizontalAlignment: Text.AlignHCenter
+                                        verticalAlignment: Text.AlignVCenter
+                                    }
+
+                                    background: Item {}
+                                }
+                            }
+                        }
+
+                        Text {
+                            text: "2. Extract the zip and double-click DMXr-Server.bat"
+                            color: theme.primarytextcolor
+                            font.family: "Poppins"
+                            font.pixelSize: 12
+                            opacity: 0.8
+                            width: parent.width
+                            wrapMode: Text.WordWrap
+                        }
+
+                        Text {
+                            text: "3. The server should appear here automatically.\n    If not, use Manual Server Connection below."
+                            color: theme.primarytextcolor
+                            font.family: "Poppins"
+                            font.pixelSize: 12
+                            opacity: 0.8
+                            width: parent.width
+                            wrapMode: Text.WordWrap
+                        }
+
+                        Rectangle {
+                            width: parent.width
+                            height: 1
+                            color: "#444444"
+                        }
+
+                        Text {
+                            text: "Troubleshooting"
+                            color: theme.primarytextcolor
+                            font.family: "Poppins"
+                            font.weight: Font.Bold
+                            font.pixelSize: 12
+                            opacity: 0.7
+                        }
+
+                        Text {
+                            text: "- Windows: install Bonjour (Apple) or iTunes for mDNS support\n- Firewall: allow UDP port 5353 (mDNS) and TCP port 8080\n- Different subnet? Use Manual Server Connection below"
+                            color: theme.primarytextcolor
+                            font.family: "Poppins"
+                            font.pixelSize: 11
+                            opacity: 0.6
+                            width: parent.width
+                            wrapMode: Text.WordWrap
+                        }
+                    }
+                }
+            }
+
+            // --- Divider ---
+            Rectangle {
+                width: parent.width - 40
+                height: 1
+                color: "#444444"
+            }
+
+            // --- Manual Server Connection (fallback) ---
+            Text {
+                text: "Manual Server Connection"
+                color: theme.primarytextcolor
+                font.family: "Poppins"
+                font.weight: Font.Bold
+                font.pixelSize: 16
+            }
+
+            Text {
+                text: "Use this if mDNS discovery doesn't find your server (e.g. different subnet, VM, no Bonjour)."
+                color: theme.primarytextcolor
+                font.family: "Poppins"
+                font.pixelSize: 12
+                opacity: 0.5
+                width: parent.width - 40
+                wrapMode: Text.WordWrap
             }
 
             Row {
@@ -194,33 +579,11 @@ Item {
                 }
             }
 
-            // --- Connection Status + Buttons ---
+            // Test Connection button + status
             Row {
                 spacing: 12
                 height: 32
 
-                // Status indicator
-                Rectangle {
-                    width: 12
-                    height: 12
-                    radius: width / 2
-                    anchors.verticalCenter: parent.verticalCenter
-                    color: connectionStatus === "connected" ? "#209e20"
-                         : connectionStatus === "error" ? "#c03030"
-                         : "#606060"
-                }
-
-                Text {
-                    text: connectionStatus === "connected" ? "Connected"
-                        : connectionStatus === "error" ? "Connection Error"
-                        : "Disconnected"
-                    color: theme.primarytextcolor
-                    font.family: "Poppins"
-                    font.pixelSize: 13
-                    anchors.verticalCenter: parent.verticalCenter
-                }
-
-                // Test Connection button
                 Item {
                     width: 130
                     height: 30
@@ -241,7 +604,7 @@ Item {
                         text: "Test Connection"
 
                         onClicked: {
-                            testConnection();
+                            testManualConnection();
                         }
 
                         contentItem: Text {
@@ -256,577 +619,243 @@ Item {
                     }
                 }
 
-                // Refresh Fixtures button
-                Item {
-                    width: 130
-                    height: 30
-
-                    Rectangle {
-                        anchors.fill: parent
-                        color: "#305080"
-                        radius: 2
-                    }
-
-                    ToolButton {
-                        width: parent.width
-                        height: parent.height
-                        anchors.verticalCenter: parent.verticalCenter
-                        font.family: "Poppins"
-                        font.bold: true
-                        font.pixelSize: 12
-                        text: "Refresh Fixtures"
-
-                        onClicked: {
-                            fetchFixtures();
-                        }
-
-                        contentItem: Text {
-                            text: parent.text
-                            color: "#ffffff"
-                            font: parent.font
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
-                        }
-
-                        background: Item {}
-                    }
-                }
-
-                // Open Web Manager button
-                Item {
-                    visible: connectionStatus === "connected"
-                    width: 150
-                    height: 30
-
-                    Rectangle {
-                        anchors.fill: parent
-                        color: "#6a3d9a"
-                        radius: 2
-                    }
-
-                    ToolButton {
-                        width: parent.width
-                        height: parent.height
-                        anchors.verticalCenter: parent.verticalCenter
-                        font.family: "Poppins"
-                        font.bold: true
-                        font.pixelSize: 12
-                        text: "Open Web Manager"
-
-                        onClicked: {
-                            Qt.openUrlExternally(getBaseUrl());
-                        }
-
-                        contentItem: Text {
-                            text: parent.text
-                            color: "#ffffff"
-                            font: parent.font
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
-                        }
-
-                        background: Item {}
-                    }
-                }
-            }
-
-            // --- DMX Hardware Status (visible when connected to server) ---
-
-            // DMX connected — green card
-            Column {
-                visible: connectionStatus === "connected" && dmxConnectionState === "connected"
-                width: parent.width - 40
-                spacing: 0
-
                 Rectangle {
-                    width: parent.width
-                    height: dmxConnectedContent.height + 20
-                    radius: 4
-                    color: "#1a2a1a"
-                    border.color: "#209e20"
-                    border.width: 1
-
-                    Column {
-                        id: dmxConnectedContent
-                        x: 16
-                        y: 10
-                        width: parent.width - 32
-                        spacing: 4
-
-                        Text {
-                            text: "DMX Hardware: " + (dmxDriver === "enttec-usb-dmx-pro" ? "ENTTEC USB DMX Pro" : dmxDriver) + " on " + dmxDevicePath + " — Connected"
-                            color: "#88ff88"
-                            font.family: "Poppins"
-                            font.weight: Font.Bold
-                            font.pixelSize: 13
-                            width: parent.width
-                            wrapMode: Text.WordWrap
-                        }
-                    }
+                    visible: manualTestStatus !== ""
+                    width: 10
+                    height: 10
+                    radius: width / 2
+                    anchors.verticalCenter: parent.verticalCenter
+                    color: manualTestStatus === "connected" ? "#209e20"
+                         : manualTestStatus === "error" ? "#c03030"
+                         : "#606060"
                 }
-            }
 
-            // DMX disconnected/reconnecting but server is connected — amber card
-            Column {
-                visible: connectionStatus === "connected" && dmxDriver !== "null" && (dmxConnectionState === "disconnected" || dmxConnectionState === "reconnecting")
-                width: parent.width - 40
-                spacing: 0
-
-                Rectangle {
-                    width: parent.width
-                    height: dmxWarnContent.height + 24
-                    radius: 4
-                    color: "#2a2a1a"
-                    border.color: "#d4a020"
-                    border.width: 1
-
-                    Column {
-                        id: dmxWarnContent
-                        x: 16
-                        y: 12
-                        width: parent.width - 32
-                        spacing: 8
-
-                        Text {
-                            text: dmxLastErrorTitle || "DMX adapter is not connected"
-                            color: "#ffd060"
-                            font.family: "Poppins"
-                            font.weight: Font.Bold
-                            font.pixelSize: 14
-                        }
-
-                        Text {
-                            text: dmxLastErrorSuggestion || "The server is running but can't reach your DMX hardware.\n1. Check the USB cable to your DMX adapter\n2. Open the Web Manager to verify the COM port\n3. Make sure no other software is using the adapter"
-                            color: theme.primarytextcolor
-                            font.family: "Poppins"
-                            font.pixelSize: 12
-                            opacity: 0.8
-                            width: parent.width
-                            wrapMode: Text.WordWrap
-                        }
-
-                        Text {
-                            visible: dmxReconnectAttempts > 0
-                            text: "Reconnect attempt " + dmxReconnectAttempts + "..."
-                            color: theme.primarytextcolor
-                            font.family: "Poppins"
-                            font.pixelSize: 11
-                            opacity: 0.6
-                        }
-
-                        Item {
-                            width: 150
-                            height: 28
-
-                            Rectangle {
-                                anchors.fill: parent
-                                color: "#6a3d9a"
-                                radius: 2
-                            }
-
-                            ToolButton {
-                                width: parent.width
-                                height: parent.height
-                                font.family: "Poppins"
-                                font.bold: true
-                                font.pixelSize: 11
-                                text: "Open Web Manager"
-
-                                onClicked: {
-                                    Qt.openUrlExternally(getBaseUrl());
-                                }
-
-                                contentItem: Text {
-                                    text: parent.text
-                                    color: "#ffffff"
-                                    font: parent.font
-                                    horizontalAlignment: Text.AlignHCenter
-                                    verticalAlignment: Text.AlignVCenter
-                                }
-
-                                background: Item {}
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Null driver — info card
-            Column {
-                visible: connectionStatus === "connected" && dmxDriver === "null"
-                width: parent.width - 40
-                spacing: 0
-
-                Rectangle {
-                    width: parent.width
-                    height: dmxNullContent.height + 24
-                    radius: 4
-                    color: "#1a1a2a"
-                    border.color: "#4060a0"
-                    border.width: 1
-
-                    Column {
-                        id: dmxNullContent
-                        x: 16
-                        y: 12
-                        width: parent.width - 32
-                        spacing: 8
-
-                        Text {
-                            text: "No DMX driver configured"
-                            color: "#8888ff"
-                            font.family: "Poppins"
-                            font.weight: Font.Bold
-                            font.pixelSize: 14
-                        }
-
-                        Text {
-                            text: "The server is running in test mode (no DMX output).\nOpen the Web Manager to configure your DMX adapter."
-                            color: theme.primarytextcolor
-                            font.family: "Poppins"
-                            font.pixelSize: 12
-                            opacity: 0.8
-                            width: parent.width
-                            wrapMode: Text.WordWrap
-                        }
-
-                        Item {
-                            width: 150
-                            height: 28
-
-                            Rectangle {
-                                anchors.fill: parent
-                                color: "#6a3d9a"
-                                radius: 2
-                            }
-
-                            ToolButton {
-                                width: parent.width
-                                height: parent.height
-                                font.family: "Poppins"
-                                font.bold: true
-                                font.pixelSize: 11
-                                text: "Open Web Manager"
-
-                                onClicked: {
-                                    Qt.openUrlExternally(getBaseUrl());
-                                }
-
-                                contentItem: Text {
-                                    text: parent.text
-                                    color: "#ffffff"
-                                    font: parent.font
-                                    horizontalAlignment: Text.AlignHCenter
-                                    verticalAlignment: Text.AlignVCenter
-                                }
-
-                                background: Item {}
-                            }
-                        }
-                    }
-                }
-            }
-
-            // --- Server Setup Guide (visible when connection fails) ---
-            Column {
-                visible: connectionStatus === "error"
-                width: parent.width - 40
-                spacing: 10
-
-                Rectangle {
-                    width: parent.width
-                    height: setupGuideContent.height + 24
-                    radius: 4
-                    color: "#2a1a1a"
-                    border.color: "#c03030"
-                    border.width: 1
-
-                    Column {
-                        id: setupGuideContent
-                        x: 16
-                        y: 12
-                        width: parent.width - 32
-                        spacing: 8
-
-                        Text {
-                            text: "DMXr Server Setup"
-                            color: "#ff8888"
-                            font.family: "Poppins"
-                            font.weight: Font.Bold
-                            font.pixelSize: 14
-                        }
-
-                        Text {
-                            text: "1. Download DMXr Server from the latest release"
-                            color: theme.primarytextcolor
-                            font.family: "Poppins"
-                            font.pixelSize: 12
-                            opacity: 0.8
-                            width: parent.width
-                            wrapMode: Text.WordWrap
-                        }
-
-                        Row {
-                            spacing: 12
-
-                            Item {
-                                width: 170
-                                height: 28
-
-                                Rectangle {
-                                    anchors.fill: parent
-                                    color: "#009000"
-                                    radius: 2
-                                }
-
-                                ToolButton {
-                                    width: parent.width
-                                    height: parent.height
-                                    font.family: "Poppins"
-                                    font.bold: true
-                                    font.pixelSize: 11
-                                    text: "Download DMXr Server"
-
-                                    onClicked: {
-                                        Qt.openUrlExternally("https://github.com/thewrz/DMXr/releases/latest");
-                                    }
-
-                                    contentItem: Text {
-                                        text: parent.text
-                                        color: "#ffffff"
-                                        font: parent.font
-                                        horizontalAlignment: Text.AlignHCenter
-                                        verticalAlignment: Text.AlignVCenter
-                                    }
-
-                                    background: Item {}
-                                }
-                            }
-                        }
-
-                        Text {
-                            text: "2. Extract the zip to any folder (e.g. Desktop)"
-                            color: theme.primarytextcolor
-                            font.family: "Poppins"
-                            font.pixelSize: 12
-                            opacity: 0.8
-                            width: parent.width
-                            wrapMode: Text.WordWrap
-                        }
-
-                        Text {
-                            text: "3. Double-click DMXr-Server.bat\n    A console window will open. Keep it running."
-                            color: theme.primarytextcolor
-                            font.family: "Poppins"
-                            font.pixelSize: 12
-                            opacity: 0.8
-                            width: parent.width
-                            wrapMode: Text.WordWrap
-                        }
-
-                        Text {
-                            text: '4. Click "Test Connection" above'
-                            color: theme.primarytextcolor
-                            font.family: "Poppins"
-                            font.pixelSize: 12
-                            opacity: 0.8
-                            width: parent.width
-                            wrapMode: Text.WordWrap
-                        }
-
-                        Rectangle {
-                            width: parent.width
-                            height: 1
-                            color: "#444444"
-                        }
-
-                        Text {
-                            text: "Troubleshooting"
-                            color: theme.primarytextcolor
-                            font.family: "Poppins"
-                            font.weight: Font.Bold
-                            font.pixelSize: 12
-                            opacity: 0.7
-                        }
-
-                        Text {
-                            text: "- Server on a different PC? Enter its IP in the Host field\n- Windows Firewall prompt? Click \"Allow access\"\n- Changed the port? Update it in the Port field (default: 8080)"
-                            color: theme.primarytextcolor
-                            font.family: "Poppins"
-                            font.pixelSize: 11
-                            opacity: 0.6
-                            width: parent.width
-                            wrapMode: Text.WordWrap
-                        }
-                    }
-                }
-            }
-
-            // --- Divider ---
-            Rectangle {
-                width: parent.width - 40
-                height: 1
-                color: "#444444"
-            }
-
-            // --- Fixtures Section ---
-            Text {
-                text: "Fixtures"
-                color: theme.primarytextcolor
-                font.family: "Poppins"
-                font.weight: Font.Bold
-                font.pixelSize: 16
-            }
-
-            Text {
-                text: fixtureList.length === 0
-                    ? "No fixtures found. Add fixtures via the web UI at http://" + serverHost + ":" + serverPort
-                    : fixtureList.length + " fixture" + (fixtureList.length !== 1 ? "s" : "") + " configured"
-                color: theme.primarytextcolor
-                font.family: "Poppins"
-                font.pixelSize: 13
-                opacity: 0.7
-                width: parent.width - 40
-                wrapMode: Text.WordWrap
-            }
-
-            // Fixture cards
-            Repeater {
-                model: fixtureList
-
-                Rectangle {
-                    width: mainColumn.width - 40
-                    height: fixtureContent.height + 20
-                    radius: 4
-                    color: "#1a2633"
-                    border.color: "#2a3a4a"
-                    border.width: 1
-
-                    Column {
-                        id: fixtureContent
-                        x: 16
-                        y: 10
-                        spacing: 4
-
-                        Text {
-                            text: modelData.name || "Unknown"
-                            color: theme.primarytextcolor
-                            font.family: "Poppins"
-                            font.weight: Font.Bold
-                            font.pixelSize: 14
-                        }
-
-                        Row {
-                            spacing: 16
-
-                            Text {
-                                text: "DMX " + (modelData.startAddress || "?")
-                                color: theme.primarytextcolor
-                                font.family: "Poppins"
-                                font.pixelSize: 12
-                                opacity: 0.6
-                            }
-
-                            Text {
-                                text: (modelData.channelCount || "?") + " ch"
-                                color: theme.primarytextcolor
-                                font.family: "Poppins"
-                                font.pixelSize: 12
-                                opacity: 0.6
-                            }
-
-                            Text {
-                                text: modelData.manufacturer || ""
-                                color: theme.primarytextcolor
-                                font.family: "Poppins"
-                                font.pixelSize: 12
-                                opacity: 0.6
-                                visible: text !== ""
-                            }
-                        }
-                    }
+                Text {
+                    visible: manualTestStatus !== ""
+                    text: manualTestStatus === "connected" ? "Reachable — will appear in server list"
+                        : manualTestStatus === "error" ? "Connection failed"
+                        : ""
+                    color: theme.primarytextcolor
+                    font.family: "Poppins"
+                    font.pixelSize: 12
+                    anchors.verticalCenter: parent.verticalCenter
+                    opacity: 0.7
                 }
             }
         }
     }
 
-    // --- Auto-poll status when connected ---
+    // --- Poll timer: refresh server registry + health every 3s ---
     Timer {
-        interval: 5000
+        interval: 3000
         repeat: true
-        running: connectionStatus === "connected"
-        onTriggered: testConnection()
-    }
-
-    // --- HTTP Helpers ---
-
-    function getBaseUrl() {
-        return "http://" + serverHost + ":" + serverPort;
-    }
-
-    function testConnection() {
-        var previousStatus = connectionStatus;
-
-        try {
-            var xhr = new XMLHttpRequest();
-            xhr.open("GET", getBaseUrl() + "/health", false);
-            xhr.send();
-
-            if (xhr.status === 200) {
-                connectionStatus = "connected";
-
-                try {
-                    var body = JSON.parse(xhr.responseText);
-                    dmxDriver = body.driver || "";
-                    dmxDevicePath = body.dmxDevicePath || "";
-                    dmxConnectionState = body.connectionState || "";
-                    dmxLastError = body.lastDmxSendError || "";
-                    dmxLastErrorTitle = body.lastErrorTitle || "";
-                    dmxLastErrorSuggestion = body.lastErrorSuggestion || "";
-                    dmxReconnectAttempts = body.reconnectAttempts || 0;
-                    serverVersion = body.version || "";
-                } catch (parseErr) {
-                    // Body parse failed — connection still OK
-                }
-
-                if (previousStatus !== "connected") {
-                    service.log("DMXr: Server connected at " + serverHost + ":" + serverPort);
-                    fetchFixtures();
-                }
-            } else {
-                connectionStatus = "error";
-                if (previousStatus !== "error") {
-                    service.log("DMXr: Server returned HTTP " + xhr.status);
-                }
-            }
-        } catch (e) {
-            connectionStatus = "error";
-            if (previousStatus !== "error") {
-                service.log("DMXr: Connection failed - " + e);
-            }
+        running: true
+        onTriggered: {
+            refreshServerRegistry();
+            pollAllServers();
         }
     }
 
-    function fetchFixtures() {
+    // --- JS Helper Functions ---
+
+    function refreshServerRegistry() {
+        var list = [];
+
+        try {
+            var raw = service.getSetting("DMXr", "serverRegistry");
+            if (raw && raw !== "") {
+                var registry = JSON.parse(raw);
+                var keys = Object.keys(registry);
+                for (var i = 0; i < keys.length; i++) {
+                    list.push(registry[keys[i]]);
+                }
+            }
+        } catch (e) {
+            // Parse failed — fall through to fallback
+        }
+
+        // Fallback: if no registry data, build from manual host:port
+        if (list.length === 0) {
+            var host = serverHost || "127.0.0.1";
+            var port = parseInt(serverPort) || 8080;
+            list.push({
+                serverId: host + ":" + port,
+                serverName: "",
+                host: host,
+                port: port,
+                udpPort: null,
+                healthy: null,
+                fixtureCount: 0,
+            });
+        }
+
+        serverList = list;
+        discoveredServerCount = list.length;
+    }
+
+    function pollAllServers() {
+        var newHealthData = {};
+
+        for (var i = 0; i < serverList.length; i++) {
+            var srv = serverList[i];
+            var sid = srv.serverId;
+            var health = fetchServerHealth(srv);
+            var fixtures = (health && health.reachable) ? fetchServerFixtures(srv) : [];
+
+            newHealthData[sid] = {
+                health: health,
+                fixtures: fixtures,
+            };
+        }
+
+        healthData = newHealthData;
+    }
+
+    function fetchServerHealth(srv) {
         try {
             var xhr = new XMLHttpRequest();
-            xhr.open("GET", getBaseUrl() + "/fixtures", false);
+            xhr.open("GET", "http://" + srv.host + ":" + srv.port + "/health", false);
             xhr.send();
 
             if (xhr.status === 200) {
-                var fixtures = JSON.parse(xhr.responseText);
-                fixtureList = fixtures;
-                service.log("DMXr: Loaded " + fixtures.length + " fixtures");
-            } else {
-                service.log("DMXr: Failed to fetch fixtures - HTTP " + xhr.status);
+                var body = JSON.parse(xhr.responseText);
+                return {
+                    reachable: true,
+                    driver: body.driver || "",
+                    dmxDevicePath: body.dmxDevicePath || "",
+                    connectionState: body.connectionState || "",
+                    lastErrorTitle: body.lastErrorTitle || "",
+                    lastErrorSuggestion: body.lastErrorSuggestion || "",
+                    reconnectAttempts: body.reconnectAttempts || 0,
+                    version: body.version || "",
+                    serverId: body.serverId || srv.serverId,
+                    serverName: body.serverName || srv.serverName,
+                };
             }
         } catch (e) {
-            service.log("DMXr: Fetch fixtures error - " + e);
+            // Server unreachable
+        }
+
+        return { reachable: false };
+    }
+
+    function fetchServerFixtures(srv) {
+        try {
+            var xhr = new XMLHttpRequest();
+            xhr.open("GET", "http://" + srv.host + ":" + srv.port + "/fixtures", false);
+            xhr.send();
+
+            if (xhr.status === 200) {
+                return JSON.parse(xhr.responseText);
+            }
+        } catch (e) {
+            // Fetch failed
+        }
+
+        return [];
+    }
+
+    function testManualConnection() {
+        try {
+            var xhr = new XMLHttpRequest();
+            xhr.open("GET", "http://" + serverHost + ":" + serverPort + "/health", false);
+            xhr.send();
+
+            if (xhr.status === 200) {
+                manualTestStatus = "connected";
+                service.log("DMXr: Manual test OK — " + serverHost + ":" + serverPort);
+            } else {
+                manualTestStatus = "error";
+            }
+        } catch (e) {
+            manualTestStatus = "error";
+            service.log("DMXr: Manual test failed — " + e);
         }
     }
 
-    // Auto-test on load
+    // --- Server card helper functions ---
+
+    function getServerBorderColor(srv) {
+        var h = healthData[srv.serverId];
+        if (!h || !h.health || !h.health.reachable) return "#c03030";
+        if (h.health.connectionState === "connected") return "#209e20";
+        return "#d4a020";
+    }
+
+    function getServerDisplayName(srv) {
+        var h = healthData[srv.serverId];
+        if (h && h.health && h.health.serverName) return h.health.serverName;
+        if (srv.serverName) return srv.serverName;
+        return "DMXr Server";
+    }
+
+    function getDmxStatusText(srv) {
+        var h = healthData[srv.serverId];
+        if (!h || !h.health || !h.health.reachable) return "Server unreachable";
+
+        var health = h.health;
+        var driver = health.driver || "unknown";
+        var driverLabel = driver === "enttec-usb-dmx-pro" ? "ENTTEC USB DMX Pro"
+                       : driver === "enttec-open-usb-dmx" ? "Open DMX USB"
+                       : driver;
+
+        if (driver === "null") return "No DMX driver configured (test mode)";
+        if (health.connectionState === "connected") {
+            return driverLabel + " on " + (health.dmxDevicePath || "?") + " — Connected";
+        }
+        if (health.connectionState === "reconnecting") {
+            return driverLabel + " — Reconnecting...";
+        }
+        if (health.lastErrorTitle) return health.lastErrorTitle;
+        return driverLabel + " — Disconnected";
+    }
+
+    function getDmxStatusColor(srv) {
+        var h = healthData[srv.serverId];
+        if (!h || !h.health || !h.health.reachable) return "#ff6060";
+
+        var health = h.health;
+        if (health.driver === "null") return "#8888ff";
+        if (health.connectionState === "connected") return "#88ff88";
+        return "#ffd060";
+    }
+
+    function getFixtureCountText(srv) {
+        var h = healthData[srv.serverId];
+        if (!h || !h.fixtures) return "0 fixtures";
+        var count = h.fixtures.length;
+        return count + " fixture" + (count !== 1 ? "s" : "");
+    }
+
+    function getServerVersion(srv) {
+        var h = healthData[srv.serverId];
+        if (h && h.health && h.health.version) return h.health.version;
+        return "";
+    }
+
+    function getReconnectAttempts(srv) {
+        var h = healthData[srv.serverId];
+        if (h && h.health) return h.health.reconnectAttempts || 0;
+        return 0;
+    }
+
+    function getErrorSuggestion(srv) {
+        var h = healthData[srv.serverId];
+        if (!h || !h.health) return "";
+        var health = h.health;
+        if (health.connectionState === "connected") return "";
+        return health.lastErrorSuggestion || "";
+    }
+
+    function getServerFixtures(srv) {
+        var h = healthData[srv.serverId];
+        if (h && h.fixtures) return h.fixtures;
+        return [];
+    }
+
+    // --- Auto-refresh on load ---
     Component.onCompleted: {
-        testConnection();
+        refreshServerRegistry();
+        pollAllServers();
     }
 }

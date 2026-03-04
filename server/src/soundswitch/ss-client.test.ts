@@ -156,6 +156,52 @@ describe.skipIf(!hasDb)("searchFixtures (integration)", () => {
   });
 });
 
+describe.skipIf(!hasDb)("mapToFixtureChannels range clamping (integration)", () => {
+  let client: SsClient;
+
+  beforeEach(() => {
+    client = createSsClient(SS_DB_PATH);
+  });
+
+  afterEach(() => {
+    client.close();
+  });
+
+  it("clamps rangeMin and rangeMax to 0-255", () => {
+    // Get a fixture mode that has channels with range values
+    const mfrs = client.getManufacturers();
+    if (mfrs.length === 0) return;
+
+    // Find any mode with channels
+    let testModeId: number | undefined;
+    for (const mfr of mfrs) {
+      const fixtures = client.getFixtures(mfr.id);
+      for (const fixture of fixtures) {
+        const modes = client.getFixtureModes(fixture.id);
+        if (modes.length > 0) {
+          testModeId = modes[0].id;
+          break;
+        }
+      }
+      if (testModeId !== undefined) break;
+    }
+
+    if (testModeId === undefined) return;
+
+    const channels = client.mapToFixtureChannels(testModeId);
+    for (const ch of channels) {
+      if (ch.rangeMin !== undefined) {
+        expect(ch.rangeMin).toBeGreaterThanOrEqual(0);
+        expect(ch.rangeMin).toBeLessThanOrEqual(255);
+      }
+      if (ch.rangeMax !== undefined) {
+        expect(ch.rangeMax).toBeGreaterThanOrEqual(0);
+        expect(ch.rangeMax).toBeLessThanOrEqual(255);
+      }
+    }
+  });
+});
+
 describe("createSsClientIfConfigured", () => {
   it("returns not_configured status when dbPath is undefined", () => {
     const result = createSsClientIfConfigured(undefined);

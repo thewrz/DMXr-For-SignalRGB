@@ -1,6 +1,7 @@
 import type { FixtureStore } from "./fixture-store.js";
 import type { UniverseManager } from "../dmx/universe-manager.js";
 import { mapColor } from "./channel-mapper.js";
+import { pipeLog, shouldSample } from "../logging/pipeline-logger.js";
 
 export interface ColorEntry {
   readonly id?: string;
@@ -24,6 +25,7 @@ export function processColorBatch(
   let totalChannels = 0;
   let fixturesMatched = 0;
   const allUpdates: Record<number, number> = {};
+  const trace = shouldSample("colorBatch");
 
   const allFixtures = fixtureStore.getAll();
 
@@ -36,6 +38,12 @@ export function processColorBatch(
           : undefined;
 
     if (fixture === undefined) {
+      if (trace) {
+        const ref = entry.id !== undefined
+          ? `id="${entry.id}"`
+          : `index=${entry.fixtureIndex}`;
+        pipeLog("debug", `colorBatch: entry ${ref} → NO MATCH`);
+      }
       continue;
     }
 
@@ -63,6 +71,16 @@ export function processColorBatch(
       fixture: "color-batch",
       channels: allUpdates,
     });
+  }
+
+  if (trace) {
+    const addrs = Object.keys(allUpdates).map(Number).sort((a, b) => a - b);
+    const snapshot = addrs.map((a) => `${a}:${allUpdates[a]}`).join(" ");
+    pipeLog(
+      "verbose",
+      `colorBatch: ${entries.length} entries → ${fixturesMatched} matched, ` +
+      `${channelsUpdated}/${totalChannels} ch sent\n  DMX: ${snapshot}`,
+    );
   }
 
   return { fixturesMatched, channelsUpdated };

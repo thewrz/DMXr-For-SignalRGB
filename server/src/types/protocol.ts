@@ -33,6 +33,9 @@ export interface HealthResponse {
   readonly udpActive?: boolean;
   readonly udpPacketsReceived?: number;
   readonly latencyAvgMs?: number;
+  readonly udpPort?: number;
+  readonly serverId?: string;
+  readonly serverName?: string;
 }
 
 /** A single DMX channel within a fixture (derived from OFL definition) */
@@ -68,6 +71,22 @@ export interface FixtureConfig {
   readonly channels: readonly FixtureChannel[];
   readonly channelOverrides?: Readonly<Record<number, ChannelOverride>>;
   readonly whiteGateThreshold?: number;
+  /** Motor guard: clamp Pan/Tilt/Focus/Zoom to prevent mechanical extremes.
+   *  Default true. When enabled, motor channels are clamped to
+   *  [buffer/2 .. 255-buffer/2] instead of [0..255]. */
+  readonly motorGuardEnabled?: boolean;
+  /** Motor guard buffer size (total DMX values excluded from each end).
+   *  Default 4 → clamp range 2-253. */
+  readonly motorGuardBuffer?: number;
+  /** DMX reset configuration for moving heads / intelligent fixtures.
+   *  channelOffset: which channel triggers the reset (e.g., 12 for "Auto Mode")
+   *  value: DMX value to send (e.g., 200)
+   *  holdMs: how long to hold before returning to 0 (e.g., 5000) */
+  readonly resetConfig?: {
+    readonly channelOffset: number;
+    readonly value: number;
+    readonly holdMs: number;
+  };
 }
 
 /** POST /fixtures request body */
@@ -88,6 +107,13 @@ export interface UpdateFixtureRequest {
   readonly dmxStartAddress?: number;
   readonly channelOverrides?: Readonly<Record<number, ChannelOverride>>;
   readonly whiteGateThreshold?: number;
+  readonly motorGuardEnabled?: boolean;
+  readonly motorGuardBuffer?: number;
+  readonly resetConfig?: {
+    readonly channelOffset: number;
+    readonly value: number;
+    readonly holdMs: number;
+  };
 }
 
 /** POST /update/colors request body */

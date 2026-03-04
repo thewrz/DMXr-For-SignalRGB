@@ -344,6 +344,13 @@
                         @touchstart.prevent="flashHold(fixture.id)"
                         @touchend="flashRelease(fixture.id)"
                         @touchcancel="flashRelease(fixture.id)">Flash</button>
+                <button class="btn btn-sm btn-reset"
+                        x-show="hasResetChannel(fixture)"
+                        @click="resetFixture(fixture.id)"
+                        :disabled="isResetting(fixture.id)"
+                        :title="'Send DMX reset command (' + getResetChannelName(fixture) + ')'">
+                  <span x-text="isResetting(fixture.id) ? 'Resetting...' : 'Reset'"></span>
+                </button>
                 <button class="btn btn-sm btn-danger" @click="removeFixture(fixture.id)">Remove</button>
               </div>
             </div>
@@ -358,6 +365,23 @@
               </span>
             </div>
             <div class="channel-overrides" x-show="expandedFixtureId === fixture.id" x-cloak>
+              <div class="motor-guard-row" x-show="hasMotorChannels(fixture)">
+                <span class="motor-guard-label">Motor Guard</span>
+                <label class="toggle-switch" title="Clamp motor channels to avoid mechanical extremes">
+                  <input type="checkbox"
+                         :checked="fixture.motorGuardEnabled !== false"
+                         @change="toggleMotorGuard(fixture.id, $event.target.checked)">
+                  <span class="toggle-track"></span>
+                </label>
+                <span class="motor-guard-buffer-label">Buffer</span>
+                <input type="range" class="motor-guard-slider"
+                       min="0" max="20" step="2"
+                       :value="fixture.motorGuardBuffer ?? 4"
+                       :disabled="fixture.motorGuardEnabled === false"
+                       @input="setMotorGuardBuffer(fixture.id, $event.target.value)">
+                <span class="motor-guard-value"
+                      x-text="(fixture.motorGuardBuffer ?? 4)"></span>
+              </div>
               <template x-for="ch in fixture.channels" :key="'ov-' + ch.offset">
                 <div class="channel-override-row" :class="{ 'override-active': isOverrideEnabled(fixture, ch.offset) }">
                   <span class="override-badge" :class="'badge-' + (ch.color || ch.type).toLowerCase()"
@@ -369,8 +393,8 @@
                     <span x-text="isOverrideEnabled(fixture, ch.offset) ? 'Locked' : 'Auto'"></span>
                   </label>
                   <input type="range" class="override-slider"
-                         :min="ch.rangeMin || 0"
-                         :max="ch.rangeMax || 255"
+                         :min="getSliderMin(fixture, ch)"
+                         :max="getSliderMax(fixture, ch)"
                          :value="getOverrideValue(fixture, ch.offset)"
                          :disabled="!isOverrideEnabled(fixture, ch.offset)"
                          @input="setChannelOverrideValue(fixture.id, ch.offset, $event.target.value)">
@@ -573,6 +597,7 @@
         <select x-model="settingsDriver">
           <option value="null">None (test mode)</option>
           <option value="enttec-usb-dmx-pro">ENTTEC USB DMX Pro</option>
+          <option value="enttec-open-usb-dmx">Open DMX USB (FTDI-based adapters)</option>
         </select>
 
         <label>COM Port</label>
@@ -708,6 +733,7 @@
         <select x-model="wizardDriver">
           <option value="null">None (test mode — no DMX output)</option>
           <option value="enttec-usb-dmx-pro">ENTTEC USB DMX Pro</option>
+          <option value="enttec-open-usb-dmx">Open DMX USB (FTDI-based adapters)</option>
         </select>
 
         <label>COM Port</label>

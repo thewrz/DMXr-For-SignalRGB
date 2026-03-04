@@ -275,6 +275,115 @@ function dmxrFixtureManager() {
       }
     },
 
+    // Reset channel detection
+    _resetPatterns: [/\breset\b/i, /\bmaintenance\b/i, /\blamp\s*control\b/i,
+                     /\bspecial\b/i, /\bauto\s*mode\b/i, /\bcontrol\s*ch/i],
+    _resettingFixtures: {},
+
+    _findResetChannel(fixture) {
+      if (fixture.resetConfig) {
+        return fixture.channels.find(function(ch) {
+          return ch.offset === fixture.resetConfig.channelOffset;
+        });
+      }
+      var patterns = this._resetPatterns;
+      for (var p = 0; p < patterns.length; p++) {
+        for (var i = 0; i < fixture.channels.length; i++) {
+          var ch = fixture.channels[i];
+          if (ch.type === "Generic" && patterns[p].test(ch.name)) return ch;
+        }
+      }
+      return null;
+    },
+
+    hasResetChannel(fixture) {
+      return this._findResetChannel(fixture) !== null;
+    },
+
+    getResetChannelName(fixture) {
+      var ch = this._findResetChannel(fixture);
+      return ch ? ch.name : "";
+    },
+
+    isResetting(fixtureId) {
+      return !!this._resettingFixtures[fixtureId];
+    },
+
+    async resetFixture(fixtureId) {
+      if (this._resettingFixtures[fixtureId]) return;
+      if (!confirm("Send DMX reset command? The fixture will re-home its motors.")) return;
+
+      this._resettingFixtures[fixtureId] = true;
+      try {
+        var res = await fetch("/fixtures/" + fixtureId + "/reset", { method: "POST" });
+        if (res.ok) {
+          var data = await res.json();
+          var self = this;
+          setTimeout(function() {
+            self._resettingFixtures[fixtureId] = false;
+          }, data.holdMs || 5000);
+        } else {
+          var err = await res.json().catch(function() { return {}; });
+          alert("Reset failed: " + (err.error || "Unknown error"));
+          this._resettingFixtures[fixtureId] = false;
+        }
+      } catch {
+        alert("Reset failed: network error");
+        this._resettingFixtures[fixtureId] = false;
+      }
+    },
+
+    // Motor guard helpers
+    _motorTypes: ["Pan", "Tilt", "Focus", "Zoom"],
+
+    _isMotorChannel(fixture, ch) {
+      return fixture.motorGuardEnabled !== false &&
+             this._motorTypes.indexOf(ch.type) !== -1;
+    },
+
+    hasMotorChannels(fixture) {
+      var self = this;
+      return fixture.channels.some(function(ch) {
+        return self._motorTypes.indexOf(ch.type) !== -1;
+      });
+    },
+
+    getSliderMin(fixture, ch) {
+      if (this._isMotorChannel(fixture, ch)) {
+        var buffer = fixture.motorGuardBuffer ?? 4;
+        return Math.max(ch.rangeMin || 0, Math.floor(buffer / 2));
+      }
+      return ch.rangeMin || 0;
+    },
+
+    getSliderMax(fixture, ch) {
+      if (this._isMotorChannel(fixture, ch)) {
+        var buffer = fixture.motorGuardBuffer ?? 4;
+        return Math.min(ch.rangeMax || 255, 255 - Math.ceil(buffer / 2));
+      }
+      return ch.rangeMax || 255;
+    },
+
+    async toggleMotorGuard(fixtureId, enabled) {
+      await this.patchFixture(fixtureId, { motorGuardEnabled: enabled });
+    },
+
+    setMotorGuardBuffer(fixtureId, value) {
+      var self = this;
+      var key = "mg:" + fixtureId;
+      if (self.overrideTimers[key]) {
+        clearTimeout(self.overrideTimers[key]);
+      }
+      var fixture = self.fixtures.find(function(f) { return f.id === fixtureId; });
+      if (fixture) {
+        fixture.motorGuardBuffer = parseInt(value, 10);
+      }
+      self.overrideTimers[key] = setTimeout(function() {
+        delete self.overrideTimers[key];
+        self.patchFixture(fixtureId, { motorGuardBuffer: parseInt(value, 10) });
+      }, 250);
+    },
+
     // Channel override methods
     toggleFixtureExpand(fixtureId) {
       this.expandedFixtureId = this.expandedFixtureId === fixtureId ? null : fixtureId;
@@ -314,9 +423,18 @@ function dmxrFixtureManager() {
       // Update local state immediately for responsiveness
       var fixture = self.fixtures.find(function(f) { return f.id === fixtureId; });
       if (fixture) {
+        var ch = fixture.channels.find(function(c) { return c.offset === offset; });
+        var parsed = parseInt(value, 10);
+        // Clamp to motor guard range if applicable
+        if (ch && self._isMotorChannel(fixture, ch)) {
+          var buffer = fixture.motorGuardBuffer ?? 4;
+          var min = Math.floor(buffer / 2);
+          var max = 255 - Math.ceil(buffer / 2);
+          parsed = Math.max(min, Math.min(max, parsed));
+        }
         if (!fixture.channelOverrides) fixture.channelOverrides = {};
         var current = fixture.channelOverrides[offset] || { value: 0, enabled: false };
-        fixture.channelOverrides[offset] = { value: parseInt(value, 10), enabled: current.enabled };
+        fixture.channelOverrides[offset] = { value: parsed, enabled: current.enabled };
       }
 
       self.overrideTimers[key] = setTimeout(function() {

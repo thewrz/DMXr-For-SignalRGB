@@ -41,8 +41,8 @@ describe("Rate limiting", () => {
   });
 
   it("returns 429 when global limit exceeded", async () => {
-    // Global limit is 100/min — send 101 requests
-    const requests = Array.from({ length: 101 }, () =>
+    // Global limit is 600/min — send 601 requests
+    const requests = Array.from({ length: 601 }, () =>
       app.inject({ method: "GET", url: "/health" }),
     );
     const responses = await Promise.all(requests);

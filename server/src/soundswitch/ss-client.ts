@@ -242,9 +242,11 @@ export function createSsClient(dbPath: string): SsClient {
 
       for (const attr of attrs) {
         const mapped = mapSsType(attr.type);
+        const clampedMin = Math.max(0, Math.min(255, attr.value_range_min));
+        const clampedMax = Math.max(0, Math.min(255, attr.value_range_max));
         const rangeProps = {
-          ...(attr.value_range_min !== 0 ? { rangeMin: attr.value_range_min } : {}),
-          ...(attr.value_range_max !== 255 ? { rangeMax: attr.value_range_max } : {}),
+          ...(clampedMin !== 0 ? { rangeMin: clampedMin } : {}),
+          ...(clampedMax !== 255 ? { rangeMax: clampedMax } : {}),
         };
 
         rawChannels.push({

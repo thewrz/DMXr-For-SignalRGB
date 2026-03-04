@@ -132,4 +132,41 @@ describe("processColorBatch", () => {
     // RGB fixture without dimmer: brightness applied to color values
     expect(universe.updateCalls[0]).toEqual({ 1: 100, 2: 50, 3: 25 });
   });
+
+  it("includes positional channels (pan/tilt) with defaults in color batch output", () => {
+    const universe = createMockUniverse();
+    const manager = createUniverseManager(universe);
+    const store = createTestFixtureStore();
+
+    const fixture = store.add({
+      name: "Moving Head",
+      mode: "13ch",
+      dmxStartAddress: 1,
+      channels: [
+        { offset: 0, name: "Pan", type: "Pan", defaultValue: 128 },
+        { offset: 1, name: "Tilt", type: "Tilt", defaultValue: 128 },
+        { offset: 2, name: "Dimmer", type: "Intensity", defaultValue: 0 },
+        { offset: 3, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
+        { offset: 4, name: "Green", type: "ColorIntensity", color: "Green", defaultValue: 0 },
+        { offset: 5, name: "Blue", type: "ColorIntensity", color: "Blue", defaultValue: 0 },
+      ],
+    });
+
+    const entries: readonly ColorEntry[] = [
+      { id: fixture.id, r: 255, g: 128, b: 64, brightness: 1.0 },
+    ];
+
+    const result = processColorBatch(entries, store, manager);
+
+    expect(result.fixturesMatched).toBe(1);
+    const update = universe.updateCalls[0];
+    // Pan and Tilt included with their default values
+    expect(update[1]).toBe(128); // pan center
+    expect(update[2]).toBe(128); // tilt center
+    // Color channels should be present
+    expect(update[3]).toBe(255); // dimmer
+    expect(update[4]).toBe(255); // red
+    expect(update[5]).toBe(128); // green
+    expect(update[6]).toBe(64);  // blue
+  });
 });

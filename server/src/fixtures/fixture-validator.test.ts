@@ -161,4 +161,35 @@ describe("validateFixtureChannels", () => {
     expect(result.valid).toBe(true);
     expect(result.warnings).toBeUndefined();
   });
+
+  it("warns when rangeMin is outside 0-255", () => {
+    const channels: FixtureChannel[] = [
+      { offset: 0, name: "Pan", type: "Pan", defaultValue: 128, rangeMin: -1 },
+    ];
+    const result = validateFixtureChannels(channels, 1);
+    expect(result.valid).toBe(true);
+    expect(result.warnings).toHaveLength(1);
+    expect(result.warnings![0]).toContain("rangeMin");
+    expect(result.warnings![0]).toContain("-1");
+  });
+
+  it("warns when rangeMax is outside 0-255", () => {
+    const channels: FixtureChannel[] = [
+      { offset: 0, name: "Pan", type: "Pan", defaultValue: 128, rangeMax: 65535 },
+    ];
+    const result = validateFixtureChannels(channels, 1);
+    expect(result.valid).toBe(true);
+    expect(result.warnings).toHaveLength(1);
+    expect(result.warnings![0]).toContain("rangeMax");
+    expect(result.warnings![0]).toContain("65535");
+  });
+
+  it("does not warn for valid rangeMin/rangeMax within 0-255", () => {
+    const channels: FixtureChannel[] = [
+      { offset: 0, name: "Dimmer", type: "Intensity", defaultValue: 0, rangeMin: 0, rangeMax: 255 },
+    ];
+    const result = validateFixtureChannels(channels, 1);
+    expect(result.valid).toBe(true);
+    expect(result.warnings).toBeUndefined();
+  });
 });

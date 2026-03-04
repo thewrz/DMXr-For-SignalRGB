@@ -1,10 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { mapColor, isWhiteGateOpen, DEFAULT_WHITE_GATE_THRESHOLD } from "./channel-mapper.js";
+import { mapColor, isWhiteGateOpen, DEFAULT_WHITE_GATE_THRESHOLD, getFixtureDefaults } from "./channel-mapper.js";
 import type { FixtureConfig, FixtureChannel, ChannelOverride } from "../types/protocol.js";
 
-interface MutableFixture extends Omit<FixtureConfig, "channelOverrides" | "whiteGateThreshold"> {
+interface MutableFixture extends Omit<FixtureConfig, "channelOverrides" | "whiteGateThreshold" | "motorGuardEnabled" | "motorGuardBuffer"> {
   channelOverrides?: Record<number, ChannelOverride>;
   whiteGateThreshold?: number;
+  motorGuardEnabled?: boolean;
+  motorGuardBuffer?: number;
 }
 
 function makeFixture(
@@ -141,7 +143,7 @@ describe("mapColor", () => {
     expect(result[2]).toBe(0); // has dimmer → no strobe
   });
 
-  it("uses defaultValue for non-color generic channels", () => {
+  it("includes generic channels with their defaultValue in color output", () => {
     const fixture = makeFixture([
       { offset: 0, name: "Pan/Tilt Speed", type: "Generic", defaultValue: 128 },
       { offset: 1, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
@@ -151,7 +153,8 @@ describe("mapColor", () => {
 
     const result = mapColor(fixture, 255, 128, 64, 1.0);
 
-    expect(result[1]).toBe(128); // generic uses defaultValue
+    expect(result[1]).toBe(128); // generic gets defaultValue
+    expect(result[2]).toBe(255);
   });
 
   it("uses correct absolute DMX addresses", () => {
@@ -217,7 +220,31 @@ describe("mapColor", () => {
     expect(result[1]).toBe(255); // no dimmer, defaultValue=0 → open shutter (255)
   });
 
-  it("defaults Pan to 128 (center) when defaultValue is 0", () => {
+  it("includes Pan with defaultValue in color output", () => {
+    const fixture = makeFixture([
+      { offset: 0, name: "Pan", type: "Pan", defaultValue: 128 },
+      { offset: 1, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
+    ]);
+
+    const result = mapColor(fixture, 255, 0, 0, 1.0);
+
+    expect(result[1]).toBe(128); // pan center
+    expect(result[2]).toBe(255); // red still mapped
+  });
+
+  it("includes Tilt with defaultValue in color output", () => {
+    const fixture = makeFixture([
+      { offset: 0, name: "Tilt", type: "Tilt", defaultValue: 128 },
+      { offset: 1, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
+    ]);
+
+    const result = mapColor(fixture, 255, 0, 0, 1.0);
+
+    expect(result[1]).toBe(128); // tilt center
+    expect(result[2]).toBe(255);
+  });
+
+  it("falls back to 128 for Pan coarse when defaultValue is 0", () => {
     const fixture = makeFixture([
       { offset: 0, name: "Pan", type: "Pan", defaultValue: 0 },
       { offset: 1, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
@@ -225,29 +252,71 @@ describe("mapColor", () => {
 
     const result = mapColor(fixture, 255, 0, 0, 1.0);
 
-    expect(result[1]).toBe(128);
+    expect(result[1]).toBe(128); // 128 fallback for coarse pan
   });
 
-  it("defaults Tilt to 128 (center) when defaultValue is 0", () => {
+  it("uses defaultValue for Pan Fine (no 128 fallback)", () => {
     const fixture = makeFixture([
-      { offset: 0, name: "Tilt", type: "Tilt", defaultValue: 0 },
+      { offset: 0, name: "Pan Fine", type: "Pan", defaultValue: 0 },
       { offset: 1, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
     ]);
 
     const result = mapColor(fixture, 255, 0, 0, 1.0);
 
-    expect(result[1]).toBe(128);
+    expect(result[1]).toBe(2); // fine channel: defaultValue 0 → motor-safe clamp min (buffer=4, min=2)
   });
 
-  it("uses Pan defaultValue when > 0", () => {
+  it("includes Pan in color output when override is enabled", () => {
     const fixture = makeFixture([
-      { offset: 0, name: "Pan", type: "Pan", defaultValue: 64 },
+      { offset: 0, name: "Pan", type: "Pan", defaultValue: 128 },
       { offset: 1, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
     ]);
+    fixture.channelOverrides = { 0: { value: 64, enabled: true } };
 
     const result = mapColor(fixture, 255, 0, 0, 1.0);
 
-    expect(result[1]).toBe(64);
+    expect(result[1]).toBe(64);  // override applied
+    expect(result[2]).toBe(255);
+  });
+
+  it("motor guard clamps Pan/Tilt override to 2-253 by default", () => {
+    const fixture = makeFixture([
+      { offset: 0, name: "Pan", type: "Pan", defaultValue: 128 },
+      { offset: 1, name: "Tilt", type: "Tilt", defaultValue: 128 },
+    ]);
+    fixture.channelOverrides = {
+      0: { value: 0, enabled: true },
+      1: { value: 255, enabled: true },
+    };
+
+    const result = mapColor(fixture, 0, 0, 0, 1.0);
+
+    expect(result[1]).toBe(2);   // Pan clamped from 0 → 2
+    expect(result[2]).toBe(253); // Tilt clamped from 255 → 253
+  });
+
+  it("motor guard can be disabled per fixture", () => {
+    const fixture = makeFixture([
+      { offset: 0, name: "Pan", type: "Pan", defaultValue: 128 },
+    ]);
+    fixture.motorGuardEnabled = false;
+    fixture.channelOverrides = { 0: { value: 0, enabled: true } };
+
+    const result = mapColor(fixture, 0, 0, 0, 1.0);
+
+    expect(result[1]).toBe(0); // no motor guard → full range
+  });
+
+  it("motor guard respects custom buffer size", () => {
+    const fixture = makeFixture([
+      { offset: 0, name: "Tilt", type: "Tilt", defaultValue: 128 },
+    ]);
+    fixture.motorGuardBuffer = 10;
+    fixture.channelOverrides = { 0: { value: 0, enabled: true } };
+
+    const result = mapColor(fixture, 0, 0, 0, 1.0);
+
+    expect(result[1]).toBe(5); // buffer=10 → min=5, max=250
   });
 
   it("maps Cyan as subtractive (255 - Red)", () => {
@@ -302,7 +371,7 @@ describe("mapColor", () => {
 
     expect(result[1]).toBe(255); // dimmer on
     expect(result[2]).toBe(0);   // strobe = effect mode → 0
-    expect(result[3]).toBe(128); // generic default
+    expect(result[3]).toBe(128); // generic gets defaultValue
   });
 
   it("basic strobe + near-white (245,250,248) → normal output", () => {
@@ -501,5 +570,87 @@ describe("isWhiteGateOpen", () => {
 
   it("DEFAULT_WHITE_GATE_THRESHOLD is 240", () => {
     expect(DEFAULT_WHITE_GATE_THRESHOLD).toBe(240);
+  });
+});
+
+describe("getFixtureDefaults", () => {
+  it("returns defaultValue for all channels", () => {
+    const fixture = makeFixture([
+      { offset: 0, name: "Dimmer", type: "Intensity", defaultValue: 0 },
+      { offset: 1, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
+      { offset: 2, name: "Green", type: "ColorIntensity", color: "Green", defaultValue: 0 },
+      { offset: 3, name: "Blue", type: "ColorIntensity", color: "Blue", defaultValue: 0 },
+    ]);
+
+    const result = getFixtureDefaults(fixture);
+
+    expect(result[1]).toBe(0);
+    expect(result[2]).toBe(0);
+    expect(result[3]).toBe(0);
+    expect(result[4]).toBe(0);
+  });
+
+  it("includes pan/tilt with their default values", () => {
+    const fixture = makeFixture([
+      { offset: 0, name: "Pan", type: "Pan", defaultValue: 128 },
+      { offset: 1, name: "Tilt", type: "Tilt", defaultValue: 128 },
+      { offset: 2, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
+    ]);
+
+    const result = getFixtureDefaults(fixture);
+
+    expect(result[1]).toBe(128); // pan center
+    expect(result[2]).toBe(128); // tilt center
+    expect(result[3]).toBe(0);   // red default
+  });
+
+  it("applies override value when override is enabled", () => {
+    const fixture = makeFixture([
+      { offset: 0, name: "Pan", type: "Pan", defaultValue: 128 },
+      { offset: 1, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
+    ]);
+    fixture.channelOverrides = { 0: { value: 200, enabled: true } };
+
+    const result = getFixtureDefaults(fixture);
+
+    expect(result[1]).toBe(200); // override value
+    expect(result[2]).toBe(0);   // no override, defaultValue
+  });
+
+  it("uses defaultValue when override is disabled", () => {
+    const fixture = makeFixture([
+      { offset: 0, name: "Pan", type: "Pan", defaultValue: 128 },
+    ]);
+    fixture.channelOverrides = { 0: { value: 200, enabled: false } };
+
+    const result = getFixtureDefaults(fixture);
+
+    expect(result[1]).toBe(128); // override disabled, uses defaultValue
+  });
+
+  it("clamps override values to 0-255", () => {
+    const fixture = makeFixture([
+      { offset: 0, name: "Pan", type: "Pan", defaultValue: 128 },
+    ]);
+    fixture.channelOverrides = { 0: { value: 300, enabled: true } };
+
+    const result = getFixtureDefaults(fixture);
+
+    expect(result[1]).toBe(253); // clamped from 300 → motor-safe max (buffer=4, max=253)
+  });
+
+  it("uses correct absolute DMX addresses", () => {
+    const fixture = makeFixture(
+      [
+        { offset: 0, name: "Pan", type: "Pan", defaultValue: 128 },
+        { offset: 1, name: "Tilt", type: "Tilt", defaultValue: 128 },
+      ],
+      40,
+    );
+
+    const result = getFixtureDefaults(fixture);
+
+    expect(result[40]).toBe(128);
+    expect(result[41]).toBe(128);
   });
 });

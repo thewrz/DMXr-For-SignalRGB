@@ -73,6 +73,9 @@ export function createFixtureStore(filePath: string): FixtureStore {
         ...(changes.dmxStartAddress !== undefined ? { dmxStartAddress: changes.dmxStartAddress } : {}),
         ...(changes.channelOverrides !== undefined ? { channelOverrides: changes.channelOverrides } : {}),
         ...(changes.whiteGateThreshold !== undefined ? { whiteGateThreshold: changes.whiteGateThreshold } : {}),
+        ...(changes.motorGuardEnabled !== undefined ? { motorGuardEnabled: changes.motorGuardEnabled } : {}),
+        ...(changes.motorGuardBuffer !== undefined ? { motorGuardBuffer: changes.motorGuardBuffer } : {}),
+        ...(changes.resetConfig !== undefined ? { resetConfig: changes.resetConfig } : {}),
       };
 
       fixtures = fixtures.map((f, i) => (i === index ? updated : f));

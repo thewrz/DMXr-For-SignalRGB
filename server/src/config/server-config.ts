@@ -16,7 +16,7 @@ export interface ServerConfig {
   readonly apiKey?: string;
 }
 
-const VALID_DRIVERS = ["null", "enttec-usb-dmx-pro"];
+const VALID_DRIVERS = ["null", "enttec-usb-dmx-pro", "enttec-open-usb-dmx"];
 
 export function loadConfig(
   persisted?: Partial<PersistedSettings>,

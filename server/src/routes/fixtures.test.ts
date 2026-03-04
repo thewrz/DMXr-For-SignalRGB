@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { buildServer } from "../server.js";
 import { createUniverseManager } from "../dmx/universe-manager.js";
+import type { UniverseManager } from "../dmx/universe-manager.js";
 import { createMockUniverse, createTestConfig, createTestFixtureStore, createMockOflClient, createMockRegistry } from "../test-helpers.js";
 import type { FixtureStore } from "../fixtures/fixture-store.js";
 import type { FastifyInstance } from "fastify";
@@ -19,12 +20,31 @@ const validFixtureBody = {
   ],
 };
 
+const movingHeadBody = {
+  name: "Moving Head",
+  mode: "13ch",
+  dmxStartAddress: 40,
+  channelCount: 6,
+  channels: [
+    { offset: 0, name: "Pan", type: "Pan", defaultValue: 128 },
+    { offset: 1, name: "Pan Fine", type: "Pan", defaultValue: 0 },
+    { offset: 2, name: "Tilt", type: "Tilt", defaultValue: 128 },
+    { offset: 3, name: "Tilt Fine", type: "Tilt", defaultValue: 0 },
+    { offset: 4, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
+    { offset: 5, name: "Green", type: "ColorIntensity", color: "Green", defaultValue: 0 },
+  ],
+};
+
 describe("Fixture routes", () => {
   let app: FastifyInstance;
   let store: FixtureStore;
+  let universe: ReturnType<typeof createMockUniverse>;
+  let manager: UniverseManager;
 
   beforeEach(async () => {
-    const manager = createUniverseManager(createMockUniverse());
+    universe = createMockUniverse();
+    manager = createUniverseManager(universe);
+    manager.resumeNormal();
     store = createTestFixtureStore();
     app = await buildServer({
       config: createTestConfig(),
@@ -292,6 +312,97 @@ describe("Fixture routes", () => {
       });
 
       expect(patchRes.statusCode).toBe(400);
+    });
+
+    it("pushes enabled override value to DMX immediately", async () => {
+      const addRes = await app.inject({
+        method: "POST",
+        url: "/fixtures",
+        payload: movingHeadBody,
+      });
+      const { id } = addRes.json();
+
+      universe.updateCalls.length = 0; // clear any prior calls
+
+      await app.inject({
+        method: "PATCH",
+        url: `/fixtures/${id}`,
+        payload: { channelOverrides: { "2": { value: 100, enabled: true } } },
+      });
+
+      // Tilt (offset 2, base 40) → DMX addr 42 should be pushed immediately
+      expect(universe.updateCalls).toHaveLength(1);
+      expect(universe.updateCalls[0][42]).toBe(100);
+    });
+
+    it("pushes defaultValue to DMX when override is disabled", async () => {
+      const addRes = await app.inject({
+        method: "POST",
+        url: "/fixtures",
+        payload: movingHeadBody,
+      });
+      const { id } = addRes.json();
+
+      universe.updateCalls.length = 0;
+
+      await app.inject({
+        method: "PATCH",
+        url: `/fixtures/${id}`,
+        payload: { channelOverrides: { "2": { value: 100, enabled: false } } },
+      });
+
+      // Tilt override disabled → reverts to defaultValue 128
+      expect(universe.updateCalls).toHaveLength(1);
+      expect(universe.updateCalls[0][42]).toBe(128);
+    });
+
+    it("uses safe center for motor channels when override disabled and defaultValue is 0", async () => {
+      const addRes = await app.inject({
+        method: "POST",
+        url: "/fixtures",
+        payload: movingHeadBody,
+      });
+      const { id } = addRes.json();
+
+      universe.updateCalls.length = 0;
+
+      // Pan Fine (offset 1) has defaultValue=0 and type=Pan
+      // Motor guard should clamp to 2 (min with buffer 4), not send 0
+      await app.inject({
+        method: "PATCH",
+        url: `/fixtures/${id}`,
+        payload: { channelOverrides: { "1": { value: 50, enabled: false } } },
+      });
+
+      expect(universe.updateCalls).toHaveLength(1);
+      // Pan Fine defaultValue=0 → clamped to motor guard min (2)
+      expect(universe.updateCalls[0][41]).toBe(2);
+    });
+
+    it("pushes multiple override channels in one update", async () => {
+      const addRes = await app.inject({
+        method: "POST",
+        url: "/fixtures",
+        payload: movingHeadBody,
+      });
+      const { id } = addRes.json();
+
+      universe.updateCalls.length = 0;
+
+      await app.inject({
+        method: "PATCH",
+        url: `/fixtures/${id}`,
+        payload: {
+          channelOverrides: {
+            "0": { value: 200, enabled: true },
+            "2": { value: 50, enabled: true },
+          },
+        },
+      });
+
+      expect(universe.updateCalls).toHaveLength(1);
+      expect(universe.updateCalls[0][40]).toBe(200); // Pan
+      expect(universe.updateCalls[0][42]).toBe(50);  // Tilt
     });
   });
 

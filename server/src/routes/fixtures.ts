@@ -1,10 +1,13 @@
 import type { FastifyInstance } from "fastify";
 import type { FixtureStore } from "../fixtures/fixture-store.js";
+import type { UniverseManager } from "../dmx/universe-manager.js";
 import type { AddFixtureRequest, UpdateFixtureRequest } from "../types/protocol.js";
 import { validateFixtureAddress, validateFixtureChannels } from "../fixtures/fixture-validator.js";
+import { pipeLog, resetSample } from "../logging/pipeline-logger.js";
 
 interface FixtureRouteDeps {
   readonly store: FixtureStore;
+  readonly manager?: UniverseManager;
 }
 
 const addFixtureSchema = {
@@ -108,6 +111,18 @@ export function registerFixtureRoutes(
               },
             },
             whiteGateThreshold: { type: "integer" as const, minimum: 0, maximum: 255 },
+            motorGuardEnabled: { type: "boolean" as const },
+            motorGuardBuffer: { type: "integer" as const, minimum: 0, maximum: 20 },
+            resetConfig: {
+              type: "object" as const,
+              required: ["channelOffset", "value", "holdMs"],
+              properties: {
+                channelOffset: { type: "integer" as const, minimum: 0 },
+                value: { type: "integer" as const, minimum: 0, maximum: 255 },
+                holdMs: { type: "integer" as const, minimum: 1000, maximum: 15000 },
+              },
+              additionalProperties: false,
+            },
           },
         },
       },
@@ -131,6 +146,63 @@ export function registerFixtureRoutes(
       }
 
       const updated = deps.store.update(request.params.id, request.body);
+
+      // Immediately push override values to DMX so changes take effect
+      // without waiting for the next color frame from SignalRGB.
+      if (updated && request.body.channelOverrides && deps.manager) {
+        const base = updated.dmxStartAddress;
+        const channels: Record<number, number> = {};
+        const logLines: string[] = [
+          `PATCH override "${updated.name}" (id=${updated.id.slice(0, 8)} base=${base}):`,
+        ];
+
+        for (const [offsetStr, override] of Object.entries(request.body.channelOverrides)) {
+          const offset = Number(offsetStr);
+          const channel = updated.channels.find((ch) => ch.offset === offset);
+          if (!channel) {
+            logLines.push(`  [${offset}] SKIP — no matching channel definition`);
+            continue;
+          }
+
+          const motorGuardOn = updated.motorGuardEnabled !== false;
+          const isMotor = motorGuardOn && (
+            channel.type === "Pan" || channel.type === "Tilt" ||
+            channel.type === "Focus" || channel.type === "Zoom");
+          const motorBuffer = updated.motorGuardBuffer ?? 4;
+          const min = isMotor ? Math.floor(motorBuffer / 2) : 0;
+          const max = isMotor ? 255 - Math.ceil(motorBuffer / 2) : 255;
+
+          let value: number;
+          if (override.enabled) {
+            value = Math.max(min, Math.min(max, Math.round(override.value)));
+          } else if (isMotor) {
+            // Auto mode on motor channels: use safe center (128) if
+            // defaultValue is 0 — same logic as mapColor to prevent
+            // motors from slamming to mechanical limits.
+            const isFine = /fine/i.test(channel.name);
+            const raw = isFine ? channel.defaultValue : (channel.defaultValue > 0 ? channel.defaultValue : 128);
+            value = Math.max(min, Math.min(max, raw));
+          } else {
+            value = Math.max(min, Math.min(max, channel.defaultValue));
+          }
+          channels[base + offset] = value;
+
+          logLines.push(
+            `  [${offset}] DMX${base + offset} ${channel.name.padEnd(16)} ` +
+            `type=${channel.type.padEnd(15)} enabled=${override.enabled} ` +
+            `value=${override.value} → DMX=${value}`,
+          );
+        }
+
+        pipeLog("info", logLines.join("\n"));
+
+        if (Object.keys(channels).length > 0) {
+          const count = deps.manager.applyFixtureUpdate({ fixture: updated.id, channels });
+          pipeLog("info", `PATCH DMX push: ${count} channels sent for "${updated.name}"`);
+          // Force next mapColor sample to log so we can see the override in action
+          resetSample(`mapColor:${updated.id}`);
+        }
+      }
 
       // Debounced save: in-memory state is already updated for mapColor.
       // Don't block the response on disk I/O — rapid slider drags would

@@ -41,6 +41,8 @@ interface BuildServerDeps {
   readonly serverVersion?: string;
   readonly latencyTracker?: LatencyTracker;
   readonly udpServer?: UdpColorServer;
+  readonly serverId?: string;
+  readonly serverName?: string;
 }
 
 export async function buildServer(
@@ -53,7 +55,7 @@ export async function buildServer(
   });
 
   await app.register(rateLimit, {
-    max: 100,
+    max: 600,
     timeWindow: "1 minute",
   });
 
@@ -107,6 +109,8 @@ export async function buildServer(
     dmxDevicePath: deps.config.dmxDevicePath,
     latencyTracker: deps.latencyTracker,
     udpServer: deps.udpServer,
+    serverId: deps.serverId,
+    serverName: deps.serverName,
   });
 
   registerUpdateRoute(app, {
@@ -116,6 +120,7 @@ export async function buildServer(
 
   registerFixtureRoutes(app, {
     store: deps.fixtureStore,
+    manager: deps.manager,
   });
 
   registerOflRoutes(app, {

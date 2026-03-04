@@ -37,7 +37,8 @@ header {
   gap: 0.5rem;
 }
 
-header h1 { font-size: 1.4rem; }
+.header-logo { height: 28px; width: auto; }
+.header-title { font-size: 1.1rem; font-weight: 600; opacity: 0.7; }
 
 .sidebar-toggle {
   display: flex;
@@ -953,6 +954,11 @@ header h1 { font-size: 1.4rem; }
 
 .wizard-modal {
   max-width: 480px;
+}
+
+.wizard-logo {
+  text-align: center;
+  margin-bottom: 0.5rem;
 }
 
 .wizard-text {

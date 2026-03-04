@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DMXr Fixture Manager</title>
+  <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+  <link rel="icon" type="image/svg+xml" href="/images/DMXr-favicon.svg">
   <link rel="stylesheet" href="/css/style.css">
   <script defer src="/js/alpine.min.js"></script>
   <script src="/js/channel-label.js"></script>
@@ -28,7 +30,8 @@
           <line x1="6" y1="2" x2="6" y2="16" stroke="currentColor" stroke-width="1.5"/>
         </svg>
       </button>
-      <h1>DMXr Fixture Manager</h1>
+      <img src="/images/DMXr-logo.svg" alt="DMXr" class="header-logo">
+      <span class="header-title">Fixture Manager</span>
     </div>
     <div class="header-right">
       <button class="btn btn-sm" @click="openLatency()" title="Latency Dashboard">
@@ -717,6 +720,9 @@
     <div class="modal wizard-modal">
       <!-- Step 1: Welcome -->
       <div x-show="wizardStep === 1">
+        <div class="wizard-logo">
+          <img src="/images/DMXr-logo.svg" alt="DMXr" width="200">
+        </div>
         <h2>Welcome to DMXr</h2>
         <p class="wizard-text">DMXr bridges your DMX lighting fixtures into SignalRGB, letting your stage lights react to games, music, and effects.</p>
         <p class="wizard-text">This server connects to your DMX adapter (like an ENTTEC USB DMX Pro) and receives color data from the SignalRGB plugin.</p>

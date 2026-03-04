@@ -299,7 +299,7 @@ export function Shutdown() {
 // --------------------------------<( Discovery Service )>--------------------------------
 
 export function DiscoveryService() {
-	this.IconUrl = "";
+	this.IconUrl = "https://raw.githubusercontent.com/thewrz/DMXr/main/DMXr-logo.png";
 	this.MDns = ["_dmxr._tcp.local."];
 	this.knownFixtures = {};
 	this.pollInterval = 2000;

@@ -109,41 +109,6 @@ function dmxrFixtureManager() {
       return channels;
     },
 
-    async addFixture() {
-      if (this.addressError || !this.fixtureName) return;
-
-      var channels = this.buildChannelsPayload();
-      if (!channels) return;
-
-      var payload = {
-        name: this.fixtureName,
-        oflKey: this.selectedMfr.key + "/" + this.selectedFixtureKey,
-        oflFixtureName: this.selectedFixtureDef.name,
-        mode: this.selectedMode,
-        dmxStartAddress: this.dmxStartAddress,
-        channelCount: this.channelCount,
-        channels: channels,
-      };
-
-      try {
-        var res = await fetch("/fixtures", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-
-        if (res.ok) {
-          await this.loadFixtures();
-          this.closeAddModal();
-        } else {
-          var err = await res.json();
-          this.addressError = err.message || err.error || "Failed to add fixture";
-        }
-      } catch {
-        this.addressError = "Network error";
-      }
-    },
-
     async removeFixture(id) {
       if (!confirm("Remove this fixture? This cannot be undone.")) return;
       try {
@@ -247,48 +212,6 @@ function dmxrFixtureManager() {
         }
       } catch {
         this.syncResult = { success: false, error: "Network error" };
-      }
-    },
-
-    closeAddModal() {
-      this.showAddModal = false;
-      this.fixtureSource = "ofl";
-      this.addStep = 1;
-      this.mfrSearch = "";
-      this.fixtureSearch = "";
-      this.selectedMfr = null;
-      this.selectedFixtureKey = null;
-      this.selectedFixtureDef = null;
-      this.selectedMode = "";
-      this.channelCount = 0;
-      this.channelNames = [];
-      this.dmxStartAddress = 1;
-      this.fixtureName = "";
-      this.addressError = "";
-      this.filteredMfrs = this.manufacturers;
-      this.filteredFixtures = [];
-      this.libStep = 1;
-      this.libMfrSearch = "";
-      this.libFilteredMfrs = this.libMfrs;
-      this.libSelectedMfr = null;
-      this.libFixtures = [];
-      this.libFixtureSearch = "";
-      this.libFilteredFixtures = [];
-      this.libSelectedFixture = null;
-      this.libModes = [];
-      this.libSelectedModeId = null;
-      this.libChannels = [];
-    },
-
-    switchSource(source) {
-      this.fixtureSource = source;
-      this.addStep = 1;
-      this.libStep = 1;
-      this.addressError = "";
-      this.dmxStartAddress = 1;
-      this.fixtureName = "";
-      if (source !== "ofl" && this.libMfrs.length === 0) {
-        this.loadLibMfrs(source);
       }
     },
 

@@ -37,7 +37,7 @@ Item {
 
             // --- Header ---
             Image {
-                source: "https://raw.githubusercontent.com/thewrz/DMXr/main/docs/images/DMXr-logo.png"
+                source: "https://raw.githubusercontent.com/thewrz/DMXr/feat/add-logo/docs/images/DMXr-logo.png"
                 width: 180
                 fillMode: Image.PreserveAspectFit
                 antialiasing: false

@@ -795,7 +795,9 @@ Item {
 
         var health = h.health;
         var driver = health.driver || "unknown";
-        var driverLabel = driver === "enttec-usb-dmx-pro" ? "ENTTEC USB DMX Pro" : driver;
+        var driverLabel = driver === "enttec-usb-dmx-pro" ? "ENTTEC USB DMX Pro"
+                       : driver === "enttec-open-usb-dmx" ? "Open DMX USB"
+                       : driver;
 
         if (driver === "null") return "No DMX driver configured (test mode)";
         if (health.connectionState === "connected") {

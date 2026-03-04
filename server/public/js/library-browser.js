@@ -72,7 +72,6 @@ function dmxrLibraryBrowser() {
     async selectManufacturer(mfr) {
       this.selectedMfr = mfr;
       this.browseStep = 2;
-      this.addStep = 2;
       this.fixtureSearch = "";
 
       try {
@@ -93,7 +92,6 @@ function dmxrLibraryBrowser() {
     async selectFixture(fixture) {
       this.selectedFixtureKey = fixture.key;
       this.browseStep = 3;
-      this.addStep = 3;
       this.selectedMode = "";
       this.channelCount = 0;
 
@@ -229,34 +227,5 @@ function dmxrLibraryBrowser() {
       }
     },
 
-    async importLibFixture() {
-      if (this.addressError || !this.fixtureName || !this.libSelectedModeId) return;
-
-      try {
-        var res = await fetch(
-          "/libraries/" + this.browseSource +
-          "/fixtures/" + this.libSelectedFixture.id +
-          "/modes/" + this.libSelectedModeId + "/import",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              name: this.fixtureName,
-              dmxStartAddress: this.dmxStartAddress,
-            }),
-          }
-        );
-
-        if (res.ok) {
-          await this.loadFixtures();
-          this.closeAddModal();
-        } else {
-          var err = await res.json();
-          this.addressError = err.message || err.error || "Failed to import fixture";
-        }
-      } catch {
-        this.addressError = "Network error";
-      }
-    },
   };
 }

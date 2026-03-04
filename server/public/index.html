@@ -266,7 +266,6 @@
     <!-- Main Content -->
     <main class="main-content">
       <div class="toolbar">
-        <button class="btn btn-primary" @click="showAddModal = true">+ Add Fixture</button>
         <button class="btn btn-danger" @click="blackout()">Blackout All</button>
         <button class="btn btn-warning" @click="whiteout()">Whiteout All</button>
         <button class="btn btn-success" x-show="overrideActive" @click="resume()">Resume</button>
@@ -317,7 +316,7 @@
       <!-- Fixture Cards -->
       <template x-if="fixtures.length === 0 && !stagedFixture">
         <div class="empty-state">
-          <p>No fixtures configured. Search or browse in the sidebar, or click <strong>+ Add Fixture</strong>.</p>
+          <p>No fixtures configured. Use the sidebar to search or browse fixture libraries.</p>
         </div>
       </template>
 
@@ -409,181 +408,6 @@
         </template>
       </div>
     </main>
-  </div>
-
-  <!-- Add Fixture Modal (fallback) -->
-  <div class="modal-overlay" x-show="showAddModal" x-cloak @click.self="closeAddModal()">
-    <div class="modal">
-      <h2>Add Fixture</h2>
-
-      <!-- Source tabs -->
-      <div class="source-tabs">
-        <button class="tab" :class="{ active: fixtureSource === 'ofl' }"
-                @click="switchSource('ofl')">Open Fixture Library</button>
-        <template x-for="lib in getNonOflLibraries()" :key="lib.id">
-          <button class="tab" :class="{ active: fixtureSource === lib.id }"
-                  @click="switchSource(lib.id)" x-text="lib.displayName"></button>
-        </template>
-      </div>
-
-      <!-- OFL Flow -->
-      <template x-if="fixtureSource === 'ofl'">
-        <div>
-          <div x-show="addStep === 1">
-            <p class="validation-error" x-show="oflError" x-text="oflError"></p>
-            <label>Manufacturer</label>
-            <input type="text" x-model="mfrSearch" placeholder="Search manufacturers..."
-                   @input="filterManufacturers()" autofocus>
-            <button class="btn btn-sm" x-show="oflError" @click="loadManufacturers()">Retry</button>
-            <div class="search-results">
-              <template x-for="mfr in filteredMfrs" :key="mfr.key">
-                <div class="result-item" @click="selectManufacturer(mfr)">
-                  <strong x-text="mfr.name"></strong>
-                  <span class="count" x-text="mfr.fixtureCount + ' fixtures'"></span>
-                </div>
-              </template>
-            </div>
-          </div>
-
-          <div x-show="addStep === 2">
-            <label x-text="'Fixtures by ' + selectedMfr?.name"></label>
-            <input type="text" x-model="fixtureSearch" placeholder="Search fixtures..."
-                   @input="filterFixtures()">
-            <div class="search-results">
-              <template x-for="f in filteredFixtures" :key="f.key">
-                <div class="result-item" @click="selectFixture(f)">
-                  <strong x-text="f.name"></strong>
-                  <span class="categories" x-text="f.categories.join(', ')"></span>
-                </div>
-              </template>
-            </div>
-            <button class="btn btn-sm" @click="addStep = 1">Back</button>
-          </div>
-
-          <div x-show="addStep === 3">
-            <p class="selected-fixture" x-text="selectedFixtureDef?.name"></p>
-
-            <label>Mode</label>
-            <select x-model="selectedMode" @change="onModeChange()">
-              <template x-for="mode in selectedFixtureDef?.modes || []" :key="mode.name">
-                <option :value="mode.name"
-                        x-text="mode.name + ' (' + mode.channels.filter(c => c !== null).length + ' ch)'"></option>
-              </template>
-            </select>
-
-            <label x-text="channelCount + ' DMX channel' + (channelCount !== 1 ? 's' : '') + (channelNames.length > 0 ? ': ' + channelNames.join(', ') : '')"></label>
-
-            <label>DMX Start Address</label>
-            <input type="number" x-model.number="dmxStartAddress" min="1" max="512"
-                   @input="validateAddress()">
-            <p class="validation-error" x-show="addressError" x-text="addressError"></p>
-
-            <label>Display Name</label>
-            <input type="text" x-model="fixtureName" placeholder="e.g. Stage Left PAR">
-
-            <div class="modal-actions">
-              <button class="btn btn-sm" @click="addStep = 2">Back</button>
-              <button class="btn btn-primary" @click="addFixture()"
-                      :disabled="!!addressError || !fixtureName">Add</button>
-            </div>
-          </div>
-        </div>
-      </template>
-
-      <!-- Library Flow (non-OFL) -->
-      <template x-if="fixtureSource !== 'ofl'">
-        <div>
-          <template x-if="!isLibAvailable(fixtureSource) && getLibStatus(fixtureSource)">
-            <div class="library-status-message">
-              <template x-if="getLibStatus(fixtureSource).state === 'not_configured'">
-                <p>Database not found. Set the <code>FIXTURE_DB_PATH</code> environment variable.</p>
-              </template>
-              <template x-if="getLibStatus(fixtureSource).state === 'not_found'">
-                <p>Database not found at <code x-text="getLibStatus(fixtureSource).path"></code>. Check that the file exists.</p>
-              </template>
-              <template x-if="getLibStatus(fixtureSource).state === 'permission_denied'">
-                <p>Cannot read database at <code x-text="getLibStatus(fixtureSource).path"></code>. Check file permissions.</p>
-              </template>
-              <template x-if="getLibStatus(fixtureSource).state === 'corrupt'">
-                <p>Database appears corrupt: <span x-text="getLibStatus(fixtureSource).error"></span></p>
-              </template>
-              <template x-if="getLibStatus(fixtureSource).state === 'error'">
-                <p>Database error: <span x-text="getLibStatus(fixtureSource).error"></span></p>
-              </template>
-            </div>
-          </template>
-
-          <div x-show="isLibAvailable(fixtureSource) && libStep === 1">
-            <label>Manufacturer</label>
-            <input type="text" x-model="libMfrSearch" placeholder="Search manufacturers..."
-                   @input="filterLibMfrs()">
-            <div class="search-results">
-              <template x-for="mfr in libFilteredMfrs" :key="mfr.id">
-                <div class="result-item" @click="selectLibMfr(mfr)">
-                  <strong x-text="mfr.name"></strong>
-                  <span class="count" x-text="mfr.fixtureCount + ' fixtures'"></span>
-                </div>
-              </template>
-            </div>
-          </div>
-
-          <div x-show="isLibAvailable(fixtureSource) && libStep === 2">
-            <label x-text="'Fixtures by ' + libSelectedMfr?.name"></label>
-            <input type="text" x-model="libFixtureSearch" placeholder="Search fixtures..."
-                   @input="filterLibFixtures()">
-            <div class="search-results">
-              <template x-for="f in libFilteredFixtures" :key="f.id">
-                <div class="result-item" @click="selectLibFixture(f)">
-                  <strong x-text="f.name"></strong>
-                  <span class="count" x-text="f.modeCount + ' mode' + (f.modeCount !== 1 ? 's' : '')"></span>
-                </div>
-              </template>
-            </div>
-            <button class="btn btn-sm" @click="libStep = 1">Back</button>
-          </div>
-
-          <div x-show="isLibAvailable(fixtureSource) && libStep === 3">
-            <p class="selected-fixture" x-text="libSelectedFixture?.name"></p>
-
-            <label>Mode</label>
-            <select x-model="libSelectedModeId" @change="onLibModeChange()">
-              <template x-for="mode in libModes" :key="mode.id">
-                <option :value="mode.id"
-                        x-text="mode.name + ' (' + mode.channelCount + ' ch)'"></option>
-              </template>
-            </select>
-
-            <template x-if="libChannels.length > 0">
-              <div>
-                <label x-text="libChannels.length + ' DMX channel' + (libChannels.length !== 1 ? 's' : '')"></label>
-                <div class="channel-preview">
-                  <template x-for="ch in libChannels" :key="ch.offset">
-                    <span class="badge" :class="'badge-' + (ch.color || ch.type).toLowerCase()"
-                          x-text="ch.name + ' (' + ch.type + ')'"></span>
-                  </template>
-                </div>
-              </div>
-            </template>
-
-            <label>DMX Start Address</label>
-            <input type="number" x-model.number="dmxStartAddress" min="1" max="512"
-                   @input="validateAddress()">
-            <p class="validation-error" x-show="addressError" x-text="addressError"></p>
-
-            <label>Display Name</label>
-            <input type="text" x-model="fixtureName">
-
-            <div class="modal-actions">
-              <button class="btn btn-sm" @click="libStep = 2">Back</button>
-              <button class="btn btn-primary" @click="importLibFixture()"
-                      :disabled="!!addressError || !fixtureName || !libSelectedModeId">Import</button>
-            </div>
-          </div>
-        </div>
-      </template>
-
-      <button class="modal-close" @click="closeAddModal()">&times;</button>
-    </div>
   </div>
 
   <!-- Settings Modal -->

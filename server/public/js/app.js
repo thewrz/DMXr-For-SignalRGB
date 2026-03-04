@@ -4,10 +4,6 @@ function dmxrApp() {
     serverOnline: false,
     overrideActive: false,
     sidebarOpen: false,
-    showAddModal: false,
-    fixtureSource: "ofl",
-    addStep: 1,
-
     // Sidebar state
     sidebarTab: "search",
     browseSource: "ofl",

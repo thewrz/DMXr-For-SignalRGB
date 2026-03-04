@@ -5,13 +5,14 @@ const publishMock = vi.fn();
 const unpublishAllMock = vi.fn();
 const destroyMock = vi.fn();
 
-vi.mock("bonjour-service", () => ({
-  Bonjour: vi.fn().mockImplementation(() => ({
-    publish: publishMock,
-    unpublishAll: unpublishAllMock,
-    destroy: destroyMock,
-  })),
-}));
+vi.mock("bonjour-service", () => {
+  const BonjourMock = vi.fn().mockImplementation(function (this: unknown) {
+    (this as Record<string, unknown>).publish = publishMock;
+    (this as Record<string, unknown>).unpublishAll = unpublishAllMock;
+    (this as Record<string, unknown>).destroy = destroyMock;
+  });
+  return { Bonjour: BonjourMock, default: { Bonjour: BonjourMock } };
+});
 
 import { createMdnsAdvertiser } from "./advertiser.js";
 

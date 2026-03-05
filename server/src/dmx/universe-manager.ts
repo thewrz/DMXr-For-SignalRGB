@@ -243,9 +243,37 @@ export function createUniverseManager(
     },
 
     resumeNormal(): void {
+      const prevMode = controlMode;
       blackoutActive = false;
       controlMode = "normal";
-      pipeLog("info", "RESUME: blackout cleared, normal updates enabled");
+
+      // Clear stale channel state left by whiteout/blackout so the monitor
+      // doesn't keep showing override values for unoccupied channels.
+      const prevCount = activeChannels.size;
+      activeChannels.clear();
+
+      // Reset DMX hardware to zero so unoccupied channels don't stay at
+      // the override level (e.g. 255 after whiteout).  Safe positions are
+      // restored immediately to prevent motor channels from slamming to 0.
+      if (safePositions.size > 0) {
+        const selective: Record<number, number> = {};
+        for (let ch = MIN_CHANNEL; ch <= MAX_CHANNEL; ch++) {
+          if (safePositions.has(ch)) {
+            selective[ch] = safePositions.get(ch)!;
+            activeChannels.set(ch, safePositions.get(ch)!);
+          } else {
+            selective[ch] = 0;
+          }
+        }
+        safeSend(`resume-selective ${MAX_CHANNEL}ch`, () => universe.update(selective));
+      } else {
+        safeSend("resume", () => universe.updateAll(0));
+      }
+
+      pipeLog("info",
+        `RESUME: ${prevMode} cleared (was ${prevCount} active channels), ` +
+        `hardware reset to 0${safePositions.size > 0 ? ` (${safePositions.size} motor positions preserved)` : ""}`,
+      );
       log?.info("DMX override cleared: resuming normal updates");
     },
 

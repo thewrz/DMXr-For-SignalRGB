@@ -162,6 +162,7 @@ describe("createUniverseManager", () => {
     it("stays active until resumeNormal is called", () => {
       manager.blackout();
       mock.updateCalls.length = 0;
+      mock.updateAllCalls.length = 0;
 
       expect(manager.applyFixtureUpdate({ fixture: "a", channels: { "1": 255 } })).toBe(0);
       expect(manager.applyFixtureUpdate({ fixture: "b", channels: { "2": 128 } })).toBe(0);
@@ -172,7 +173,17 @@ describe("createUniverseManager", () => {
 
       const count = manager.applyFixtureUpdate({ fixture: "d", channels: { "4": 200 } });
       expect(count).toBe(1);
-      expect(mock.updateCalls).toHaveLength(1);
+    });
+
+    it("clears activeChannels and resets hardware on resume", () => {
+      manager.applyFixtureUpdate({ fixture: "a", channels: { "1": 255, "2": 128 } });
+      manager.blackout();
+      mock.updateAllCalls.length = 0;
+
+      manager.resumeNormal();
+
+      expect(manager.getActiveChannelCount()).toBe(0);
+      expect(mock.updateAllCalls).toEqual([0]);
     });
 
     it("allows applyRawUpdate during blackout", () => {
@@ -259,7 +270,53 @@ describe("createUniverseManager", () => {
 
       const count = manager.applyFixtureUpdate({ fixture: "c", channels: { "3": 200 } });
       expect(count).toBe(1);
+    });
+
+    it("clears activeChannels on resume so unoccupied channels show 0", () => {
+      manager.whiteout();
+      // After whiteout all 512 channels are active at 255
+      expect(manager.getActiveChannelCount()).toBe(512);
+
+      manager.resumeNormal();
+      // After resume, all channels should be cleared
+      expect(manager.getActiveChannelCount()).toBe(0);
+
+      // Full snapshot should be empty (no stale 255s)
+      const snapshot = manager.getFullSnapshot();
+      expect(Object.keys(snapshot)).toHaveLength(0);
+    });
+
+    it("resets DMX hardware to 0 on resume after whiteout", () => {
+      manager.whiteout();
+      mock.updateCalls.length = 0;
+      mock.updateAllCalls.length = 0;
+
+      manager.resumeNormal();
+
+      // Should send updateAll(0) to zero the hardware
+      expect(mock.updateAllCalls).toEqual([0]);
+    });
+
+    it("preserves safe positions on resume after whiteout", () => {
+      manager.registerSafePositions({ 54: 128, 56: 128 });
+      manager.whiteout();
+      mock.updateCalls.length = 0;
+      mock.updateAllCalls.length = 0;
+
+      manager.resumeNormal();
+
+      // Should use selective update (not updateAll)
+      expect(mock.updateAllCalls).toHaveLength(0);
       expect(mock.updateCalls).toHaveLength(1);
+      const update = mock.updateCalls[0];
+      // Motor channels preserved
+      expect(update[54]).toBe(128);
+      expect(update[56]).toBe(128);
+      // Non-motor channels zeroed
+      expect(update[1]).toBe(0);
+      expect(update[100]).toBe(0);
+      // Only safe positions should be active
+      expect(manager.getActiveChannelCount()).toBe(2);
     });
   });
 

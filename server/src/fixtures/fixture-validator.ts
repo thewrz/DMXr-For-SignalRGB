@@ -1,4 +1,5 @@
 import type { FixtureConfig, FixtureChannel } from "../types/protocol.js";
+import { DEFAULT_UNIVERSE_ID } from "../types/protocol.js";
 
 const MIN_ADDRESS = 1;
 const MAX_ADDRESS = 512;
@@ -70,6 +71,7 @@ export function validateFixtureAddress(
   channelCount: number,
   existingFixtures: readonly FixtureConfig[],
   excludeId?: string,
+  universeId?: string,
 ): ValidationResult {
   if (
     !Number.isInteger(startAddress) ||
@@ -91,8 +93,15 @@ export function validateFixtureAddress(
     return { valid: false, error: "Channel count must be >= 1" };
   }
 
+  const targetUniverse = universeId ?? DEFAULT_UNIVERSE_ID;
+
   for (const existing of existingFixtures) {
     if (excludeId !== undefined && existing.id === excludeId) {
+      continue;
+    }
+
+    const existingUniverse = existing.universeId ?? DEFAULT_UNIVERSE_ID;
+    if (existingUniverse !== targetUniverse) {
       continue;
     }
 

@@ -2,10 +2,12 @@ import { readFile, writeFile, mkdir, rename } from "node:fs/promises";
 import { dirname } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { FixtureConfig, AddFixtureRequest, UpdateFixtureRequest } from "../types/protocol.js";
+import { DEFAULT_UNIVERSE_ID } from "../types/protocol.js";
 
 export interface FixtureStore {
   readonly getAll: () => readonly FixtureConfig[];
   readonly getById: (id: string) => FixtureConfig | undefined;
+  readonly getByUniverse: (universeId: string) => readonly FixtureConfig[];
   readonly add: (request: AddFixtureRequest) => FixtureConfig;
   readonly update: (id: string, changes: UpdateFixtureRequest) => FixtureConfig | undefined;
   readonly remove: (id: string) => boolean;
@@ -46,10 +48,15 @@ export function createFixtureStore(filePath: string): FixtureStore {
       return fixtures.find((f) => f.id === id);
     },
 
+    getByUniverse(universeId: string): readonly FixtureConfig[] {
+      return fixtures.filter((f) => (f.universeId ?? DEFAULT_UNIVERSE_ID) === universeId);
+    },
+
     add(request: AddFixtureRequest): FixtureConfig {
       const fixture: FixtureConfig = {
         id: randomUUID(),
         name: request.name,
+        universeId: request.universeId ?? DEFAULT_UNIVERSE_ID,
         ...(request.oflKey ? { oflKey: request.oflKey } : {}),
         ...(request.oflFixtureName ? { oflFixtureName: request.oflFixtureName } : {}),
         ...(request.source ? { source: request.source } : {}),
@@ -71,6 +78,7 @@ export function createFixtureStore(filePath: string): FixtureStore {
       const updated: FixtureConfig = {
         ...fixtures[index],
         ...(changes.name !== undefined ? { name: changes.name } : {}),
+        ...(changes.universeId !== undefined ? { universeId: changes.universeId } : {}),
         ...(changes.dmxStartAddress !== undefined ? { dmxStartAddress: changes.dmxStartAddress } : {}),
         ...(changes.channelOverrides !== undefined ? { channelOverrides: changes.channelOverrides } : {}),
         ...(changes.whiteGateThreshold !== undefined ? { whiteGateThreshold: changes.whiteGateThreshold } : {}),
@@ -124,11 +132,14 @@ export function createFixtureStore(filePath: string): FixtureStore {
         const parsed: unknown = JSON.parse(data);
 
         if (isValidFixtureArray(parsed)) {
-          fixtures = parsed.map((f) =>
-            f.source === ("soundswitch" as string)
+          fixtures = parsed.map((f) => {
+            const migrated = f.source === ("soundswitch" as string)
               ? { ...f, source: "local-db" as const }
-              : f,
-          );
+              : f;
+            return migrated.universeId === undefined
+              ? { ...migrated, universeId: DEFAULT_UNIVERSE_ID }
+              : migrated;
+          });
         } else {
           fixtures = [];
         }

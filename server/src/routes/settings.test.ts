@@ -174,9 +174,10 @@ describe("settings routes", () => {
   });
 
   describe("POST /settings/restart", () => {
-    it("returns restarting response", async () => {
-      // Mock process.exit to prevent actual exit
+    it("returns restarting response and exits with non-zero code", async () => {
+      vi.useFakeTimers();
       const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+      const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
 
       const res = await app.inject({
         method: "POST",
@@ -186,9 +187,17 @@ describe("settings routes", () => {
       expect(res.statusCode).toBe(200);
       expect(res.json().restarting).toBe(true);
 
-      // Clean up timer before it fires
+      // Advance past the 500ms delay to trigger process.exit
+      await vi.advanceTimersByTimeAsync(500);
+
+      expect(exitSpy).toHaveBeenCalledWith(1);
+      expect(stderrSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Restarting server"),
+      );
+
       vi.useRealTimers();
       exitSpy.mockRestore();
+      stderrSpy.mockRestore();
     });
   });
 });

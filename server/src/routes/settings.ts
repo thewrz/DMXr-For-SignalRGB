@@ -86,7 +86,11 @@ export function registerSettingsRoutes(
     reply.send({ restarting: true });
 
     setTimeout(() => {
-      process.exit(0);
+      // Exit with non-zero code so service managers (systemd Restart=on-failure,
+      // NSSM) will restart the process. Exit code 0 is treated as intentional
+      // shutdown and will NOT trigger a restart.
+      process.stderr.write("[DMXr] Restarting server (requested via settings UI)\n");
+      process.exit(1);
     }, 500);
   });
 }

@@ -99,9 +99,9 @@ export function registerControlRoutes(
       deps.coordinator.blackout(universeId);
     } else if (deps.coordinator) {
       deps.coordinator.blackoutAll();
-    } else {
-      deps.manager.blackout();
     }
+    // Primary manager is not in the connection pool — always update it
+    deps.manager.blackout();
 
     const fixtures = deps.store.getAll();
     request.log.info(
@@ -121,9 +121,9 @@ export function registerControlRoutes(
       deps.coordinator.whiteout(universeId);
     } else if (deps.coordinator) {
       deps.coordinator.whiteoutAll();
-    } else {
-      deps.manager.whiteout();
     }
+    // Primary manager is not in the connection pool — always update it
+    deps.manager.whiteout();
 
     // Overlay fixture-specific values via mapColor for correct
     // non-color channels (pan center, strobe open, dimmer full, etc.)
@@ -183,9 +183,9 @@ export function registerControlRoutes(
       deps.coordinator.resumeNormal(universeId);
     } else if (deps.coordinator) {
       deps.coordinator.resumeNormalAll();
-    } else {
-      deps.manager.resumeNormal();
     }
+    // Primary manager is not in the connection pool — always update it
+    deps.manager.resumeNormal();
 
     request.log.info(
       { action: "resume", universeId: universeId ?? "all" },

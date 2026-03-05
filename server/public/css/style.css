@@ -1272,3 +1272,173 @@ header {
   width: 100%;
   height: 100%;
 }
+
+/* ── DMX Monitor ── */
+
+.monitor-modal {
+  max-width: 960px;
+  width: 95%;
+  max-height: 90vh;
+}
+
+.monitor-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.monitor-toolbar .btn { padding: 0.3rem 0.6rem; font-size: 0.8rem; }
+
+.monitor-view-toggle {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.monitor-view-toggle button {
+  background: var(--surface2);
+  color: var(--text-dim);
+  border: none;
+  padding: 0.3rem 0.75rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.monitor-view-toggle button:not(:last-child) {
+  border-right: 1px solid var(--border);
+}
+
+.monitor-view-toggle button.active {
+  background: var(--accent2);
+  color: var(--text);
+}
+
+.monitor-status {
+  margin-left: auto;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.monitor-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.monitor-status-dot.live { background: var(--success); }
+.monitor-status-dot.paused { background: var(--warning); }
+.monitor-status-dot.error { background: var(--danger); }
+
+/* Grid View: 32 columns x 16 rows */
+.monitor-grid {
+  display: grid;
+  grid-template-columns: repeat(32, 1fr);
+  gap: 1px;
+  font-variant-numeric: tabular-nums;
+  overflow-x: auto;
+}
+
+.monitor-cell {
+  aspect-ratio: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 2px;
+  font-size: 0.55rem;
+  line-height: 1.2;
+  transition: background 0.1s;
+  user-select: none;
+}
+
+.monitor-cell-addr {
+  opacity: 0.5;
+  font-size: 0.5rem;
+}
+
+.monitor-cell-val {
+  font-weight: 600;
+}
+
+/* Fixture-Grouped View */
+.monitor-fixture-group {
+  margin-bottom: 1rem;
+}
+
+.monitor-fixture-header {
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.4rem 0.5rem;
+  background: var(--surface2);
+  border-radius: 4px 4px 0 0;
+  border: 1px solid var(--border);
+  border-bottom: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.monitor-fixture-addr {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  font-weight: 400;
+}
+
+.monitor-fixture-channels {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  gap: 1px;
+  border: 1px solid var(--border);
+  border-radius: 0 0 4px 4px;
+  overflow: hidden;
+}
+
+.monitor-fixture-ch {
+  display: flex;
+  flex-direction: column;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.75rem;
+  transition: background 0.1s;
+}
+
+.monitor-fixture-ch-name {
+  color: var(--text-dim);
+  font-size: 0.65rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.monitor-fixture-ch-val {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.monitor-empty {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+}
+
+/* Responsive: smaller cells on narrow screens */
+@media (max-width: 768px) {
+  .monitor-grid {
+    grid-template-columns: repeat(16, 1fr);
+  }
+  .monitor-cell {
+    font-size: 0.5rem;
+  }
+  .monitor-cell-addr {
+    display: none;
+  }
+}

@@ -83,5 +83,6 @@ function dmxrApp() {
     dmxrSetupWizard(),
     dmxrCustomFixture(),
     dmxrFixtureIcons(),
+    dmxrDmxMonitor(),
   );
 }

@@ -25,7 +25,9 @@ import { registerSettingsRoutes } from "./routes/settings.js";
 import { registerMetricsRoute } from "./routes/metrics.js";
 import { registerUserFixtureRoutes } from "./routes/user-fixtures.js";
 import { registerUniverseRoutes } from "./routes/universes.js";
+import { registerMonitorRoutes } from "./routes/monitor.js";
 import { registerApiKeyAuth } from "./middleware/api-key-auth.js";
+import type { DmxMonitor } from "./dmx/dmx-monitor.js";
 import type { LatencyTracker } from "./metrics/latency-tracker.js";
 import type { MdnsAdvertiser } from "./mdns/advertiser.js";
 import type { UdpColorServer } from "./udp/udp-color-server.js";
@@ -52,6 +54,7 @@ interface BuildServerDeps {
   readonly serverId?: string;
   readonly serverName?: string;
   readonly getMdnsAdvertiser?: () => MdnsAdvertiser | undefined;
+  readonly dmxMonitor?: DmxMonitor;
   readonly coordinator?: MultiUniverseCoordinator;
   readonly universeRegistry?: UniverseRegistry;
   readonly connectionPool?: ConnectionPool;
@@ -184,6 +187,13 @@ export async function buildServer(
       settingsStore: deps.settingsStore,
       serverVersion: deps.serverVersion ?? "0.0.0",
       getMdnsAdvertiser: deps.getMdnsAdvertiser,
+    });
+  }
+
+  if (deps.dmxMonitor) {
+    registerMonitorRoutes(app, {
+      monitor: deps.dmxMonitor,
+      fixtureStore: deps.fixtureStore,
     });
   }
 

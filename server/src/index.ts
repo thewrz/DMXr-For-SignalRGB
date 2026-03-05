@@ -26,6 +26,7 @@ import { createLibraryRegistry } from "./libraries/registry.js";
 import { buildServer } from "./server.js";
 import { createUdpColorServer } from "./udp/udp-color-server.js";
 import { createLatencyTracker } from "./metrics/latency-tracker.js";
+import { createDmxMonitor } from "./dmx/dmx-monitor.js";
 import { getFixtureDefaults } from "./fixtures/channel-mapper.js";
 import { setPipelineLogLevel, parsePipelineLogLevel, pipeLog } from "./logging/pipeline-logger.js";
 
@@ -205,6 +206,8 @@ async function main() {
     logger: consoleLogger,
   });
 
+  const dmxMonitor = createDmxMonitor({ manager });
+
   const app = await buildServer({
     config: finalConfig,
     manager,
@@ -222,6 +225,7 @@ async function main() {
     serverId,
     serverName,
     getMdnsAdvertiser: () => mdnsAdvertiser,
+    dmxMonitor,
     coordinator,
     universeRegistry,
     connectionPool,
@@ -250,6 +254,7 @@ async function main() {
     for (const provider of registry.getAll()) {
       provider.close?.();
     }
+    dmxMonitor.close();
     coordinator.blackoutAll();
     manager.blackout();
     await udpServer.close();

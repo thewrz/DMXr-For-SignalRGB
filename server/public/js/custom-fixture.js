@@ -237,6 +237,7 @@ function dmxrCustomFixture() {
         this.stagedFixture = {
           name: saved.name,
           source: "custom",
+          category: this.customCategory,
           mode: mode.name,
           channelCount: mode.channels.length,
           channels: mode.channels,
@@ -267,6 +268,7 @@ function dmxrCustomFixture() {
       this.stagedFixture = {
         name: template.name,
         source: "custom",
+        category: template.category,
         mode: mode.name,
         channelCount: mode.channels.length,
         channels: mode.channels,

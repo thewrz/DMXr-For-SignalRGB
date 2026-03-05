@@ -665,7 +665,7 @@ function probeOneServer(host, port) {
 // --------------------------------<( Fixture Category Derivation )>-----------------------
 // Lightweight port of classify-fixture logic for category icons.
 
-function deriveCategoryFromChannels(channels) {
+function deriveCategoryFromChannels(channels, name) {
 	if (!channels || channels.length === 0) return "Other";
 	var hasPan = false, hasTilt = false, hasGobo = false, hasPrism = false;
 	var hasColorWheel = false, hasStrobe = false, hasColor = false;
@@ -694,6 +694,18 @@ function deriveCategoryFromChannels(channels) {
 	if (hasColor && hasUvOnly) return "Blacklight";
 	if (hasColor) return "Color Changer";
 	if (allDimmer && hasIntensity && !hasColor) return "Dimmer";
+
+	// Name heuristic as last resort
+	if (name) {
+		var n = name.toLowerCase();
+		if (/\blaser\b/.test(n)) return "Laser";
+		if (/\bsmoke\b|\bfog\b|\bhaze\b|\bhurricane\b/.test(n)) return "Smoke Machine";
+		if (/\bblinder\b/.test(n)) return "Blinder";
+		if (/\bstrobe\b/.test(n)) return "Strobe";
+		if (/\bbar\b|\bstrip\b|\bpixel\b/.test(n)) return "Pixel Bar";
+		if (/\bspot\b|\bpar\b/.test(n)) return "Color Changer";
+	}
+
 	return "Other";
 }
 
@@ -721,8 +733,8 @@ function DMXrBridge(fixture, udpIndex, server, displayName) {
 	// UDP fixture index (position in server's fixture array)
 	this._udpIndex = typeof udpIndex === "number" ? udpIndex : -1;
 
-	// Derive fixture category for icon
-	this._category = deriveCategoryFromChannels(fixture.channels || []);
+	// Derive fixture category for icon (prefer persisted category)
+	this._category = fixture.category || deriveCategoryFromChannels(fixture.channels || [], fixture.name);
 	this.image = "https://raw.githubusercontent.com/thewrz/DMXr-For-SignalRGB/main/docs/images/fixture-icons/" +
 		this._category.toLowerCase().replace(/ /g, "-") + ".png";
 

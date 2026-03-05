@@ -46,6 +46,7 @@ export interface FixtureLibraryProvider {
   readonly getFixtureModes: (fixtureId: number) => readonly LibraryMode[];
   readonly getModeChannels: (modeId: number) => readonly FixtureChannel[];
   readonly searchFixtures: (query: string, limit?: number) => readonly LibrarySearchResult[];
+  readonly getFixtureCategory?: (fixtureId: number) => string | null;
   readonly close?: () => void;
 }
 

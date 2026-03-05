@@ -14,7 +14,7 @@ var FIXTURE_ICON_MAP = {
   "Effect": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="5" x2="12" y2="1"/><line x1="12" y1="23" x2="12" y2="19"/><line x1="5" y1="12" x2="1" y2="12"/><line x1="23" y1="12" x2="19" y2="12"/><line x1="7.05" y1="7.05" x2="4.22" y2="4.22"/><line x1="19.78" y1="19.78" x2="16.95" y2="16.95"/></svg>',
   "Pixel Bar": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="8" width="22" height="8" rx="2"/><circle cx="5" cy="12" r="1.5" fill="currentColor" opacity="0.6"/><circle cx="9.5" cy="12" r="1.5" fill="currentColor" opacity="0.6"/><circle cx="14.5" cy="12" r="1.5" fill="currentColor" opacity="0.6"/><circle cx="19" cy="12" r="1.5" fill="currentColor" opacity="0.6"/></svg>',
   "Blacklight": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="9" width="18" height="6" rx="3"/><line x1="6" y1="6" x2="6" y2="9" stroke-dasharray="1 1.5" opacity="0.5"/><line x1="10" y1="5" x2="10" y2="9" stroke-dasharray="1 1.5" opacity="0.5"/><line x1="14" y1="5" x2="14" y2="9" stroke-dasharray="1 1.5" opacity="0.5"/><line x1="18" y1="6" x2="18" y2="9" stroke-dasharray="1 1.5" opacity="0.5"/></svg>',
-  "Smoke Machine": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="14" width="16" height="7" rx="2"/><path d="M18 17h2a2 2 0 002-2v-1a2 2 0 00-2-2h-2"/><path d="M6 14c0-2 1-4 3-5" opacity="0.5"/><path d="M10 14c0-3 1.5-5 3.5-7" opacity="0.5"/><path d="M14 14c0-2 .5-3 1.5-4" opacity="0.5"/></svg>',
+  "Smoke Machine": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h8a3 3 0 1 0 3-3"/><path d="M3 12h12a3 3 0 1 1 3 3"/><path d="M3 16h6a3 3 0 1 0 3-3"/></svg>',
   "Other": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21h6"/><path d="M12 21v-2"/><path d="M12 3a6 6 0 016 6c0 2.2-1.2 3.8-2.5 5-.8.7-1.5 1.5-1.5 3h-4c0-1.5-.7-2.3-1.5-3C7.2 12.8 6 11.2 6 9a6 6 0 016-6z"/></svg>',
 };
 
@@ -24,7 +24,7 @@ var FIXTURE_ICON_MAP = {
  * @param {Array<{type: string, color?: string}>} channels
  * @returns {string}
  */
-function deriveFixtureCategory(channels) {
+function deriveFixtureCategory(channels, name) {
   if (!channels || channels.length === 0) return "Other";
 
   var hasPan = false;
@@ -72,6 +72,17 @@ function deriveFixtureCategory(channels) {
   if (hasColor) return "Color Changer";
   if (allDimmer && hasIntensity && !hasColor) return "Dimmer";
 
+  // Name heuristic as last resort
+  if (name) {
+    var n = name.toLowerCase();
+    if (/\blaser\b/.test(n)) return "Laser";
+    if (/\bsmoke\b|\bfog\b|\bhaze\b|\bhurricane\b/.test(n)) return "Smoke Machine";
+    if (/\bblinder\b/.test(n)) return "Blinder";
+    if (/\bstrobe\b/.test(n)) return "Strobe";
+    if (/\bbar\b|\bstrip\b|\bpixel\b/.test(n)) return "Pixel Bar";
+    if (/\bspot\b|\bpar\b/.test(n)) return "Color Changer";
+  }
+
   return "Other";
 }
 
@@ -92,13 +103,17 @@ function getFixtureIcon(category) {
  * @returns {string} SVG string
  */
 function getFixtureIconForResult(fixture) {
-  // OFL search results have categories array
+  // 1. Explicit category from config (persisted from source data)
+  if (fixture.category && FIXTURE_ICON_MAP[fixture.category]) {
+    return FIXTURE_ICON_MAP[fixture.category];
+  }
+  // 2. OFL search results have categories[]
   if (fixture.categories && fixture.categories.length > 0) {
     return getFixtureIcon(fixture.categories[0]);
   }
-  // Staged / configured fixtures have channels array
+  // 3. Derive from channels + name heuristic
   if (fixture.channels) {
-    return getFixtureIcon(deriveFixtureCategory(fixture.channels));
+    return getFixtureIcon(deriveFixtureCategory(fixture.channels, fixture.name));
   }
   return getFixtureIcon("Other");
 }
@@ -129,8 +144,8 @@ function dmxrFixtureIcons() {
      * @param {Array} channels
      * @returns {string}
      */
-    deriveCategoryFromChannels(channels) {
-      return deriveFixtureCategory(channels);
+    deriveCategoryFromChannels(channels, name) {
+      return deriveFixtureCategory(channels, name);
     },
   };
 }

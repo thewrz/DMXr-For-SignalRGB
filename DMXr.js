@@ -146,6 +146,8 @@ var serverRegistry = {};
 // serverRegistry[serverId] = { serverId, serverName, host, port, udpPort, lastSeen, healthy }
 
 var STALE_TIMEOUT_MS = 300000; // prune servers not seen in 5 minutes
+var UPDATE_CHECK_URL = "https://raw.githubusercontent.com/thewrz/DMXr/main/DMXr.js";
+var updateCheckDone = false;
 
 function getServerUrlFor(server, path) {
 	return "http://" + server.host + ":" + server.port + path;
@@ -317,6 +319,31 @@ export function Shutdown() {
 	}
 }
 
+// --------------------------------<( Plugin Update Check )>-------------------------------
+// Fetches the latest DMXr.js from GitHub once per session to compare Version().
+// Runs synchronously but only fires once, so the ~20KB fetch is negligible.
+
+function checkForPluginUpdate() {
+	if (updateCheckDone) return;
+	updateCheckDone = true;
+
+	try {
+		var xhr = new XMLHttpRequest();
+		xhr.open("GET", UPDATE_CHECK_URL, false);
+		xhr.send();
+
+		if (xhr.status !== 200) return;
+
+		var match = xhr.responseText.match(/export function Version\(\)\s*\{\s*return\s*"([^"]+)"/);
+		if (match && match[1] !== Version()) {
+			service.log("DMXr: Update available! You have v" + Version() + ", latest is v" + match[1]);
+			service.log("DMXr: To update — close SignalRGB, delete the addon cache folder, and reopen SignalRGB.");
+		}
+	} catch (e) {
+		// Update check is best-effort — network may be unavailable
+	}
+}
+
 // --------------------------------<( Discovery Service )>--------------------------------
 
 export function DiscoveryService() {
@@ -397,6 +424,9 @@ export function DiscoveryService() {
 		}
 
 		self.lastPollTime = now;
+
+		// One-time plugin update check (best-effort, non-blocking on failure)
+		checkForPluginUpdate();
 
 		// Prune stale servers
 		var serverKeys = Object.keys(serverRegistry);

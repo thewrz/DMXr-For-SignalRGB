@@ -83,6 +83,16 @@ describe("Library routes", () => {
       expect(localDb.displayName).toBe("Local Fixture Database");
       expect(localDb.status.available).toBe(true);
     });
+
+    it("includes builtin provider in library list", async () => {
+      const res = await app.inject({ method: "GET", url: "/libraries" });
+      const body = res.json();
+      const builtin = body.find((l: { id: string }) => l.id === "builtin");
+      expect(builtin).toBeDefined();
+      expect(builtin.displayName).toBe("Built-in Templates");
+      expect(builtin.status.available).toBe(true);
+      expect(builtin.status.fixtureCount).toBe(9);
+    });
   });
 
   describe("GET /libraries/:id/manufacturers", () => {
@@ -139,6 +149,62 @@ describe("Library routes", () => {
       const body = res.json();
       expect(body).toHaveLength(3);
       expect(body[0].name).toBe("Red");
+    });
+  });
+
+  describe("Builtin template routes", () => {
+    it("returns Generic manufacturer", async () => {
+      const res = await app.inject({ method: "GET", url: "/libraries/builtin/manufacturers" });
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body).toHaveLength(1);
+      expect(body[0].name).toBe("Generic");
+      expect(body[0].fixtureCount).toBe(9);
+    });
+
+    it("returns all 9 builtin fixtures", async () => {
+      const mfrRes = await app.inject({ method: "GET", url: "/libraries/builtin/manufacturers" });
+      const mfrId = mfrRes.json()[0].id;
+      const res = await app.inject({ method: "GET", url: `/libraries/builtin/manufacturers/${mfrId}/fixtures` });
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toHaveLength(9);
+    });
+
+    it("returns modes and channels for a builtin fixture", async () => {
+      const mfrRes = await app.inject({ method: "GET", url: "/libraries/builtin/manufacturers" });
+      const mfrId = mfrRes.json()[0].id;
+      const fixRes = await app.inject({ method: "GET", url: `/libraries/builtin/manufacturers/${mfrId}/fixtures` });
+      const fixtureId = fixRes.json()[0].id;
+
+      const modeRes = await app.inject({ method: "GET", url: `/libraries/builtin/fixtures/${fixtureId}/modes` });
+      expect(modeRes.statusCode).toBe(200);
+      const modes = modeRes.json().modes;
+      expect(modes.length).toBeGreaterThanOrEqual(1);
+
+      const chanRes = await app.inject({ method: "GET", url: `/libraries/builtin/fixtures/${fixtureId}/modes/${modes[0].id}/channels` });
+      expect(chanRes.statusCode).toBe(200);
+      expect(chanRes.json().length).toBeGreaterThan(0);
+    });
+
+    it("imports a builtin template as a fixture with source 'builtin'", async () => {
+      const mfrRes = await app.inject({ method: "GET", url: "/libraries/builtin/manufacturers" });
+      const mfrId = mfrRes.json()[0].id;
+      const fixRes = await app.inject({ method: "GET", url: `/libraries/builtin/manufacturers/${mfrId}/fixtures` });
+      const fixtureId = fixRes.json()[0].id;
+      const modeRes = await app.inject({ method: "GET", url: `/libraries/builtin/fixtures/${fixtureId}/modes` });
+      const modeId = modeRes.json().modes[0].id;
+
+      const importRes = await app.inject({
+        method: "POST",
+        url: `/libraries/builtin/fixtures/${fixtureId}/modes/${modeId}/import`,
+        payload: { name: "My Generic PAR", dmxStartAddress: 1 },
+      });
+
+      expect(importRes.statusCode).toBe(201);
+      const body = importRes.json();
+      expect(body.name).toBe("My Generic PAR");
+      expect(body.source).toBe("builtin");
+      expect(body.channels.length).toBeGreaterThan(0);
     });
   });
 

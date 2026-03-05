@@ -20,6 +20,7 @@ import { createOflClient } from "./ofl/ofl-client.js";
 import { createSsClientIfConfigured } from "./soundswitch/ss-client.js";
 import { createLocalDbProvider } from "./libraries/local-db-provider.js";
 import { createUserFixtureProvider } from "./libraries/user-fixture-provider.js";
+import { createBuiltinTemplateProvider } from "./libraries/builtin-template-provider.js";
 import { createOflProvider } from "./libraries/ofl-provider.js";
 import { createLibraryRegistry } from "./libraries/registry.js";
 import { buildServer } from "./server.js";
@@ -193,7 +194,8 @@ async function main() {
   const oflProvider = createOflProvider(oflClient);
   const localDbProvider = createLocalDbProvider(ssClient, ssStatus);
   const userFixtureProvider = createUserFixtureProvider(userFixtureStore);
-  const registry = createLibraryRegistry([oflProvider, localDbProvider, userFixtureProvider]);
+  const builtinProvider = createBuiltinTemplateProvider();
+  const registry = createLibraryRegistry([oflProvider, localDbProvider, userFixtureProvider, builtinProvider]);
 
   const udpServer = createUdpColorServer({
     fixtureStore,

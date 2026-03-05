@@ -145,6 +145,15 @@ describe("GET /search", () => {
     expect(fixture.categories).toEqual(["Color Changer"]);
   });
 
+  it("returns builtin templates in search results", async () => {
+    const res = await app.inject({ method: "GET", url: "/search?q=rgb generic" });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    const builtins = body.filter((r: { source: string }) => r.source === "builtin");
+    expect(builtins.length).toBeGreaterThan(0);
+    expect(builtins[0].type).toBe("fixture");
+  });
+
   it("handles missing local-db gracefully (OFL-only)", async () => {
     const manager = createUniverseManager(createMockUniverse());
     const oflOnlyApp = await buildServer({

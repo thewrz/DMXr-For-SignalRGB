@@ -90,7 +90,7 @@ export interface ChannelOverride {
 }
 
 /** Fixture data source */
-export type FixtureSource = "ofl" | "local-db" | "custom";
+export type FixtureSource = "ofl" | "local-db" | "custom" | "builtin";
 
 /** Stored fixture configuration */
 export interface FixtureConfig {

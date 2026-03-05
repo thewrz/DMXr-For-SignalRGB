@@ -5,9 +5,13 @@ import { loadConfig } from "./config/server-config.js";
 import { createSettingsStore } from "./config/settings-store.js";
 import { createUniverseManager } from "./dmx/universe-manager.js";
 import { createResilientConnection } from "./dmx/resilient-connection.js";
+import type { ResilientConnection } from "./dmx/resilient-connection.js";
 import { createFixtureStore } from "./fixtures/fixture-store.js";
 import { createUserFixtureStore } from "./fixtures/user-fixture-store.js";
 import { autoDetectDmxPort } from "./dmx/serial-port-scanner.js";
+import { createUniverseRegistry } from "./dmx/universe-registry.js";
+import { createConnectionPool } from "./dmx/connection-pool.js";
+import { createMultiUniverseCoordinator } from "./dmx/multi-universe-coordinator.js";
 import {
   createMdnsAdvertiser,
   type MdnsAdvertiser,
@@ -144,6 +148,35 @@ async function main() {
   }
   pipeLog("info", "Fixture defaults initialization complete");
 
+  // ── Multi-Universe Stack ──
+  const universeRegistry = createUniverseRegistry("./config/universes.json");
+  await universeRegistry.load();
+
+  const connectionPool = createConnectionPool({
+    createConnection: async (uniConfig) => {
+      const uniServerConfig = {
+        ...finalConfig,
+        dmxDriver: uniConfig.driverType,
+        dmxDevicePath: uniConfig.devicePath,
+      };
+      return createResilientConnection({
+        config: uniServerConfig,
+        logger: consoleLogger,
+        getChannelSnapshot: () =>
+          connectionPool.getManager(uniConfig.id)?.getFullSnapshot() ?? {},
+      });
+    },
+    createManager: (universe) =>
+      createUniverseManager(universe, {
+        logger: consoleLogger,
+        onDmxError: (err) => process.stderr.write(`[DMX] Send error: ${err}\n`),
+        onDmxSendTiming: (ms) => latencyTracker.recordDmxSend(ms),
+      }),
+  });
+
+  const coordinator = createMultiUniverseCoordinator(() => connectionPool.getAllManagers());
+  pipeLog("info", `Universe registry loaded: ${universeRegistry.getAll().length} universe(s)`);
+
   const oflClient = createOflClient();
   const { client: ssClient, status: ssStatus } = createSsClientIfConfigured(finalConfig.localDbPath);
 
@@ -155,6 +188,7 @@ async function main() {
   const udpServer = createUdpColorServer({
     fixtureStore,
     manager,
+    coordinator,
     latencyTracker,
     logger: consoleLogger,
   });
@@ -176,6 +210,9 @@ async function main() {
     serverId,
     serverName,
     getMdnsAdvertiser: () => mdnsAdvertiser,
+    coordinator,
+    universeRegistry,
+    connectionPool,
   });
 
   let mdnsAdvertiser: MdnsAdvertiser | undefined;
@@ -186,6 +223,7 @@ async function main() {
   process.on("exit", () => {
     if (!exitBlackoutDone) {
       exitBlackoutDone = true;
+      coordinator.blackoutAll();
       manager.blackout();
     }
   });
@@ -200,9 +238,11 @@ async function main() {
     for (const provider of registry.getAll()) {
       provider.close?.();
     }
+    coordinator.blackoutAll();
     manager.blackout();
     await udpServer.close();
     await app.close();
+    await connectionPool.closeAll();
     await connection.close();
     process.exit(0);
   };

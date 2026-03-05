@@ -662,6 +662,40 @@ function probeOneServer(host, port) {
 	}
 }
 
+// --------------------------------<( Fixture Category Derivation )>-----------------------
+// Lightweight port of classify-fixture logic for category icons.
+
+function deriveCategoryFromChannels(channels) {
+	if (!channels || channels.length === 0) return "Other";
+	var hasPan = false, hasTilt = false, hasGobo = false, hasPrism = false;
+	var hasColorWheel = false, hasStrobe = false, hasColor = false;
+	var hasUvOnly = true, allDimmer = true;
+	for (var i = 0; i < channels.length; i++) {
+		var t = channels[i].type;
+		if (t === "Pan") hasPan = true;
+		else if (t === "Tilt") hasTilt = true;
+		else if (t === "Gobo") hasGobo = true;
+		else if (t === "Prism") hasPrism = true;
+		else if (t === "ColorWheel") hasColorWheel = true;
+		else if (t === "Strobe" || t === "ShutterStrobe") hasStrobe = true;
+		if (t === "ColorIntensity") {
+			hasColor = true;
+			if (channels[i].color !== "UV") hasUvOnly = false;
+		}
+		if (t !== "Intensity" && t !== "Generic" && t !== "NoFunction" && t !== "ColorIntensity") {
+			allDimmer = false;
+		}
+	}
+	if (hasPan && hasTilt) return "Moving Head";
+	if (hasPan || hasTilt) return "Scanner";
+	if (hasGobo || hasPrism || hasColorWheel) return "Effect";
+	if (hasStrobe && !hasColor) return "Strobe";
+	if (hasColor && hasUvOnly) return "Blacklight";
+	if (hasColor) return "Color Changer";
+	if (allDimmer && !hasColor) return "Dimmer";
+	return "Other";
+}
+
 // --------------------------------<( Bridge Data Class )>--------------------------------
 // Data-only object passed to service.addController(). Device operations happen in
 // the top-level Initialize/Render/Shutdown exports, not here.
@@ -685,6 +719,11 @@ function DMXrBridge(fixture, udpIndex, server, displayName) {
 
 	// UDP fixture index (position in server's fixture array)
 	this._udpIndex = typeof udpIndex === "number" ? udpIndex : -1;
+
+	// Derive fixture category for icon
+	this._category = deriveCategoryFromChannels(fixture.channels || []);
+	this.image = "https://raw.githubusercontent.com/thewrz/DMXr-For-SignalRGB/main/docs/images/fixture-icons/" +
+		this._category.toLowerCase().replace(/ /g, "-") + ".png";
 
 	// Runtime state (managed by top-level lifecycle exports)
 	this._lastR = -1;

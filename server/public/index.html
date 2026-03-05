@@ -17,6 +17,7 @@
   <script src="/js/latency.js"></script>
   <script src="/js/setup-wizard.js"></script>
   <script src="/js/custom-fixture.js"></script>
+  <script src="/js/fixture-icons.js"></script>
   <script src="/js/app.js"></script>
 </head>
 <body x-data="dmxrApp()" x-init="init()">
@@ -73,7 +74,8 @@
           <template x-for="result in unifiedSearchResults" :key="result.key">
             <div class="result-item" @click="selectSearchResult(result)">
               <div class="result-row">
-                <div>
+                <div style="display:flex;align-items:center;gap:0.3rem">
+                  <span class="result-icon" x-html="fixtureIcon(result)"></span>
                   <strong x-text="result.name"></strong>
                   <span class="result-detail" x-show="result.type === 'fixture'" x-text="result.detail"></span>
                 </div>
@@ -136,7 +138,10 @@
               <div class="search-results">
                 <template x-for="f in filteredFixtures" :key="f.key">
                   <div class="result-item" @click="selectFixture(f)">
-                    <strong x-text="f.name"></strong>
+                    <div style="display:flex;align-items:center;gap:0.3rem">
+                      <span class="result-icon" x-html="fixtureIcon(f)"></span>
+                      <strong x-text="f.name"></strong>
+                    </div>
                     <span class="categories" x-text="f.categories.join(', ')"></span>
                   </div>
                 </template>
@@ -175,10 +180,13 @@
               <div class="custom-template-list" x-show="customTemplates.length > 0">
                 <template x-for="tpl in customTemplates" :key="tpl.id">
                   <div class="custom-template-item">
-                    <div class="custom-template-info" @click="stageCustomTemplate(tpl)">
-                      <strong x-text="tpl.name"></strong>
-                      <span class="custom-template-meta"
-                            x-text="tpl.manufacturer + ' &middot; ' + (tpl.modes[0]?.channels.length || 0) + ' ch'"></span>
+                    <div class="custom-template-info" @click="stageCustomTemplate(tpl)" style="display:flex;align-items:center;gap:0.3rem">
+                      <span class="result-icon" x-html="categoryIcon(tpl.category)"></span>
+                      <div>
+                        <strong x-text="tpl.name"></strong>
+                        <span class="custom-template-meta"
+                              x-text="tpl.manufacturer + ' &middot; ' + (tpl.modes[0]?.channels.length || 0) + ' ch'"></span>
+                      </div>
                     </div>
                     <div class="custom-template-actions">
                       <button class="btn btn-sm" @click.stop="startCustomEdit(tpl)" title="Edit">&#9998;</button>
@@ -378,6 +386,7 @@
            @dragstart="onStagedDragStart($event)"
            @dragend="onDragEnd()">
         <div class="staged-header">
+          <span class="staged-icon" x-html="fixtureIcon(stagedFixture)"></span>
           <strong x-text="stagedFixture?.name"></strong>
           <button class="btn btn-sm btn-danger" @click="stagedFixture = null">&times;</button>
         </div>
@@ -452,7 +461,10 @@
                @mouseleave="highlightedFixtureId = null">
             <div class="fixture-card-top">
               <div class="fixture-header">
-                <strong x-text="fixture.name"></strong>
+                <div style="display:flex;align-items:center;gap:0.3rem">
+                  <span class="fixture-icon" x-html="fixtureIcon(fixture)"></span>
+                  <strong x-text="fixture.name"></strong>
+                </div>
                 <span class="fixture-meta">
                   <span x-text="fixture.oflFixtureName || fixture.source || ''"></span>
                   <span x-show="fixture.oflFixtureName || fixture.source"> &middot; </span>

@@ -82,5 +82,6 @@ function dmxrApp() {
     dmxrLatency(),
     dmxrSetupWizard(),
     dmxrCustomFixture(),
+    dmxrFixtureIcons(),
   );
 }

@@ -32,6 +32,8 @@ var FIXTURE_CATEGORIES = [
   "Laser",
   "Effect",
   "Pixel Bar",
+  "Blacklight",
+  "Smoke Machine",
   "Other",
 ];
 

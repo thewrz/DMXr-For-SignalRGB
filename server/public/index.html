@@ -457,10 +457,10 @@
       <div class="universe-map">
         <div class="universe-header">
           <h3>DMX Universe <span class="fixture-count" x-text="'(' + fixtures.length + ' fixture' + (fixtures.length !== 1 ? 's' : '') + ')'"></span></h3>
-          <select class="universe-select" x-show="availableUniverses.length > 0" x-cloak
+          <select class="universe-select" x-show="availableUniverses.length > 1" x-cloak
                   @change="switchUniverse($event.target.value)"
                   :value="selectedUniverseId">
-            <option value="">Default Universe</option>
+            <option value="">All Universes</option>
             <template x-for="uni in availableUniverses" :key="uni.id">
               <option :value="uni.id" x-text="uni.name"></option>
             </template>
@@ -664,11 +664,11 @@
           <button :class="monitorView === 'fixture' ? 'active' : ''" @click="monitorView = 'fixture'; loadGroupedSnapshot()">Fixtures</button>
         </div>
 
-        <select x-show="monitorUniverses.length > 0"
+        <select x-show="monitorUniverses.length > 1"
                 class="monitor-universe-select"
                 :value="monitorUniverseId"
                 @change="switchMonitorUniverse($event.target.value)">
-          <option value="">Default Universe</option>
+          <option value="">All Universes</option>
           <template x-for="uni in monitorUniverses" :key="uni.id">
             <option :value="uni.id" x-text="uni.name"></option>
           </template>

@@ -6,6 +6,7 @@ import { createSettingsStore } from "./config/settings-store.js";
 import { createUniverseManager } from "./dmx/universe-manager.js";
 import { createResilientConnection } from "./dmx/resilient-connection.js";
 import { createFixtureStore } from "./fixtures/fixture-store.js";
+import { createUserFixtureStore } from "./fixtures/user-fixture-store.js";
 import { autoDetectDmxPort } from "./dmx/serial-port-scanner.js";
 import {
   createMdnsAdvertiser,
@@ -14,6 +15,7 @@ import {
 import { createOflClient } from "./ofl/ofl-client.js";
 import { createSsClientIfConfigured } from "./soundswitch/ss-client.js";
 import { createLocalDbProvider } from "./libraries/local-db-provider.js";
+import { createUserFixtureProvider } from "./libraries/user-fixture-provider.js";
 import { createOflProvider } from "./libraries/ofl-provider.js";
 import { createLibraryRegistry } from "./libraries/registry.js";
 import { buildServer } from "./server.js";
@@ -107,6 +109,9 @@ async function main() {
   const fixtureStore = createFixtureStore(finalConfig.fixturesPath);
   await fixtureStore.load();
 
+  const userFixtureStore = createUserFixtureStore(finalConfig.userFixturesPath);
+  await userFixtureStore.load();
+
   pipeLog("info", `Loaded ${fixtureStore.getAll().length} fixtures, initializing defaults...`);
 
   // Register safe positions for motor channels (Pan/Tilt/Focus/Zoom etc.)
@@ -144,7 +149,8 @@ async function main() {
 
   const oflProvider = createOflProvider(oflClient);
   const localDbProvider = createLocalDbProvider(ssClient, ssStatus);
-  const registry = createLibraryRegistry([oflProvider, localDbProvider]);
+  const userFixtureProvider = createUserFixtureProvider(userFixtureStore);
+  const registry = createLibraryRegistry([oflProvider, localDbProvider, userFixtureProvider]);
 
   const udpServer = createUdpColorServer({
     fixtureStore,
@@ -161,6 +167,7 @@ async function main() {
     fixtureStore,
     oflClient,
     registry,
+    userFixtureStore,
     getConnectionStatus: () => connection.getStatus(),
     settingsStore,
     serverVersion,

@@ -12,6 +12,7 @@ export interface ServerConfig {
   readonly mdnsEnabled: boolean;
   readonly portRangeSize: number;
   readonly localDbPath?: string;
+  readonly userFixturesPath: string;
   readonly corsOrigin?: string;
   readonly apiKey?: string;
 }
@@ -72,6 +73,7 @@ export function loadConfig(
       process.env["DMX_DEVICE_PATH"] ?? base.dmxDevicePath ?? "auto",
     logLevel: process.env["LOG_LEVEL"] ?? "info",
     fixturesPath: process.env["FIXTURES_PATH"] ?? "./config/fixtures.json",
+    userFixturesPath: process.env["USER_FIXTURES_PATH"] ?? "./config/user-fixtures.json",
     mdnsEnabled:
       process.env["MDNS_ENABLED"] !== undefined
         ? process.env["MDNS_ENABLED"] !== "false"

@@ -65,6 +65,7 @@ function dmxrApp() {
       await this.loadFixtures();
       await this.loadManufacturers();
       await this.loadLibraries();
+      await this.loadCustomTemplates();
       this.loadServerName();
       this.pollFixtures();
       await this.checkWizardNeeded();
@@ -80,5 +81,6 @@ function dmxrApp() {
     dmxrSettings(),
     dmxrLatency(),
     dmxrSetupWizard(),
+    dmxrCustomFixture(),
   );
 }

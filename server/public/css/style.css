@@ -1094,3 +1094,132 @@ header {
   color: var(--text-dim);
   font-weight: normal;
 }
+
+/* ── Custom Fixture Builder ── */
+
+.tab-custom {
+  border-bottom-color: var(--accent) !important;
+}
+
+.btn-block {
+  display: block;
+  width: 100%;
+  margin-bottom: 0.5rem;
+}
+
+.custom-template-list {
+  margin-top: 0.5rem;
+}
+
+.custom-template-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.custom-template-item:hover {
+  background: var(--surface2);
+}
+
+.custom-template-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.custom-template-info strong {
+  display: block;
+  font-size: 0.85rem;
+}
+
+.custom-template-meta {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+.custom-template-actions {
+  display: flex;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+.channel-builder {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0.5rem 0;
+}
+
+.channel-row {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.3rem;
+  background: var(--surface2);
+  border-radius: 4px;
+  flex-wrap: wrap;
+}
+
+.channel-offset {
+  width: 1.5rem;
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+.channel-name-input {
+  flex: 1;
+  min-width: 60px;
+  font-size: 0.8rem;
+  padding: 0.2rem 0.35rem;
+}
+
+.channel-type-select {
+  width: 110px;
+  font-size: 0.8rem;
+  padding: 0.2rem 0.2rem;
+}
+
+.channel-color-select {
+  width: 70px;
+  font-size: 0.8rem;
+  padding: 0.2rem 0.2rem;
+}
+
+.channel-default-input {
+  width: 48px;
+  font-size: 0.8rem;
+  padding: 0.2rem 0.2rem;
+  text-align: center;
+}
+
+.channel-row-actions {
+  display: flex;
+  gap: 0.15rem;
+  flex-shrink: 0;
+}
+
+.channel-row-actions .btn {
+  padding: 0.1rem 0.3rem;
+  font-size: 0.75rem;
+  min-width: 0;
+}
+
+.review-summary {
+  margin: 0.5rem 0;
+  font-size: 0.85rem;
+}
+
+.review-row {
+  padding: 0.15rem 0;
+}
+
+.review-label {
+  color: var(--text-dim);
+  display: inline-block;
+  min-width: 90px;
+}

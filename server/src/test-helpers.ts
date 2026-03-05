@@ -4,6 +4,8 @@ import type { ServerConfig } from "./config/server-config.js";
 import type { OflClient, OflSearchResult } from "./ofl/ofl-client.js";
 import { createFixtureStore } from "./fixtures/fixture-store.js";
 import type { FixtureStore } from "./fixtures/fixture-store.js";
+import { createUserFixtureStore } from "./fixtures/user-fixture-store.js";
+import type { UserFixtureStore } from "./fixtures/user-fixture-store.js";
 import type { LibraryRegistry } from "./libraries/types.js";
 import { createLibraryRegistry } from "./libraries/registry.js";
 
@@ -39,6 +41,7 @@ export function createTestConfig(overrides: Partial<ServerConfig> = {}): ServerC
     dmxDevicePath: "",
     logLevel: "silent",
     fixturesPath: uniqueFixturesPath(),
+    userFixturesPath: `/tmp/dmxr-test-user-fixtures-${randomUUID()}.json`,
     mdnsEnabled: false,
     portRangeSize: 10,
     ...overrides,
@@ -47,6 +50,10 @@ export function createTestConfig(overrides: Partial<ServerConfig> = {}): ServerC
 
 export function createTestFixtureStore(): FixtureStore {
   return createFixtureStore(uniqueFixturesPath());
+}
+
+export function createTestUserFixtureStore(): UserFixtureStore {
+  return createUserFixtureStore(`/tmp/dmxr-test-user-fixtures-${randomUUID()}.json`);
 }
 
 export function createMockOflClient(): OflClient {

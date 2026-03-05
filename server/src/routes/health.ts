@@ -1,10 +1,17 @@
 import type { FastifyInstance } from "fastify";
-import type { HealthResponse } from "../types/protocol.js";
+import type { HealthResponse, UniverseConfig } from "../types/protocol.js";
 import type { UniverseManager } from "../dmx/universe-manager.js";
 import type { FixtureStore } from "../fixtures/fixture-store.js";
 import type { ConnectionStatus } from "../dmx/connection-state.js";
 import type { LatencyTracker } from "../metrics/latency-tracker.js";
 import type { UdpColorServer } from "../udp/udp-color-server.js";
+import type { MultiUniverseCoordinator } from "../dmx/multi-universe-coordinator.js";
+
+interface UniverseStatusProvider {
+  readonly getUniverseConfigs: () => readonly UniverseConfig[];
+  readonly getConnectionStatuses: () => ReadonlyMap<string, ConnectionStatus>;
+  readonly coordinator: MultiUniverseCoordinator;
+}
 
 interface HealthDeps {
   readonly manager: UniverseManager;
@@ -18,6 +25,7 @@ interface HealthDeps {
   readonly udpServer?: UdpColorServer;
   readonly serverId?: string;
   readonly serverName?: string;
+  readonly universeStatus?: UniverseStatusProvider;
 }
 
 export function registerHealthRoute(
@@ -28,9 +36,28 @@ export function registerHealthRoute(
     const dmxStatus = deps.manager.getDmxSendStatus();
     const connStatus = deps.getConnectionStatus?.();
 
+    // Build per-universe status if provider is available
+    let universeStatuses: HealthResponse["universes"] | undefined;
+    if (deps.universeStatus) {
+      const configs = deps.universeStatus.getUniverseConfigs();
+      const statuses = deps.universeStatus.getConnectionStatuses();
+      universeStatuses = configs.map((config) => {
+        const uniStatus = statuses.get(config.id);
+        return {
+          id: config.id,
+          name: config.name,
+          state: uniStatus?.state ?? "disconnected" as const,
+          activeChannels: deps.universeStatus!.coordinator.getActiveChannelCount(config.id),
+        };
+      });
+    }
+
+    const anyUniverseDegraded = universeStatuses?.some((u) => u.state !== "connected") ?? false;
+
     const isDegraded =
       dmxStatus.lastSendError !== null ||
-      (connStatus !== undefined && connStatus.state !== "connected");
+      (connStatus !== undefined && connStatus.state !== "connected") ||
+      anyUniverseDegraded;
 
     const udpStats = deps.udpServer?.getStats();
     const latency = deps.latencyTracker?.getMetrics();
@@ -56,6 +83,7 @@ export function registerHealthRoute(
         : undefined,
       serverId: deps.serverId,
       serverName: deps.serverName,
+      universes: universeStatuses,
     };
   });
 

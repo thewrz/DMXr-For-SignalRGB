@@ -1,7 +1,9 @@
 import type { FastifyInstance } from "fastify";
 import type { UniverseManager } from "../dmx/universe-manager.js";
+import type { MultiUniverseCoordinator } from "../dmx/multi-universe-coordinator.js";
 import type { FixtureStore } from "../fixtures/fixture-store.js";
 import type { FixtureConfig, FixtureChannel } from "../types/protocol.js";
+import { DEFAULT_UNIVERSE_ID } from "../types/protocol.js";
 import { mapColor } from "../fixtures/channel-mapper.js";
 import { analyzeFixture } from "../fixtures/fixture-capabilities.js";
 import { pipeLog } from "../logging/pipeline-logger.js";
@@ -33,6 +35,7 @@ function detectResetChannel(channels: readonly FixtureChannel[]): FixtureChannel
 interface ControlRouteDeps {
   readonly manager: UniverseManager;
   readonly store: FixtureStore;
+  readonly coordinator?: MultiUniverseCoordinator;
 }
 
 interface TestBody {
@@ -89,21 +92,38 @@ export function registerControlRoutes(
     holdSnapshots.delete(fixture.id);
   }
 
-  app.post("/control/blackout", async (request) => {
-    deps.manager.blackout();
+  app.post<{ Body: { universeId?: string } }>("/control/blackout", async (request) => {
+    const universeId = request.body?.universeId;
+
+    if (deps.coordinator && universeId) {
+      deps.coordinator.blackout(universeId);
+    } else if (deps.coordinator) {
+      deps.coordinator.blackoutAll();
+    } else {
+      deps.manager.blackout();
+    }
+
     const fixtures = deps.store.getAll();
     request.log.info(
-      { action: "blackout", fixtureCount: fixtures.length },
-      "blackout: all 512 channels → 0",
+      { action: "blackout", fixtureCount: fixtures.length, universeId: universeId ?? "all" },
+      `blackout: ${universeId ?? "all universes"} → 0`,
     );
-    return { success: true, action: "blackout" };
+    return { success: true, action: "blackout", universeId: universeId ?? null };
   });
 
-  app.post("/control/whiteout", async (request) => {
-    const fixtures = deps.store.getAll();
+  app.post<{ Body: { universeId?: string } }>("/control/whiteout", async (request) => {
+    const universeId = request.body?.universeId;
+    const fixtures = universeId
+      ? deps.store.getByUniverse(universeId)
+      : deps.store.getAll();
 
-    // All 512 channels to 255 — works even with no fixtures in store
-    deps.manager.whiteout();
+    if (deps.coordinator && universeId) {
+      deps.coordinator.whiteout(universeId);
+    } else if (deps.coordinator) {
+      deps.coordinator.whiteoutAll();
+    } else {
+      deps.manager.whiteout();
+    }
 
     // Overlay fixture-specific values via mapColor for correct
     // non-color channels (pan center, strobe open, dimmer full, etc.)
@@ -132,16 +152,26 @@ export function registerControlRoutes(
       success: true,
       action: "whiteout",
       fixturesUpdated: fixtures.length,
+      universeId: universeId ?? null,
     };
   });
 
-  app.post("/control/resume", async (request) => {
-    deps.manager.resumeNormal();
+  app.post<{ Body: { universeId?: string } }>("/control/resume", async (request) => {
+    const universeId = request.body?.universeId;
+
+    if (deps.coordinator && universeId) {
+      deps.coordinator.resumeNormal(universeId);
+    } else if (deps.coordinator) {
+      deps.coordinator.resumeNormalAll();
+    } else {
+      deps.manager.resumeNormal();
+    }
+
     request.log.info(
-      { action: "resume" },
-      "resume: blackout/whiteout override cleared",
+      { action: "resume", universeId: universeId ?? "all" },
+      `resume: ${universeId ?? "all universes"} override cleared`,
     );
-    return { success: true, action: "resume" };
+    return { success: true, action: "resume", universeId: universeId ?? null };
   });
 
   // Diagnostic: dump DMX channel snapshot for a fixture or address range

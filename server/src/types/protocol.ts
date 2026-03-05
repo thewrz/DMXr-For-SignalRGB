@@ -64,6 +64,12 @@ export interface HealthResponse {
   readonly udpPort?: number;
   readonly serverId?: string;
   readonly serverName?: string;
+  readonly universes?: readonly {
+    readonly id: string;
+    readonly name: string;
+    readonly state: "connected" | "disconnected" | "reconnecting";
+    readonly activeChannels: number;
+  }[];
 }
 
 /** A single DMX channel within a fixture (derived from OFL definition) */

@@ -4,9 +4,33 @@
  */
 function dmxrFixtureManager() {
   return {
+    async initControlMode() {
+      await this.pollControlMode();
+    },
+
+    async loadUniverses() {
+      try {
+        var res = await fetch("/universes");
+        if (res.ok) {
+          this.availableUniverses = await res.json();
+        }
+      } catch {
+        // Non-critical — dropdown just won't show extra universes
+      }
+    },
+
+    switchUniverse(universeId) {
+      this.selectedUniverseId = universeId;
+      this.loadFixtures();
+    },
+
     async loadFixtures() {
       try {
-        var res = await fetch("/fixtures");
+        var url = "/fixtures";
+        if (this.selectedUniverseId) {
+          url += "?universeId=" + encodeURIComponent(this.selectedUniverseId);
+        }
+        var res = await fetch(url);
         if (!res.ok) {
           this.serverOnline = false;
           return;
@@ -24,11 +48,28 @@ function dmxrFixtureManager() {
     },
 
     pollFixtures() {
+      var self = this;
       setInterval(function() {
-        if (!this.isDragging) {
-          this.loadFixtures();
+        if (!self.isDragging) {
+          self.loadFixtures();
         }
-      }.bind(this), 3000);
+        self.pollControlMode();
+      }, 3000);
+    },
+
+    async pollControlMode() {
+      try {
+        var res = await fetch("/health");
+        if (res.ok) {
+          var data = await res.json();
+          if (data.controlMode) {
+            this.controlMode = data.controlMode;
+            this.overrideActive = data.controlMode !== "normal";
+          }
+        }
+      } catch {
+        // Non-critical — will retry on next poll
+      }
     },
 
     validateAddress(excludeId) {
@@ -174,8 +215,14 @@ function dmxrFixtureManager() {
 
     async blackout() {
       try {
-        await fetch("/control/blackout", { method: "POST" });
+        this.controlMode = "blackout";
         this.overrideActive = true;
+        var body = this.selectedUniverseId ? { universeId: this.selectedUniverseId } : {};
+        await fetch("/control/blackout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
       } catch {
         // ignore
       }
@@ -183,8 +230,14 @@ function dmxrFixtureManager() {
 
     async whiteout() {
       try {
-        await fetch("/control/whiteout", { method: "POST" });
+        this.controlMode = "whiteout";
         this.overrideActive = true;
+        var body = this.selectedUniverseId ? { universeId: this.selectedUniverseId } : {};
+        await fetch("/control/whiteout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
       } catch {
         // ignore
       }
@@ -192,8 +245,14 @@ function dmxrFixtureManager() {
 
     async resume() {
       try {
-        await fetch("/control/resume", { method: "POST" });
+        this.controlMode = "normal";
         this.overrideActive = false;
+        var body = this.selectedUniverseId ? { universeId: this.selectedUniverseId } : {};
+        await fetch("/control/resume", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
       } catch {
         // ignore
       }

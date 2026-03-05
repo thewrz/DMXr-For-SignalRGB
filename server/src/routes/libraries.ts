@@ -16,6 +16,7 @@ const importSchema = {
     properties: {
       name: { type: "string" as const, minLength: 1 },
       dmxStartAddress: { type: "integer" as const, minimum: 1, maximum: 512 },
+      universeId: { type: "string" as const },
     },
   },
 };
@@ -162,7 +163,7 @@ export function registerLibraryRoutes(
   // Import a fixture from a library
   app.post<{
     Params: { id: string; fid: string; mid: string };
-    Body: { name: string; dmxStartAddress: number };
+    Body: { name: string; dmxStartAddress: number; universeId?: string };
   }>(
     "/libraries/:id/fixtures/:fid/modes/:mid/import",
     { schema: importSchema },
@@ -208,10 +209,13 @@ export function registerLibraryRoutes(
         return;
       }
 
+      const targetUniverse = request.body.universeId;
       const validation = validateFixtureAddress(
         request.body.dmxStartAddress,
         channels.length,
         deps.store.getAll(),
+        undefined,
+        targetUniverse,
       );
 
       if (!validation.valid) {
@@ -226,6 +230,7 @@ export function registerLibraryRoutes(
         name: request.body.name,
         source: isFixtureSource(provider.id) ? provider.id : "custom",
         ...(category ? { category } : {}),
+        ...(targetUniverse ? { universeId: targetUniverse } : {}),
         mode: modeName,
         dmxStartAddress: request.body.dmxStartAddress,
         channelCount: channels.length,

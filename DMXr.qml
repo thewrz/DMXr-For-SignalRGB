@@ -152,6 +152,125 @@ Item {
                             wrapMode: Text.WordWrap
                         }
 
+                        // Control mode indicator
+                        Text {
+                            visible: getControlMode(modelData) !== "normal"
+                            text: getControlMode(modelData) === "blackout" ? "BLACKOUT ACTIVE" : "WHITEOUT ACTIVE"
+                            color: getControlMode(modelData) === "blackout" ? "#ff6060" : "#ffd060"
+                            font.family: "Poppins"
+                            font.weight: Font.Bold
+                            font.pixelSize: 12
+                        }
+
+                        // Control buttons
+                        Row {
+                            visible: modelData.healthy !== false
+                            spacing: 6
+
+                            Item {
+                                width: 70
+                                height: 24
+
+                                Rectangle {
+                                    anchors.fill: parent
+                                    color: "#c03030"
+                                    radius: 2
+                                }
+
+                                ToolButton {
+                                    width: parent.width
+                                    height: parent.height
+                                    font.family: "Poppins"
+                                    font.bold: true
+                                    font.pixelSize: 10
+                                    text: "Blackout"
+
+                                    onClicked: {
+                                        sendControlCommand(modelData, "blackout");
+                                    }
+
+                                    contentItem: Text {
+                                        text: parent.text
+                                        color: "#ffffff"
+                                        font: parent.font
+                                        horizontalAlignment: Text.AlignHCenter
+                                        verticalAlignment: Text.AlignVCenter
+                                    }
+
+                                    background: Item {}
+                                }
+                            }
+
+                            Item {
+                                width: 70
+                                height: 24
+
+                                Rectangle {
+                                    anchors.fill: parent
+                                    color: "#b08020"
+                                    radius: 2
+                                }
+
+                                ToolButton {
+                                    width: parent.width
+                                    height: parent.height
+                                    font.family: "Poppins"
+                                    font.bold: true
+                                    font.pixelSize: 10
+                                    text: "Whiteout"
+
+                                    onClicked: {
+                                        sendControlCommand(modelData, "whiteout");
+                                    }
+
+                                    contentItem: Text {
+                                        text: parent.text
+                                        color: "#ffffff"
+                                        font: parent.font
+                                        horizontalAlignment: Text.AlignHCenter
+                                        verticalAlignment: Text.AlignVCenter
+                                    }
+
+                                    background: Item {}
+                                }
+                            }
+
+                            Item {
+                                visible: getControlMode(modelData) !== "normal"
+                                width: 70
+                                height: 24
+
+                                Rectangle {
+                                    anchors.fill: parent
+                                    color: "#209e20"
+                                    radius: 2
+                                }
+
+                                ToolButton {
+                                    width: parent.width
+                                    height: parent.height
+                                    font.family: "Poppins"
+                                    font.bold: true
+                                    font.pixelSize: 10
+                                    text: "Resume"
+
+                                    onClicked: {
+                                        sendControlCommand(modelData, "resume");
+                                    }
+
+                                    contentItem: Text {
+                                        text: parent.text
+                                        color: "#ffffff"
+                                        font: parent.font
+                                        horizontalAlignment: Text.AlignHCenter
+                                        verticalAlignment: Text.AlignVCenter
+                                    }
+
+                                    background: Item {}
+                                }
+                            }
+                        }
+
                         // Fixture count + version
                         Row {
                             spacing: 16
@@ -724,6 +843,7 @@ Item {
                     driver: body.driver || "",
                     dmxDevicePath: body.dmxDevicePath || "",
                     connectionState: body.connectionState || "",
+                    controlMode: body.controlMode || "normal",
                     lastErrorTitle: body.lastErrorTitle || "",
                     lastErrorSuggestion: body.lastErrorSuggestion || "",
                     reconnectAttempts: body.reconnectAttempts || 0,
@@ -851,6 +971,23 @@ Item {
         var h = healthData[srv.serverId];
         if (h && h.fixtures) return h.fixtures;
         return [];
+    }
+
+    function getControlMode(srv) {
+        var h = healthData[srv.serverId];
+        if (h && h.health && h.health.controlMode) return h.health.controlMode;
+        return "normal";
+    }
+
+    function sendControlCommand(srv, action) {
+        try {
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", "http://" + srv.host + ":" + srv.port + "/control/" + action, false);
+            xhr.setRequestHeader("Content-Type", "application/json");
+            xhr.send("{}");
+        } catch (e) {
+            service.log("DMXr: Control command '" + action + "' failed — " + e);
+        }
     }
 
     // --- Auto-refresh on load ---

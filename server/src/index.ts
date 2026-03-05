@@ -26,6 +26,7 @@ import { createLibraryRegistry } from "./libraries/registry.js";
 import { buildServer } from "./server.js";
 import { createUdpColorServer } from "./udp/udp-color-server.js";
 import { createLatencyTracker } from "./metrics/latency-tracker.js";
+import { createDmxMonitor } from "./dmx/dmx-monitor.js";
 import { getFixtureDefaults } from "./fixtures/channel-mapper.js";
 import { setPipelineLogLevel, parsePipelineLogLevel, pipeLog } from "./logging/pipeline-logger.js";
 
@@ -141,10 +142,12 @@ async function main() {
   manager.blackout();
 
   // Initialize fixture defaults (sets pan/tilt center, strobe open, etc.)
-  manager.resumeNormal();
+  // Use applyRawUpdate to bypass blackout guard — server stays in blackout
+  // until a client explicitly resumes or SignalRGB starts sending colors.
   for (const fixture of fixtureStore.getAll()) {
     const defaults = getFixtureDefaults(fixture);
-    const count = manager.applyFixtureUpdate({ fixture: fixture.id, channels: defaults });
+    manager.applyRawUpdate(defaults);
+    const count = Object.keys(defaults).length;
     pipeLog("info", `Startup defaults for "${fixture.name}": ${count} channels pushed to DMX`);
   }
   pipeLog("info", "Fixture defaults initialization complete");
@@ -205,6 +208,8 @@ async function main() {
     logger: consoleLogger,
   });
 
+  const dmxMonitor = createDmxMonitor({ manager, coordinator });
+
   const app = await buildServer({
     config: finalConfig,
     manager,
@@ -222,6 +227,7 @@ async function main() {
     serverId,
     serverName,
     getMdnsAdvertiser: () => mdnsAdvertiser,
+    dmxMonitor,
     coordinator,
     universeRegistry,
     connectionPool,
@@ -250,6 +256,7 @@ async function main() {
     for (const provider of registry.getAll()) {
       provider.close?.();
     }
+    dmxMonitor.close();
     coordinator.blackoutAll();
     manager.blackout();
     await udpServer.close();

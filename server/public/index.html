@@ -19,6 +19,7 @@
   <script src="/js/ofl-export.js"></script>
   <script src="/js/custom-fixture.js"></script>
   <script src="/js/fixture-icons.js"></script>
+  <script src="/js/dmx-monitor.js"></script>
   <script src="/js/app.js"></script>
 </head>
 <body x-data="dmxrApp()" x-init="init()">
@@ -38,6 +39,13 @@
       <span class="header-server-name" x-show="settingsServerName" x-text="settingsServerName" x-cloak></span>
     </div>
     <div class="header-right">
+      <button class="btn btn-sm" @click="openMonitor()" title="DMX Channel Monitor">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M0 2a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H2z"/>
+          <path d="M2 4h2v2H2V4zm3 0h2v4H5V4zm3 0h2v3H8V4zm3 0h2v5h-2V4zM2 14h4v1H2v-1zm5 0h4v1H7v-1zm5 0h2v1h-2v-1z"/>
+        </svg>
+        Monitor
+      </button>
       <button class="btn btn-sm" @click="openLatency()" title="Latency Dashboard">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
           <path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71V3.5z"/>
@@ -425,6 +433,8 @@
         <button class="btn btn-danger" @click="blackout()">Blackout All</button>
         <button class="btn btn-warning" @click="whiteout()">Whiteout All</button>
         <button class="btn btn-success" x-show="overrideActive" @click="resume()">Resume</button>
+        <span class="badge-control badge-blackout" x-show="controlMode === 'blackout'" x-cloak>BLACKOUT</span>
+        <span class="badge-control badge-whiteout" x-show="controlMode === 'whiteout'" x-cloak>WHITEOUT</span>
         <button class="btn" x-show="fixtures.length > 0" @click="syncComponents()"
                 title="Write component files for SignalRGB Layout tile names">Sync SignalRGB Components</button>
       </div>
@@ -447,7 +457,17 @@
 
       <!-- Universe Grid (primary patch bay) -->
       <div class="universe-map">
-        <h3>DMX Universe <span class="fixture-count" x-text="'(' + fixtures.length + ' fixture' + (fixtures.length !== 1 ? 's' : '') + ')'"></span></h3>
+        <div class="universe-header">
+          <h3>DMX Universe <span class="fixture-count" x-text="'(' + fixtures.length + ' fixture' + (fixtures.length !== 1 ? 's' : '') + ')'"></span></h3>
+          <select class="universe-select" x-show="availableUniverses.length > 1" x-cloak
+                  @change="switchUniverse($event.target.value)"
+                  :value="selectedUniverseId">
+            <option value="">All Universes</option>
+            <template x-for="uni in availableUniverses" :key="uni.id">
+              <option :value="uni.id" x-text="uni.name"></option>
+            </template>
+          </select>
+        </div>
         <div class="channel-grid"
              @dragover.prevent="onGridDragOver($event)"
              @drop.prevent="onGridDrop($event)"
@@ -632,6 +652,82 @@
       </div>
 
       <button class="modal-close" @click="closeSettings()">&times;</button>
+    </div>
+  </div>
+
+  <!-- DMX Channel Monitor Modal -->
+  <div class="modal-overlay" x-show="showMonitor" x-cloak @click.self="closeMonitor()">
+    <div class="modal monitor-modal">
+      <h2>DMX Channel Monitor</h2>
+
+      <div class="monitor-toolbar">
+        <div class="monitor-view-toggle">
+          <button :class="monitorView === 'grid' ? 'active' : ''" @click="monitorView = 'grid'">Grid</button>
+          <button :class="monitorView === 'fixture' ? 'active' : ''" @click="monitorView = 'fixture'; loadGroupedSnapshot()">Fixtures</button>
+        </div>
+
+        <select x-show="monitorUniverses.length > 1"
+                class="monitor-universe-select"
+                :value="monitorUniverseId"
+                @change="switchMonitorUniverse($event.target.value)">
+          <option value="">All Universes</option>
+          <template x-for="uni in monitorUniverses" :key="uni.id">
+            <option :value="uni.id" x-text="uni.name"></option>
+          </template>
+        </select>
+
+        <button class="btn btn-sm" @click="toggleMonitorPause()">
+          <span x-text="monitorPaused ? 'Resume' : 'Pause'"></span>
+        </button>
+
+        <div class="monitor-status">
+          <span class="monitor-status-dot"
+                :class="monitorError ? 'error' : monitorPaused ? 'paused' : 'live'"></span>
+          <span x-text="monitorError ? 'Error' : monitorPaused ? 'Paused' : 'Live'"></span>
+          <span x-show="monitorActiveCount > 0" x-text="monitorActiveCount + ' active'" style="margin-left: 0.25rem;"></span>
+          <span x-show="monitorBlackoutActive" class="text-warning" style="margin-left: 0.25rem;">BLACKOUT</span>
+        </div>
+      </div>
+
+      <p class="validation-error" x-show="monitorError" x-text="monitorError"></p>
+
+      <!-- Grid View: 512 channels -->
+      <div x-show="monitorView === 'grid' && !monitorError">
+        <div class="monitor-grid">
+          <template x-for="ch in gridChannels()" :key="ch.address">
+            <div class="monitor-cell" :style="channelIntensity(ch.value) + channelTextColor(ch.value)">
+              <span class="monitor-cell-addr" x-text="ch.address"></span>
+              <span class="monitor-cell-val" x-text="ch.value"></span>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- Fixture-Grouped View -->
+      <div x-show="monitorView === 'fixture' && !monitorError">
+        <div x-show="monitorFixtures.length === 0" class="monitor-empty">
+          No fixtures configured. Add fixtures to see grouped channel view.
+        </div>
+        <template x-for="fixture in monitorFixtures" :key="fixture.id">
+          <div class="monitor-fixture-group">
+            <div class="monitor-fixture-header">
+              <span x-text="fixture.name"></span>
+              <span class="monitor-fixture-addr" x-text="'DMX ' + fixture.dmxStartAddress + '-' + (fixture.dmxStartAddress + fixture.channelCount - 1)"></span>
+            </div>
+            <div class="monitor-fixture-channels">
+              <template x-for="ch in fixture.channels" :key="ch.offset">
+                <div class="monitor-fixture-ch" :style="channelIntensity(monitorChannels[ch.dmxAddress] || 0)">
+                  <span class="monitor-fixture-ch-name" x-text="ch.name"></span>
+                  <span class="monitor-fixture-ch-val" :style="channelTextColor(monitorChannels[ch.dmxAddress] || 0)"
+                        x-text="monitorChannels[ch.dmxAddress] || 0"></span>
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <button class="modal-close" @click="closeMonitor()">&times;</button>
     </div>
   </div>
 

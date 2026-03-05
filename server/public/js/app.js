@@ -2,8 +2,12 @@ function dmxrApp() {
   var app = {
     fixtures: [],
     serverOnline: false,
+    controlMode: "normal",
     overrideActive: false,
     sidebarOpen: false,
+    // Universe selection
+    selectedUniverseId: "",
+    availableUniverses: [],
     // Sidebar state
     sidebarTab: "search",
     browseSource: "ofl",
@@ -62,6 +66,8 @@ function dmxrApp() {
     overrideTimers: {},
 
     async init() {
+      await this.initControlMode();
+      await this.loadUniverses();
       await this.loadFixtures();
       await this.loadManufacturers();
       await this.loadLibraries();
@@ -83,5 +89,6 @@ function dmxrApp() {
     dmxrSetupWizard(),
     dmxrCustomFixture(),
     dmxrFixtureIcons(),
+    dmxrDmxMonitor(),
   );
 }

@@ -203,4 +203,21 @@ describe("createMultiUniverseCoordinator", () => {
       expect(coordinator.getDmxSendStatus("nonexistent")).toBeUndefined();
     });
   });
+
+  describe("applyRawUpdate", () => {
+    it("routes raw updates to the correct manager", () => {
+      const channels = { 1: 200, 2: 100 };
+      coordinator.applyRawUpdate("uni-a", channels);
+
+      expect(managerA.applyRawUpdate).toHaveBeenCalledWith(channels);
+      expect(managerB.applyRawUpdate).not.toHaveBeenCalled();
+      expect(defaultManager.applyRawUpdate).not.toHaveBeenCalled();
+    });
+
+    it("is a no-op for unknown universe", () => {
+      coordinator.applyRawUpdate("nonexistent", { 1: 255 });
+      expect(managerA.applyRawUpdate).not.toHaveBeenCalled();
+      expect(defaultManager.applyRawUpdate).not.toHaveBeenCalled();
+    });
+  });
 });

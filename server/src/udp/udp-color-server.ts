@@ -110,8 +110,10 @@ export function createUdpColorServer(deps: UdpColorServerDeps): UdpColorServer {
             sock.send(reply, rinfo.port, rinfo.address);
           }
 
-          // Skip color processing while override (blackout/whiteout) is active
-          if (deps.manager.isBlackoutActive()) {
+          // Skip color processing while override (blackout/whiteout) is active.
+          // When coordinator is available, defer blackout enforcement to per-universe
+          // managers inside processColorBatchMulti rather than doing a single check here.
+          if (!deps.coordinator && deps.manager.isBlackoutActive()) {
             if (shouldSample("udp:blackout-skip")) {
               pipeLog("debug", "UDP packet skipped (blackout active)");
             }

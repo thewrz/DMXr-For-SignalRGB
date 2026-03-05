@@ -177,6 +177,16 @@ async function main() {
   const coordinator = createMultiUniverseCoordinator(() => connectionPool.getAllManagers());
   pipeLog("info", `Universe registry loaded: ${universeRegistry.getAll().length} universe(s)`);
 
+  // Bootstrap connections for all persisted universes
+  for (const uniConfig of universeRegistry.getAll()) {
+    try {
+      await connectionPool.create(uniConfig);
+      pipeLog("info", `Universe "${uniConfig.name}" (${uniConfig.id.slice(0, 8)}) connected`);
+    } catch (err) {
+      consoleLogger.warn(`Failed to initialize universe "${uniConfig.name}": ${err}`);
+    }
+  }
+
   const oflClient = createOflClient();
   const { client: ssClient, status: ssStatus } = createSsClientIfConfigured(finalConfig.localDbPath);
 

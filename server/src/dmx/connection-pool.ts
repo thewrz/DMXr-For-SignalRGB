@@ -36,9 +36,13 @@ export function createConnectionPool(factory: ConnectionFactory): ConnectionPool
       }
 
       const connection = await factory.createConnection(config);
-      const manager = factory.createManager(connection.universe);
-
-      entries.set(config.id, { connection, manager });
+      try {
+        const manager = factory.createManager(connection.universe);
+        entries.set(config.id, { connection, manager });
+      } catch (err) {
+        await connection.close();
+        throw err;
+      }
     },
 
     getManager(universeId: string): UniverseManager | undefined {

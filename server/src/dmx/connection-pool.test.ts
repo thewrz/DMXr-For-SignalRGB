@@ -106,6 +106,30 @@ describe("createConnectionPool", () => {
 
       await expect(pool.create(config)).rejects.toThrow(/already exists/i);
     });
+
+    it("closes the connection if manager creation fails", async () => {
+      const failFactory: ConnectionFactory = {
+        createConnection: vi.fn().mockImplementation(async () => {
+          const universe = makeMockUniverse();
+          return makeMockConnection(universe);
+        }),
+        createManager: vi.fn().mockImplementation(() => {
+          throw new Error("Manager init failed");
+        }),
+      };
+
+      const failPool = createConnectionPool(failFactory);
+      const config = makeUniverseConfig({ id: "leak-test" });
+
+      await expect(failPool.create(config)).rejects.toThrow("Manager init failed");
+
+      // The connection should have been closed to prevent leak
+      const mockConn = await (failFactory.createConnection as ReturnType<typeof vi.fn>).mock.results[0].value;
+      expect(mockConn.close).toHaveBeenCalled();
+
+      // Pool should not have the entry
+      expect(failPool.getManager("leak-test")).toBeUndefined();
+    });
   });
 
   describe("getManager", () => {

@@ -25,8 +25,8 @@ const updateSchema = {
     type: "object" as const,
     properties: {
       name: { type: "string" as const, minLength: 1 },
-      devicePath: { type: "string" as const },
-      driverType: { type: "string" as const },
+      devicePath: { type: "string" as const, minLength: 1 },
+      driverType: { type: "string" as const, minLength: 1 },
       serialNumber: { type: "string" as const },
     },
   },
@@ -86,6 +86,13 @@ export function registerUniverseRoutes(
 
   app.delete<{ Params: { id: string } }>("/universes/:id", async (req, reply) => {
     try {
+      const orphans = deps.fixtureStore.getByUniverse(req.params.id);
+      if (orphans.length > 0) {
+        return reply.status(409).send({
+          error: `Cannot delete universe with ${orphans.length} assigned fixture(s). Reassign them first.`,
+        });
+      }
+
       const removed = deps.registry.remove(req.params.id);
       if (!removed) {
         return reply.status(404).send({ error: "Universe not found" });

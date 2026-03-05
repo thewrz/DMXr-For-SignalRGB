@@ -110,6 +110,17 @@ export function createUniverseRegistry(filePath: string): UniverseRegistry {
         }
       }
 
+      if (changes.devicePath !== undefined && changes.devicePath !== "null") {
+        const deviceTaken = universes.some(
+          (u) => u.devicePath === changes.devicePath && u.id !== id,
+        );
+        if (deviceTaken) {
+          throw new Error(
+            `Device "${changes.devicePath}" is already assigned to another universe`,
+          );
+        }
+      }
+
       const updated: UniverseConfig = {
         ...universes[index],
         ...(changes.name !== undefined ? { name: changes.name } : {}),
@@ -147,6 +158,11 @@ export function createUniverseRegistry(filePath: string): UniverseRegistry {
             this.update(existing.id, { devicePath: device.path });
           }
           continue;
+        }
+
+        // Skip past any user-created names to avoid collision
+        while (universes.some((u) => u.name === `Universe ${nextIndex}`)) {
+          nextIndex++;
         }
 
         const universe = this.add({

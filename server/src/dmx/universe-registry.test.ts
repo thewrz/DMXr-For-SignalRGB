@@ -140,6 +140,38 @@ describe("createUniverseRegistry", () => {
       const updated = registry.update(universe.id, { name: "Keep Me" });
       expect(updated!.name).toBe("Keep Me");
     });
+
+    it("rejects devicePath collision with another universe", () => {
+      registry.add(makeRequest({ name: "First", devicePath: "/dev/ttyUSB0" }));
+      const second = registry.add(
+        makeRequest({ name: "Second", devicePath: "/dev/ttyUSB1" }),
+      );
+
+      expect(() =>
+        registry.update(second.id, { devicePath: "/dev/ttyUSB0" }),
+      ).toThrow(/device.*already assigned/i);
+    });
+
+    it("allows updating to the same devicePath (no self-collision)", () => {
+      const universe = registry.add(
+        makeRequest({ name: "Mine", devicePath: "/dev/ttyUSB0" }),
+      );
+      const updated = registry.update(universe.id, { devicePath: "/dev/ttyUSB0" });
+      expect(updated!.devicePath).toBe("/dev/ttyUSB0");
+    });
+
+    it("allows multiple universes with null devicePath", () => {
+      const first = registry.add(
+        makeRequest({ name: "Null1", devicePath: "null", driverType: "null" }),
+      );
+      const second = registry.add(
+        makeRequest({ name: "Null2", devicePath: "null", driverType: "null" }),
+      );
+
+      // Should not throw — null devices are exempt from uniqueness
+      const updated = registry.update(second.id, { devicePath: "null" });
+      expect(updated!.devicePath).toBe("null");
+    });
   });
 
   describe("remove", () => {
@@ -297,6 +329,22 @@ describe("createUniverseRegistry", () => {
     it("does nothing when no new devices found", () => {
       const created = registry.autoAssignDevices([]);
       expect(created).toHaveLength(0);
+    });
+
+    it("skips past existing names to avoid collision", () => {
+      // Manually create "Universe 1" so auto-assign must skip to 2
+      registry.add(makeRequest({
+        name: "Universe 1",
+        devicePath: "/dev/ttyUSB5",
+      }));
+
+      const devices = [
+        makeDevice({ path: "/dev/ttyUSB0", serialNumber: "EN001" }),
+      ];
+
+      const created = registry.autoAssignDevices(devices);
+      expect(created).toHaveLength(1);
+      expect(created[0].name).toBe("Universe 2");
     });
   });
 });

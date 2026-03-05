@@ -127,25 +127,44 @@ export function registerControlRoutes(
 
     // Overlay fixture-specific values via mapColor for correct
     // non-color channels (pan center, strobe open, dimmer full, etc.)
-    const allUpdates: Record<number, number> = {};
-    for (const fixture of fixtures) {
-      const channels = mapColor(fixture, 255, 255, 255, 1.0);
-      for (const [addr, val] of Object.entries(channels)) {
-        allUpdates[Number(addr)] = val;
+    let totalChannelsSet = 0;
+    if (deps.coordinator) {
+      const byUniverse = new Map<string, Record<number, number>>();
+      for (const fixture of fixtures) {
+        const uid = fixture.universeId ?? DEFAULT_UNIVERSE_ID;
+        const channels = mapColor(fixture, 255, 255, 255, 1.0);
+        const existing = byUniverse.get(uid) ?? {};
+        const merged = { ...existing };
+        for (const [addr, val] of Object.entries(channels)) {
+          merged[Number(addr)] = val;
+        }
+        byUniverse.set(uid, merged);
       }
-    }
-
-    if (Object.keys(allUpdates).length > 0) {
-      deps.manager.applyRawUpdate(allUpdates);
+      for (const [uid, updates] of byUniverse) {
+        totalChannelsSet += Object.keys(updates).length;
+        deps.coordinator.applyRawUpdate(uid, updates);
+      }
+    } else {
+      const allUpdates: Record<number, number> = {};
+      for (const fixture of fixtures) {
+        const channels = mapColor(fixture, 255, 255, 255, 1.0);
+        for (const [addr, val] of Object.entries(channels)) {
+          allUpdates[Number(addr)] = val;
+        }
+      }
+      totalChannelsSet = Object.keys(allUpdates).length;
+      if (totalChannelsSet > 0) {
+        deps.manager.applyRawUpdate(allUpdates);
+      }
     }
 
     request.log.info(
       {
         action: "whiteout",
         fixtureCount: fixtures.length,
-        channelsSet: Object.keys(allUpdates).length,
+        channelsSet: totalChannelsSet,
       },
-      `whiteout: ${fixtures.length} fixtures, ${Object.keys(allUpdates).length} channels set via mapColor`,
+      `whiteout: ${fixtures.length} fixtures, ${totalChannelsSet} channels set via mapColor`,
     );
 
     return {
@@ -185,7 +204,16 @@ export function registerControlRoutes(
 
       const base = fixture.dmxStartAddress;
       const count = fixture.channelCount;
-      const snapshot = deps.manager.getChannelSnapshot(base, count);
+      const universeId = fixture.universeId ?? DEFAULT_UNIVERSE_ID;
+
+      const manager = deps.coordinator
+        ? (() => { const m = deps.coordinator!; return {
+            getChannelSnapshot: (s: number, c: number) => m.getChannelSnapshot(universeId, s, c),
+            isBlackoutActive: () => m.isBlackoutActive(universeId),
+            getActiveChannelCount: () => m.getActiveChannelCount(universeId),
+          }; })()
+        : deps.manager;
+      const snapshot = manager.getChannelSnapshot(base, count);
 
       const channels = fixture.channels.map((ch) => {
         const addr = base + ch.offset;
@@ -204,7 +232,7 @@ export function registerControlRoutes(
       });
 
       pipeLog("info",
-        `DEBUG fixture "${fixture.name}" (base=${base}):\n` +
+        `DEBUG fixture "${fixture.name}" (base=${base} universe=${universeId}):\n` +
         channels.map((ch) =>
           `  [${ch.offset}] DMX${ch.dmxAddress} ${ch.name.padEnd(16)} ` +
           `buffer=${ch.currentDmxValue} ovr=${ch.overrideEnabled ? "ON" : "off"}(${ch.overrideValue})`
@@ -214,10 +242,11 @@ export function registerControlRoutes(
       return {
         fixture: fixture.name,
         id: fixture.id,
+        universeId,
         dmxStartAddress: base,
         channelCount: count,
-        blackoutActive: deps.manager.isBlackoutActive(),
-        activeChannels: deps.manager.getActiveChannelCount(),
+        blackoutActive: manager.isBlackoutActive(),
+        activeChannels: manager.getActiveChannelCount(),
         channels,
       };
     },
@@ -355,7 +384,7 @@ export function registerControlRoutes(
   );
 
   // ── Raw DMX channel write (debug / probing) ──
-  app.post<{ Body: { channels: Record<string, number> } }>(
+  app.post<{ Body: { channels: Record<string, number>; universeId?: string } }>(
     "/debug/raw",
     {
       schema: {
@@ -367,6 +396,7 @@ export function registerControlRoutes(
               type: "object" as const,
               additionalProperties: { type: "integer" as const, minimum: 0, maximum: 255 },
             },
+            universeId: { type: "string" as const },
           },
         },
       },
@@ -379,9 +409,16 @@ export function registerControlRoutes(
           updates[dmxAddr] = val;
         }
       }
-      deps.manager.applyRawUpdate(updates);
-      pipeLog("info", `DEBUG raw DMX write: ${JSON.stringify(updates)}`);
-      return { success: true, channelsSet: Object.keys(updates).length, updates };
+
+      const uid = request.body.universeId;
+      if (deps.coordinator && uid) {
+        deps.coordinator.applyRawUpdate(uid, updates);
+      } else {
+        deps.manager.applyRawUpdate(updates);
+      }
+
+      pipeLog("info", `DEBUG raw DMX write (universe=${uid ?? "default"}): ${JSON.stringify(updates)}`);
+      return { success: true, channelsSet: Object.keys(updates).length, universeId: uid ?? null, updates };
     },
   );
 

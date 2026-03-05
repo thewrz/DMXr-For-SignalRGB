@@ -167,6 +167,32 @@ describe("universe routes", () => {
       });
       expect(res.statusCode).toBe(404);
     });
+
+    it("rejects deletion when fixtures are assigned", async () => {
+      const createRes = await app.inject({
+        method: "POST",
+        url: "/universes",
+        payload: { name: "HasFixtures", devicePath: "null", driverType: "null" },
+      });
+      const universeId = createRes.json().id;
+
+      // Add a fixture to this universe
+      fixtureStore.add({
+        name: "PAR in universe",
+        mode: "3ch",
+        dmxStartAddress: 1,
+        channelCount: 1,
+        universeId,
+        channels: [{ offset: 0, name: "Dim", type: "Intensity", defaultValue: 0 }],
+      });
+
+      const res = await app.inject({
+        method: "DELETE",
+        url: `/universes/${universeId}`,
+      });
+      expect(res.statusCode).toBe(409);
+      expect(res.json().error).toMatch(/fixture/i);
+    });
   });
 
   describe("GET /universes/:id/fixtures", () => {

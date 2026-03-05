@@ -2,6 +2,8 @@ import type { DmxUniverse } from "./driver-factory.js";
 import type { ChannelMap, FixtureUpdatePayload } from "../types/protocol.js";
 import { pipeLog, shouldSample } from "../logging/pipeline-logger.js";
 
+export type ControlMode = "normal" | "blackout" | "whiteout";
+
 const MIN_CHANNEL = 1;
 const MAX_CHANNEL = 512;
 const MIN_VALUE = 0;
@@ -30,6 +32,7 @@ export interface UniverseManager {
   readonly whiteout: () => void;
   readonly resumeNormal: () => void;
   readonly isBlackoutActive: () => boolean;
+  readonly getControlMode: () => ControlMode;
   readonly getActiveChannelCount: () => number;
   readonly getChannelSnapshot: (start: number, count: number) => Record<number, number>;
   readonly getFullSnapshot: () => Record<number, number>;
@@ -86,6 +89,7 @@ export function createUniverseManager(
   let lastSendTime: number | null = null;
   let lastSendError: string | null = null;
   let blackoutActive = false;
+  let controlMode: ControlMode = "normal";
 
   function safeSend(label: string, fn: () => void): void {
     try {
@@ -154,6 +158,7 @@ export function createUniverseManager(
 
     blackout(): void {
       blackoutActive = true;
+      controlMode = "blackout";
       const prevCount = activeChannels.size;
 
       // Preserve locked channel values before clearing
@@ -195,6 +200,7 @@ export function createUniverseManager(
 
     whiteout(): void {
       blackoutActive = true;
+      controlMode = "whiteout";
 
       // Preserve locked channel values before clearing
       const lockedValues = new Map<number, number>();
@@ -238,12 +244,17 @@ export function createUniverseManager(
 
     resumeNormal(): void {
       blackoutActive = false;
+      controlMode = "normal";
       pipeLog("info", "RESUME: blackout cleared, normal updates enabled");
       log?.info("DMX override cleared: resuming normal updates");
     },
 
     isBlackoutActive(): boolean {
       return blackoutActive;
+    },
+
+    getControlMode(): ControlMode {
+      return controlMode;
     },
 
     getActiveChannelCount(): number {

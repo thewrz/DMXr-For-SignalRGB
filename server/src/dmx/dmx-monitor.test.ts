@@ -62,6 +62,19 @@ describe("createDmxMonitor", () => {
     expect(snapshot.blackoutActive).toBe(true);
   });
 
+  it("getSnapshot includes controlMode field", () => {
+    monitor = createDmxMonitor({ manager });
+
+    expect(monitor.getSnapshot().controlMode).toBe("normal");
+
+    manager.blackout();
+    expect(monitor.getSnapshot().controlMode).toBe("blackout");
+
+    manager.resumeNormal();
+    manager.whiteout();
+    expect(monitor.getSnapshot().controlMode).toBe("whiteout");
+  });
+
   it("getSnapshot uses default universe ID when none provided", () => {
     monitor = createDmxMonitor({ manager });
 

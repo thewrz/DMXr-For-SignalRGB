@@ -62,6 +62,7 @@ export interface HealthResponse {
   readonly udpPacketsReceived?: number;
   readonly latencyAvgMs?: number;
   readonly udpPort?: number;
+  readonly controlMode?: "normal" | "blackout" | "whiteout";
   readonly serverId?: string;
   readonly serverName?: string;
   readonly universes?: readonly {

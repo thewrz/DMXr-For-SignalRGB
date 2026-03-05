@@ -78,6 +78,7 @@ export function registerHealthRoute(
       udpActive: udpStats !== undefined ? udpStats.packetsReceived > 0 : undefined,
       udpPacketsReceived: udpStats?.packetsReceived,
       udpPort: deps.udpServer?.getPort() || undefined,
+      controlMode: deps.manager.getControlMode(),
       latencyAvgMs: latency !== undefined
         ? Math.round((latency.totalProcessing.avg) * 100) / 100
         : undefined,

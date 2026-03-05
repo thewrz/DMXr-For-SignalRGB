@@ -1,6 +1,6 @@
 import type { FixtureUpdatePayload } from "../types/protocol.js";
 import { DEFAULT_UNIVERSE_ID } from "../types/protocol.js";
-import type { UniverseManager, DmxSendStatus } from "./universe-manager.js";
+import type { UniverseManager, DmxSendStatus, ControlMode } from "./universe-manager.js";
 
 export interface MultiUniverseCoordinator {
   readonly applyFixtureUpdate: (universeId: string | undefined, payload: FixtureUpdatePayload) => number;
@@ -19,6 +19,7 @@ export interface MultiUniverseCoordinator {
   readonly unlockChannels: (universeId: string, addresses: readonly number[]) => void;
   readonly applyRawUpdate: (universeId: string, channels: Record<number, number>) => void;
   readonly getDmxSendStatus: (universeId: string) => DmxSendStatus | undefined;
+  readonly getControlMode: (universeId: string) => ControlMode;
 }
 
 type ManagerProvider = () => ReadonlyMap<string, UniverseManager>;
@@ -101,6 +102,10 @@ export function createMultiUniverseCoordinator(
 
     getDmxSendStatus(universeId: string): DmxSendStatus | undefined {
       return resolve(universeId)?.getDmxSendStatus();
+    },
+
+    getControlMode(universeId: string): ControlMode {
+      return resolve(universeId)?.getControlMode() ?? "normal";
     },
   };
 }

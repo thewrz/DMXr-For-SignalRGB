@@ -433,6 +433,8 @@
         <button class="btn btn-danger" @click="blackout()">Blackout All</button>
         <button class="btn btn-warning" @click="whiteout()">Whiteout All</button>
         <button class="btn btn-success" x-show="overrideActive" @click="resume()">Resume</button>
+        <span class="badge-control badge-blackout" x-show="controlMode === 'blackout'" x-cloak>BLACKOUT</span>
+        <span class="badge-control badge-whiteout" x-show="controlMode === 'whiteout'" x-cloak>WHITEOUT</span>
         <button class="btn" x-show="fixtures.length > 0" @click="syncComponents()"
                 title="Write component files for SignalRGB Layout tile names">Sync SignalRGB Components</button>
       </div>

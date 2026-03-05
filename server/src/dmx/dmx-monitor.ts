@@ -1,4 +1,4 @@
-import type { UniverseManager } from "./universe-manager.js";
+import type { UniverseManager, ControlMode } from "./universe-manager.js";
 import type { MultiUniverseCoordinator } from "./multi-universe-coordinator.js";
 import { DEFAULT_UNIVERSE_ID } from "../types/protocol.js";
 
@@ -7,6 +7,7 @@ export interface DmxFrameSnapshot {
   readonly universeId: string;
   readonly channels: Record<number, number>;
   readonly blackoutActive: boolean;
+  readonly controlMode: ControlMode;
   readonly activeChannelCount: number;
 }
 
@@ -29,6 +30,7 @@ const DEFAULT_INTERVAL_MS = 67; // ~15fps
 const EMPTY_SNAPSHOT: Omit<DmxFrameSnapshot, "timestamp" | "universeId"> = {
   channels: {},
   blackoutActive: false,
+  controlMode: "normal",
   activeChannelCount: 0,
 };
 
@@ -50,6 +52,7 @@ export function createDmxMonitor(options: DmxMonitorOptions): DmxMonitor {
         universeId: uid,
         channels: coordinator.getFullSnapshot(uid),
         blackoutActive: coordinator.isBlackoutActive(uid),
+        controlMode: coordinator.getControlMode(uid),
         activeChannelCount: coordinator.getActiveChannelCount(uid),
       };
     }
@@ -60,6 +63,7 @@ export function createDmxMonitor(options: DmxMonitorOptions): DmxMonitor {
         universeId: uid,
         channels: manager.getFullSnapshot(),
         blackoutActive: manager.isBlackoutActive(),
+        controlMode: manager.getControlMode(),
         activeChannelCount: manager.getActiveChannelCount(),
       };
     }

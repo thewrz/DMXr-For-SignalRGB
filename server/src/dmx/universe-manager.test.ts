@@ -459,4 +459,32 @@ describe("createUniverseManager", () => {
       expect(count).toBe(0);
     });
   });
+
+  describe("getControlMode", () => {
+    it("returns 'normal' initially", () => {
+      expect(manager.getControlMode()).toBe("normal");
+    });
+
+    it("returns 'blackout' after blackout()", () => {
+      manager.blackout();
+      expect(manager.getControlMode()).toBe("blackout");
+    });
+
+    it("returns 'whiteout' after whiteout()", () => {
+      manager.whiteout();
+      expect(manager.getControlMode()).toBe("whiteout");
+    });
+
+    it("returns 'normal' after resumeNormal()", () => {
+      manager.blackout();
+      manager.resumeNormal();
+      expect(manager.getControlMode()).toBe("normal");
+    });
+
+    it("returns 'whiteout' when switching from blackout to whiteout", () => {
+      manager.blackout();
+      manager.whiteout();
+      expect(manager.getControlMode()).toBe("whiteout");
+    });
+  });
 });

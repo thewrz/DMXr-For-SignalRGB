@@ -4,6 +4,10 @@
  */
 function dmxrFixtureManager() {
   return {
+    async initControlMode() {
+      await this.pollControlMode();
+    },
+
     async loadUniverses() {
       try {
         var res = await fetch("/universes");
@@ -44,11 +48,28 @@ function dmxrFixtureManager() {
     },
 
     pollFixtures() {
+      var self = this;
       setInterval(function() {
-        if (!this.isDragging) {
-          this.loadFixtures();
+        if (!self.isDragging) {
+          self.loadFixtures();
         }
-      }.bind(this), 3000);
+        self.pollControlMode();
+      }, 3000);
+    },
+
+    async pollControlMode() {
+      try {
+        var res = await fetch("/health");
+        if (res.ok) {
+          var data = await res.json();
+          if (data.controlMode) {
+            this.controlMode = data.controlMode;
+            this.overrideActive = data.controlMode !== "normal";
+          }
+        }
+      } catch {
+        // Non-critical — will retry on next poll
+      }
     },
 
     validateAddress(excludeId) {
@@ -194,13 +215,14 @@ function dmxrFixtureManager() {
 
     async blackout() {
       try {
+        this.controlMode = "blackout";
+        this.overrideActive = true;
         var body = this.selectedUniverseId ? { universeId: this.selectedUniverseId } : {};
         await fetch("/control/blackout", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         });
-        this.overrideActive = true;
       } catch {
         // ignore
       }
@@ -208,13 +230,14 @@ function dmxrFixtureManager() {
 
     async whiteout() {
       try {
+        this.controlMode = "whiteout";
+        this.overrideActive = true;
         var body = this.selectedUniverseId ? { universeId: this.selectedUniverseId } : {};
         await fetch("/control/whiteout", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         });
-        this.overrideActive = true;
       } catch {
         // ignore
       }
@@ -222,13 +245,14 @@ function dmxrFixtureManager() {
 
     async resume() {
       try {
+        this.controlMode = "normal";
+        this.overrideActive = false;
         var body = this.selectedUniverseId ? { universeId: this.selectedUniverseId } : {};
         await fetch("/control/resume", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         });
-        this.overrideActive = false;
       } catch {
         // ignore
       }

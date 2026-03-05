@@ -2,6 +2,7 @@ function dmxrApp() {
   var app = {
     fixtures: [],
     serverOnline: false,
+    controlMode: "normal",
     overrideActive: false,
     sidebarOpen: false,
     // Universe selection
@@ -65,6 +66,7 @@ function dmxrApp() {
     overrideTimers: {},
 
     async init() {
+      await this.initControlMode();
       await this.loadUniverses();
       await this.loadFixtures();
       await this.loadManufacturers();

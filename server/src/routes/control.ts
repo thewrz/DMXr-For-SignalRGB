@@ -108,7 +108,7 @@ export function registerControlRoutes(
       { action: "blackout", fixtureCount: fixtures.length, universeId: universeId ?? "all" },
       `blackout: ${universeId ?? "all universes"} → 0`,
     );
-    return { success: true, action: "blackout", universeId: universeId ?? null };
+    return { success: true, action: "blackout", controlMode: "blackout" as const, universeId: universeId ?? null };
   });
 
   app.post<{ Body: { universeId?: string } }>("/control/whiteout", async (request) => {
@@ -170,6 +170,7 @@ export function registerControlRoutes(
     return {
       success: true,
       action: "whiteout",
+      controlMode: "whiteout" as const,
       fixturesUpdated: fixtures.length,
       universeId: universeId ?? null,
     };
@@ -190,7 +191,7 @@ export function registerControlRoutes(
       { action: "resume", universeId: universeId ?? "all" },
       `resume: ${universeId ?? "all universes"} override cleared`,
     );
-    return { success: true, action: "resume", universeId: universeId ?? null };
+    return { success: true, action: "resume", controlMode: "normal" as const, universeId: universeId ?? null };
   });
 
   // Diagnostic: dump DMX channel snapshot for a fixture or address range

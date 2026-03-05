@@ -1098,13 +1098,32 @@ header {
 /* ── Custom Fixture Builder ── */
 
 .tab-custom {
-  border-bottom-color: var(--accent) !important;
+  /* styled same as other tabs; active state handled by .tab.active */
 }
 
 .btn-block {
   display: block;
   width: 100%;
   margin-bottom: 0.5rem;
+}
+
+.btn-block-secondary {
+  border-color: var(--border);
+  color: var(--text-dim);
+  background: var(--surface2);
+}
+.btn-block-secondary:hover {
+  color: var(--text);
+  border-color: var(--text-dim);
+}
+
+.btn-export {
+  width: 100%;
+  margin-top: 0.35rem;
+  color: var(--text-dim);
+}
+.btn-export:hover {
+  color: var(--text);
 }
 
 .custom-template-list {

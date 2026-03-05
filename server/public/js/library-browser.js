@@ -233,16 +233,12 @@ function dmxrLibraryBrowser() {
       var def = this.selectedFixtureDef;
       if (!def) return;
 
-      var today = new Date().toISOString().split("T")[0];
+      var base = buildOflMeta();
       var ofl = {
-        $schema: OFL_SCHEMA_URL,
+        $schema: base.$schema,
         name: def.name,
         categories: def.categories || ["Other"],
-        meta: {
-          authors: ["DMXr Export"],
-          createDate: today,
-          lastModifyDate: today,
-        },
+        meta: base.meta,
         availableChannels: def.availableChannels || {},
         modes: def.modes || [],
       };
@@ -282,7 +278,7 @@ function dmxrLibraryBrowser() {
         var ofl = buildOflExportJson(self.libSelectedFixture.name, oflCategories, modes);
         triggerJsonDownload(ofl, slugify(self.libSelectedFixture.name) + ".json");
       } catch {
-        // Silently fail — user can retry
+        alert("Export failed — check server connection");
       }
     },
 

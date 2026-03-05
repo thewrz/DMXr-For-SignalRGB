@@ -216,7 +216,7 @@
               <template x-if="_oflImportModes.length > 1">
                 <div>
                   <label>Mode to Import</label>
-                  <select @change="onOflModeSelect(parseInt($event.target.value))">
+                  <select @change="onOflModeSelect(parseInt($event.target.value, 10))">
                     <template x-for="(m, idx) in _oflImportModes" :key="idx">
                       <option :value="idx" x-text="m" :selected="idx === _oflSelectedModeIndex"></option>
                     </template>

@@ -179,6 +179,9 @@ function dmxrCustomFixture() {
       this.customName = template.name;
       this.customManufacturer = template.manufacturer;
       this.customCategory = template.category;
+      this._oflImportDef = null;
+      this._oflImportModes = [];
+      this._oflSelectedModeIndex = 0;
       // Load first mode for editing
       var mode = template.modes[0];
       this.customModeName = mode ? mode.name : "";

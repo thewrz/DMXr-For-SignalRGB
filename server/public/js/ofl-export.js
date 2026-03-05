@@ -88,6 +88,32 @@ var DMXR_TO_OFL_CATEGORIES = {
 };
 
 /**
+ * Build the OFL $schema + meta block.
+ * @returns {{ $schema: string, meta: { authors: string[], createDate: string, lastModifyDate: string } }}
+ */
+function buildOflMeta() {
+  var today = new Date().toISOString().split("T")[0];
+  return {
+    $schema: OFL_SCHEMA_URL,
+    meta: {
+      authors: ["DMXr Export"],
+      createDate: today,
+      lastModifyDate: today,
+    },
+  };
+}
+
+/**
+ * Check if two OFL capability objects are equivalent.
+ * @param {Object} a
+ * @param {Object} b
+ * @returns {boolean}
+ */
+function _capabilitiesEqual(a, b) {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+/**
  * Build a complete OFL JSON export object.
  * @param {string} name - fixture name
  * @param {string[]} oflCategories - OFL categories array
@@ -95,7 +121,7 @@ var DMXR_TO_OFL_CATEGORIES = {
  * @returns {Object} OFL fixture JSON
  */
 function buildOflExportJson(name, oflCategories, modes) {
-  var today = new Date().toISOString().split("T")[0];
+  var base = buildOflMeta();
 
   // Collect all unique channels across all modes
   var allChannels = {};
@@ -109,22 +135,31 @@ function buildOflExportJson(name, oflCategories, modes) {
     for (var i = 0; i < mode.channels.length; i++) {
       var ch = mode.channels[i];
       var baseName = ch.name || ("Channel " + (i + 1));
-      var uniqueName = baseName;
 
-      if (nameCounts[baseName] !== undefined) {
-        nameCounts[baseName]++;
-        uniqueName = baseName + " " + nameCounts[baseName];
-      } else {
-        nameCounts[baseName] = 1;
+      var capFn = DMXR_TO_OFL_CAPABILITY[ch.type];
+      var capability = capFn ? capFn(ch) : { type: "Generic" };
+      var chDef = { capability: capability };
+      if (typeof ch.defaultValue === "number" && ch.defaultValue !== 0) {
+        chDef.defaultValue = ch.defaultValue;
+      }
+
+      // If a channel with the same baseName already exists with an equivalent
+      // capability, reuse it (shared channel across modes). Only create a
+      // suffixed name when the capability differs.
+      var uniqueName = baseName;
+      if (allChannels[baseName] !== undefined) {
+        if (_capabilitiesEqual(allChannels[baseName].capability, capability)) {
+          uniqueName = baseName;
+        } else {
+          if (nameCounts[baseName] === undefined) {
+            nameCounts[baseName] = 1;
+          }
+          nameCounts[baseName]++;
+          uniqueName = baseName + " " + nameCounts[baseName];
+        }
       }
 
       if (!allChannels[uniqueName]) {
-        var capFn = DMXR_TO_OFL_CAPABILITY[ch.type];
-        var capability = capFn ? capFn(ch) : { type: "Generic" };
-        var chDef = { capability: capability };
-        if (typeof ch.defaultValue === "number" && ch.defaultValue !== 0) {
-          chDef.defaultValue = ch.defaultValue;
-        }
         allChannels[uniqueName] = chDef;
       }
       modeChannelNames.push(uniqueName);
@@ -137,14 +172,10 @@ function buildOflExportJson(name, oflCategories, modes) {
   }
 
   return {
-    $schema: OFL_SCHEMA_URL,
+    $schema: base.$schema,
     name: name,
     categories: oflCategories,
-    meta: {
-      authors: ["DMXr Export"],
-      createDate: today,
-      lastModifyDate: today,
-    },
+    meta: base.meta,
     availableChannels: allChannels,
     modes: modesDef,
   };

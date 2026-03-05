@@ -10,6 +10,7 @@ function dmxrDmxMonitor() {
     monitorBlackoutActive: false,
     monitorActiveCount: 0,
     monitorTimestamp: null,
+    monitorRevision: 0,
 
     // Universe selection
     monitorUniverseId: "",  // empty = default
@@ -17,6 +18,11 @@ function dmxrDmxMonitor() {
 
     // SSE connection
     _monitorSource: null,
+    // rAF coalescing — buffer latest frame, apply on next paint
+    _pendingFrame: null,
+    _rafId: null,
+    // Pre-built grid array (created once, updated in-place)
+    _gridArray: null,
 
     openMonitor() {
       this.showMonitor = true;
@@ -71,11 +77,16 @@ function dmxrDmxMonitor() {
         source.onmessage = function(event) {
           self.monitorLoading = false;
           try {
-            var frame = JSON.parse(event.data);
-            self.monitorChannels = frame.channels;
-            self.monitorBlackoutActive = frame.blackoutActive;
-            self.monitorActiveCount = frame.activeChannelCount;
-            self.monitorTimestamp = frame.timestamp;
+            self._pendingFrame = JSON.parse(event.data);
+            if (!self._rafId) {
+              self._rafId = requestAnimationFrame(function() {
+                self._rafId = null;
+                if (self._pendingFrame) {
+                  self._applyFrame(self._pendingFrame);
+                  self._pendingFrame = null;
+                }
+              });
+            }
           } catch (e) {
             self.monitorError = "Failed to parse frame data";
           }
@@ -100,6 +111,11 @@ function dmxrDmxMonitor() {
         this._monitorSource.close();
         this._monitorSource = null;
       }
+      if (this._rafId) {
+        cancelAnimationFrame(this._rafId);
+        this._rafId = null;
+      }
+      this._pendingFrame = null;
     },
 
     toggleMonitorPause() {
@@ -127,16 +143,41 @@ function dmxrDmxMonitor() {
       }
     },
 
-    // Build a flat array of 512 channels for the grid view
-    gridChannels() {
-      var channels = [];
+    // Apply a frame with delta detection — only update changed channels
+    _applyFrame(frame) {
+      var prev = this.monitorChannels;
+      var next = frame.channels;
+      var changed = false;
       for (var i = 1; i <= 512; i++) {
-        channels.push({
-          address: i,
-          value: this.monitorChannels[i] || 0,
-        });
+        var newVal = next[i] || 0;
+        var oldVal = prev[i] || 0;
+        if (newVal !== oldVal) {
+          prev[i] = newVal;
+          changed = true;
+        }
       }
-      return channels;
+      this.monitorBlackoutActive = frame.blackoutActive;
+      this.monitorActiveCount = frame.activeChannelCount;
+      this.monitorTimestamp = frame.timestamp;
+      if (changed) {
+        this.monitorRevision++;
+      }
+    },
+
+    // Pre-built 512-element array, updated in-place to avoid Alpine re-rendering all x-for bindings
+    gridChannels() {
+      if (!this._gridArray) {
+        this._gridArray = [];
+        for (var i = 1; i <= 512; i++) {
+          this._gridArray.push({ address: i, value: 0 });
+        }
+      }
+      // Touch monitorRevision so Alpine tracks this as a dependency
+      void this.monitorRevision;
+      for (var i = 0; i < 512; i++) {
+        this._gridArray[i].value = this.monitorChannels[i + 1] || 0;
+      }
+      return this._gridArray;
     },
 
     channelIntensity(value) {

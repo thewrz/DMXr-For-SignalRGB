@@ -1407,7 +1407,7 @@ header {
   border-radius: 2px;
   font-size: 0.55rem;
   line-height: 1.2;
-  transition: background 0.1s;
+  transition: none;
   user-select: none;
 }
 
@@ -1458,7 +1458,7 @@ header {
   flex-direction: column;
   padding: 0.4rem 0.5rem;
   font-size: 0.75rem;
-  transition: background 0.1s;
+  transition: none;
 }
 
 .monitor-fixture-ch-name {

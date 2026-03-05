@@ -1,4 +1,5 @@
 import type { UniverseManager } from "./universe-manager.js";
+import type { MultiUniverseCoordinator } from "./multi-universe-coordinator.js";
 import { DEFAULT_UNIVERSE_ID } from "../types/protocol.js";
 
 export interface DmxFrameSnapshot {
@@ -10,41 +11,79 @@ export interface DmxFrameSnapshot {
 }
 
 export interface DmxMonitor {
-  readonly getSnapshot: () => DmxFrameSnapshot;
-  readonly subscribe: (callback: (frame: DmxFrameSnapshot) => void) => () => void;
+  readonly getSnapshot: (universeId?: string) => DmxFrameSnapshot;
+  readonly subscribe: (callback: (frame: DmxFrameSnapshot) => void, universeId?: string) => () => void;
   readonly subscriberCount: () => number;
   readonly close: () => void;
 }
 
 export interface DmxMonitorOptions {
-  readonly manager: UniverseManager;
+  readonly manager?: UniverseManager;
+  readonly coordinator?: MultiUniverseCoordinator;
   readonly universeId?: string;
   readonly intervalMs?: number;
 }
 
 const DEFAULT_INTERVAL_MS = 67; // ~15fps
 
+const EMPTY_SNAPSHOT: Omit<DmxFrameSnapshot, "timestamp" | "universeId"> = {
+  channels: {},
+  blackoutActive: false,
+  activeChannelCount: 0,
+};
+
 export function createDmxMonitor(options: DmxMonitorOptions): DmxMonitor {
-  const { manager, universeId = DEFAULT_UNIVERSE_ID } = options;
+  const { manager, coordinator, universeId: defaultUniverseId = DEFAULT_UNIVERSE_ID } = options;
   const intervalMs = options.intervalMs ?? DEFAULT_INTERVAL_MS;
-  const subscribers = new Set<(frame: DmxFrameSnapshot) => void>();
+
+  // Each subscriber is tagged with its target universe
+  const subscribers = new Map<(frame: DmxFrameSnapshot) => void, string>();
   let timer: ReturnType<typeof setInterval> | null = null;
   let closed = false;
 
-  function buildSnapshot(): DmxFrameSnapshot {
-    return {
-      timestamp: Date.now(),
-      universeId,
-      channels: manager.getFullSnapshot(),
-      blackoutActive: manager.isBlackoutActive(),
-      activeChannelCount: manager.getActiveChannelCount(),
-    };
+  function buildSnapshot(universeId?: string): DmxFrameSnapshot {
+    const uid = universeId ?? defaultUniverseId;
+
+    if (coordinator) {
+      return {
+        timestamp: Date.now(),
+        universeId: uid,
+        channels: coordinator.getFullSnapshot(uid),
+        blackoutActive: coordinator.isBlackoutActive(uid),
+        activeChannelCount: coordinator.getActiveChannelCount(uid),
+      };
+    }
+
+    if (manager) {
+      return {
+        timestamp: Date.now(),
+        universeId: uid,
+        channels: manager.getFullSnapshot(),
+        blackoutActive: manager.isBlackoutActive(),
+        activeChannelCount: manager.getActiveChannelCount(),
+      };
+    }
+
+    return { timestamp: Date.now(), universeId: uid, ...EMPTY_SNAPSHOT };
   }
 
   function broadcast(): void {
-    const frame = buildSnapshot();
-    for (const cb of subscribers) {
-      cb(frame);
+    // Group subscribers by universe to avoid redundant snapshots
+    const byUniverse = new Map<string, Array<(frame: DmxFrameSnapshot) => void>>();
+    for (const [cb, uid] of subscribers) {
+      const list = byUniverse.get(uid);
+      if (list) {
+        list.push(cb);
+      } else {
+        byUniverse.set(uid, [cb]);
+      }
+    }
+
+    for (const [uid, callbacks] of byUniverse) {
+      const frame = buildSnapshot(uid);
+      for (const cb of callbacks) {
+        cb(frame);
+      }
     }
   }
 
@@ -64,9 +103,9 @@ export function createDmxMonitor(options: DmxMonitorOptions): DmxMonitor {
   return {
     getSnapshot: buildSnapshot,
 
-    subscribe(callback: (frame: DmxFrameSnapshot) => void): () => void {
+    subscribe(callback: (frame: DmxFrameSnapshot) => void, universeId?: string): () => void {
       if (closed) return () => {};
-      subscribers.add(callback);
+      subscribers.set(callback, universeId ?? defaultUniverseId);
       startInterval();
 
       return () => {

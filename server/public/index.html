@@ -654,6 +654,16 @@
           <button :class="monitorView === 'fixture' ? 'active' : ''" @click="monitorView = 'fixture'; loadGroupedSnapshot()">Fixtures</button>
         </div>
 
+        <select x-show="monitorUniverses.length > 0"
+                class="monitor-universe-select"
+                :value="monitorUniverseId"
+                @change="switchMonitorUniverse($event.target.value)">
+          <option value="">Default Universe</option>
+          <template x-for="uni in monitorUniverses" :key="uni.id">
+            <option :value="uni.id" x-text="uni.name"></option>
+          </template>
+        </select>
+
         <button class="btn btn-sm" @click="toggleMonitorPause()">
           <span x-text="monitorPaused ? 'Resume' : 'Pause'"></span>
         </button>

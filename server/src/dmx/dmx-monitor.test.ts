@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { createDmxMonitor } from "./dmx-monitor.js";
 import { createUniverseManager } from "./universe-manager.js";
+import { createMultiUniverseCoordinator } from "./multi-universe-coordinator.js";
 import { createMockUniverse } from "../test-helpers.js";
 import type { DmxMonitor, DmxFrameSnapshot } from "./dmx-monitor.js";
 import type { UniverseManager } from "./universe-manager.js";
@@ -214,6 +215,145 @@ describe("createDmxMonitor", () => {
 
       unsub2();
       expect(monitor.subscriberCount()).toBe(0);
+    });
+  });
+
+  describe("multi-universe support (coordinator)", () => {
+    let mockUniverseA: ReturnType<typeof createMockUniverse>;
+    let mockUniverseB: ReturnType<typeof createMockUniverse>;
+    let managerA: UniverseManager;
+    let managerB: UniverseManager;
+
+    beforeEach(() => {
+      mockUniverseA = createMockUniverse();
+      mockUniverseB = createMockUniverse();
+      managerA = createUniverseManager(mockUniverseA);
+      managerB = createUniverseManager(mockUniverseB);
+    });
+
+    it("getSnapshot resolves the correct universe via coordinator", () => {
+      const managers = new Map<string, UniverseManager>([
+        ["uni-a", managerA],
+        ["uni-b", managerB],
+      ]);
+      const coordinator = createMultiUniverseCoordinator(() => managers);
+
+      managerA.applyFixtureUpdate({ fixture: "par", channels: { "1": 100 } });
+      managerB.applyFixtureUpdate({ fixture: "mover", channels: { "40": 200 } });
+
+      monitor = createDmxMonitor({ coordinator });
+
+      const snapA = monitor.getSnapshot("uni-a");
+      expect(snapA.universeId).toBe("uni-a");
+      expect(snapA.channels[1]).toBe(100);
+      expect(snapA.channels[40]).toBeUndefined();
+
+      const snapB = monitor.getSnapshot("uni-b");
+      expect(snapB.universeId).toBe("uni-b");
+      expect(snapB.channels[40]).toBe(200);
+      expect(snapB.channels[1]).toBeUndefined();
+    });
+
+    it("getSnapshot falls back to default universe when no universeId given", () => {
+      const managers = new Map<string, UniverseManager>([
+        ["default", managerA],
+        ["uni-b", managerB],
+      ]);
+      const coordinator = createMultiUniverseCoordinator(() => managers);
+
+      managerA.applyFixtureUpdate({ fixture: "par", channels: { "5": 55 } });
+
+      monitor = createDmxMonitor({ coordinator });
+
+      const snap = monitor.getSnapshot();
+      expect(snap.universeId).toBe("default");
+      expect(snap.channels[5]).toBe(55);
+    });
+
+    it("getSnapshot returns empty state for unknown universe", () => {
+      const managers = new Map<string, UniverseManager>([
+        ["uni-a", managerA],
+      ]);
+      const coordinator = createMultiUniverseCoordinator(() => managers);
+
+      monitor = createDmxMonitor({ coordinator });
+
+      const snap = monitor.getSnapshot("nonexistent");
+      expect(snap.universeId).toBe("nonexistent");
+      expect(snap.activeChannelCount).toBe(0);
+      expect(snap.blackoutActive).toBe(false);
+      expect(Object.keys(snap.channels)).toHaveLength(0);
+    });
+
+    it("subscribe delivers frames for the specified universe", () => {
+      const managers = new Map<string, UniverseManager>([
+        ["uni-a", managerA],
+        ["uni-b", managerB],
+      ]);
+      const coordinator = createMultiUniverseCoordinator(() => managers);
+
+      managerA.applyFixtureUpdate({ fixture: "par", channels: { "1": 111 } });
+      managerB.applyFixtureUpdate({ fixture: "mover", channels: { "40": 222 } });
+
+      monitor = createDmxMonitor({ coordinator, intervalMs: 100 });
+
+      const framesA: DmxFrameSnapshot[] = [];
+      monitor.subscribe((frame) => framesA.push(frame), "uni-a");
+
+      vi.advanceTimersByTime(150);
+
+      expect(framesA.length).toBe(1);
+      expect(framesA[0].universeId).toBe("uni-a");
+      expect(framesA[0].channels[1]).toBe(111);
+      expect(framesA[0].channels[40]).toBeUndefined();
+    });
+
+    it("subscribers to different universes receive independent frames", () => {
+      const managers = new Map<string, UniverseManager>([
+        ["uni-a", managerA],
+        ["uni-b", managerB],
+      ]);
+      const coordinator = createMultiUniverseCoordinator(() => managers);
+
+      managerA.applyFixtureUpdate({ fixture: "par", channels: { "1": 10 } });
+      managerB.applyFixtureUpdate({ fixture: "mover", channels: { "1": 99 } });
+
+      monitor = createDmxMonitor({ coordinator, intervalMs: 100 });
+
+      const framesA: DmxFrameSnapshot[] = [];
+      const framesB: DmxFrameSnapshot[] = [];
+      monitor.subscribe((frame) => framesA.push(frame), "uni-a");
+      monitor.subscribe((frame) => framesB.push(frame), "uni-b");
+
+      vi.advanceTimersByTime(150);
+
+      expect(framesA[0].channels[1]).toBe(10);
+      expect(framesB[0].channels[1]).toBe(99);
+    });
+
+    it("falls back to legacy manager when coordinator is not provided", () => {
+      manager.applyFixtureUpdate({ fixture: "test", channels: { "3": 33 } });
+      monitor = createDmxMonitor({ manager });
+
+      const snap = monitor.getSnapshot();
+      expect(snap.channels[3]).toBe(33);
+      expect(snap.universeId).toBe("default");
+    });
+
+    it("coordinator blackout state is reflected per-universe", () => {
+      const managers = new Map<string, UniverseManager>([
+        ["uni-a", managerA],
+        ["uni-b", managerB],
+      ]);
+      const coordinator = createMultiUniverseCoordinator(() => managers);
+
+      managerA.applyFixtureUpdate({ fixture: "par", channels: { "1": 255 } });
+      managerA.blackout();
+
+      monitor = createDmxMonitor({ coordinator });
+
+      expect(monitor.getSnapshot("uni-a").blackoutActive).toBe(true);
+      expect(monitor.getSnapshot("uni-b").blackoutActive).toBe(false);
     });
   });
 });

@@ -5,12 +5,15 @@ function dmxrDmxMonitor() {
     monitorError: "",
     monitorPaused: false,
     monitorView: "grid",  // "grid" or "fixture"
-    monitorFps: 10,
     monitorChannels: {},
     monitorFixtures: [],
     monitorBlackoutActive: false,
     monitorActiveCount: 0,
     monitorTimestamp: null,
+
+    // Universe selection
+    monitorUniverseId: "",  // empty = default
+    monitorUniverses: [],   // [{id, name}] from /universes
 
     // SSE connection
     _monitorSource: null,
@@ -18,6 +21,7 @@ function dmxrDmxMonitor() {
     openMonitor() {
       this.showMonitor = true;
       this.monitorError = "";
+      this.loadMonitorUniverses();
       this.connectMonitor();
     },
 
@@ -26,13 +30,42 @@ function dmxrDmxMonitor() {
       this.disconnectMonitor();
     },
 
+    async loadMonitorUniverses() {
+      try {
+        var res = await fetch("/universes");
+        if (res.ok) {
+          this.monitorUniverses = await res.json();
+        }
+      } catch (e) {
+        // Non-critical — dropdown just won't show extra universes
+      }
+    },
+
+    monitorStreamUrl() {
+      var url = "/api/dmx/monitor";
+      if (this.monitorUniverseId) {
+        url += "?universeId=" + encodeURIComponent(this.monitorUniverseId);
+      }
+      return url;
+    },
+
+    switchMonitorUniverse(universeId) {
+      this.monitorUniverseId = universeId;
+      if (!this.monitorPaused) {
+        this.connectMonitor();
+      }
+      if (this.monitorView === "fixture") {
+        this.loadGroupedSnapshot();
+      }
+    },
+
     connectMonitor() {
       this.disconnectMonitor();
       this.monitorLoading = true;
       this.monitorPaused = false;
 
       try {
-        var source = new EventSource("/api/dmx/monitor");
+        var source = new EventSource(this.monitorStreamUrl());
         var self = this;
 
         source.onmessage = function(event) {
@@ -80,7 +113,11 @@ function dmxrDmxMonitor() {
 
     async loadGroupedSnapshot() {
       try {
-        var res = await fetch("/api/dmx/snapshot?grouped=true");
+        var url = "/api/dmx/snapshot?grouped=true";
+        if (this.monitorUniverseId) {
+          url += "&universeId=" + encodeURIComponent(this.monitorUniverseId);
+        }
+        var res = await fetch(url);
         if (res.ok) {
           var data = await res.json();
           this.monitorFixtures = data.fixtures || [];

@@ -206,7 +206,7 @@ async function main() {
     logger: consoleLogger,
   });
 
-  const dmxMonitor = createDmxMonitor({ manager });
+  const dmxMonitor = createDmxMonitor({ manager, coordinator });
 
   const app = await buildServer({
     config: finalConfig,

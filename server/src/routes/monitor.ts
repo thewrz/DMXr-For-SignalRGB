@@ -15,11 +15,16 @@ export function registerMonitorRoutes(
     "/api/dmx/snapshot",
     { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } },
     async (request) => {
-      const snapshot = deps.monitor.getSnapshot();
+      const universeId = request.query.universeId;
+      const snapshot = deps.monitor.getSnapshot(universeId);
       const grouped = request.query.grouped === "true";
 
       if (grouped && deps.fixtureStore) {
-        const fixtures = deps.fixtureStore.getAll().map((fixture) => ({
+        const allFixtures = universeId
+          ? deps.fixtureStore.getByUniverse(universeId)
+          : deps.fixtureStore.getAll();
+
+        const fixtures = allFixtures.map((fixture) => ({
           id: fixture.id,
           name: fixture.name,
           dmxStartAddress: fixture.dmxStartAddress,
@@ -44,7 +49,8 @@ export function registerMonitorRoutes(
   app.get<{ Querystring: { universeId?: string; fps?: string } }>(
     "/api/dmx/monitor",
     async (request, reply) => {
-      const initial = deps.monitor.getSnapshot();
+      const universeId = request.query.universeId;
+      const initial = deps.monitor.getSnapshot(universeId);
       const initialPayload = `data:${JSON.stringify(initial)}\n\n`;
 
       // Fastify inject() uses a mock socket — detect and return a single frame
@@ -69,7 +75,7 @@ export function registerMonitorRoutes(
 
       const unsubscribe = deps.monitor.subscribe((frame) => {
         reply.raw.write(`data:${JSON.stringify(frame)}\n\n`);
-      });
+      }, universeId);
 
       request.raw.on("close", () => {
         unsubscribe();

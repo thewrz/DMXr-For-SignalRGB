@@ -102,15 +102,17 @@
       <!-- Browse Tab -->
       <div x-show="sidebarTab === 'browse'" class="sidebar-panel">
         <!-- Source selector -->
-        <div class="source-tabs">
-          <button class="tab" :class="{ active: browseSource === 'ofl' }"
-                  @click="switchBrowseSource('ofl')">OFL</button>
-          <template x-for="lib in getNonOflLibraries().filter(l => l.id !== 'custom')" :key="lib.id">
-            <button class="tab" :class="{ active: browseSource === lib.id }"
-                    @click="switchBrowseSource(lib.id)" x-text="lib.displayName"></button>
-          </template>
-          <button class="tab tab-custom" :class="{ active: browseSource === 'custom' }"
-                  @click="switchBrowseSource('custom'); loadCustomTemplates()">Custom</button>
+        <div class="source-select-wrap">
+          <select class="source-select"
+                  :value="browseSource"
+                  @change="switchBrowseSource($event.target.value);
+                           if ($event.target.value === 'custom') loadCustomTemplates()">
+            <option value="ofl">Open Fixture Library</option>
+            <template x-for="lib in getNonOflLibraries().filter(l => l.id !== 'custom')" :key="lib.id">
+              <option :value="lib.id" x-text="lib.displayName"></option>
+            </template>
+            <option value="custom">Custom</option>
+          </select>
         </div>
 
         <!-- OFL Browse -->

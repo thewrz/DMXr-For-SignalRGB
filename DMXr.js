@@ -669,7 +669,7 @@ function deriveCategoryFromChannels(channels) {
 	if (!channels || channels.length === 0) return "Other";
 	var hasPan = false, hasTilt = false, hasGobo = false, hasPrism = false;
 	var hasColorWheel = false, hasStrobe = false, hasColor = false;
-	var hasUvOnly = true, allDimmer = true;
+	var hasUvOnly = true, hasIntensity = false, allDimmer = true;
 	for (var i = 0; i < channels.length; i++) {
 		var t = channels[i].type;
 		if (t === "Pan") hasPan = true;
@@ -678,6 +678,7 @@ function deriveCategoryFromChannels(channels) {
 		else if (t === "Prism") hasPrism = true;
 		else if (t === "ColorWheel") hasColorWheel = true;
 		else if (t === "Strobe" || t === "ShutterStrobe") hasStrobe = true;
+		else if (t === "Intensity") hasIntensity = true;
 		if (t === "ColorIntensity") {
 			hasColor = true;
 			if (channels[i].color !== "UV") hasUvOnly = false;
@@ -692,7 +693,7 @@ function deriveCategoryFromChannels(channels) {
 	if (hasStrobe && !hasColor) return "Strobe";
 	if (hasColor && hasUvOnly) return "Blacklight";
 	if (hasColor) return "Color Changer";
-	if (allDimmer && !hasColor) return "Dimmer";
+	if (allDimmer && hasIntensity && !hasColor) return "Dimmer";
 	return "Other";
 }
 

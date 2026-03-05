@@ -7,10 +7,10 @@ var FIXTURE_ICON_MAP = {
   "Color Changer": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="12" height="14" rx="2"/><circle cx="12" cy="11" r="3"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="9" y1="1" x2="7" y2="4"/><line x1="15" y1="1" x2="17" y2="4"/><line x1="12" y1="1" x2="12" y2="4"/></svg>',
   "Moving Head": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 20h10"/><path d="M9 20V14"/><path d="M15 20V14"/><rect x="7" y="6" width="10" height="8" rx="2"/><circle cx="12" cy="10" r="2"/><path d="M5 6c0-2 3-4 7-4s7 2 7 4" stroke-dasharray="2 2" opacity="0.5"/></svg>',
   "Scanner": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="10" height="8" rx="1"/><path d="M14 12l7-6"/><circle cx="14" cy="12" r="1.5"/><path d="M14 12l7 6" stroke-dasharray="2 2" opacity="0.4"/></svg>',
-  "Dimmer": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M12 4v2"/><path d="M12 18v2"/><path d="M4 12h2"/><path d="M18 12h2"/><path d="M12 12V8"/><path d="M12 12l3 3"/></svg>',
+  "Dimmer": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18V22"/><path d="M5.6 15.4l-2.8 2.8"/><path d="M18.4 15.4l2.8 2.8"/><path d="M2 12H4"/><path d="M20 12h2"/><path d="M12 2a8 8 0 010 16"/><path d="M12 2v16" stroke-dasharray="2 2" opacity="0.4"/></svg>',
   "Strobe": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4 14h7l-2 8 9-12h-7z"/></svg>',
   "Blinder": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="9" height="12" rx="2"/><rect x="13" y="6" width="9" height="12" rx="2"/><circle cx="6.5" cy="12" r="2.5"/><circle cx="17.5" cy="12" r="2.5"/></svg>',
-  "Laser": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="9" width="8" height="6" rx="1"/><line x1="10" y1="12" x2="22" y2="12"/><circle cx="22" cy="12" r="1" fill="currentColor"/><circle cx="2" cy="12" r="1" fill="currentColor"/></svg>',
+  "Laser": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 10l6 2-6 2"/><line x1="8" y1="12" x2="22" y2="12" stroke-width="2"/><circle cx="22" cy="12" r="1.5" fill="currentColor" stroke="none"/><line x1="18" y1="6" x2="20" y2="10" opacity="0.4"/><line x1="22" y1="5" x2="21" y2="9" opacity="0.4"/><line x1="18" y1="18" x2="20" y2="14" opacity="0.4"/></svg>',
   "Effect": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="5" x2="12" y2="1"/><line x1="12" y1="23" x2="12" y2="19"/><line x1="5" y1="12" x2="1" y2="12"/><line x1="23" y1="12" x2="19" y2="12"/><line x1="7.05" y1="7.05" x2="4.22" y2="4.22"/><line x1="19.78" y1="19.78" x2="16.95" y2="16.95"/></svg>',
   "Pixel Bar": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="8" width="22" height="8" rx="2"/><circle cx="5" cy="12" r="1.5" fill="currentColor" opacity="0.6"/><circle cx="9.5" cy="12" r="1.5" fill="currentColor" opacity="0.6"/><circle cx="14.5" cy="12" r="1.5" fill="currentColor" opacity="0.6"/><circle cx="19" cy="12" r="1.5" fill="currentColor" opacity="0.6"/></svg>',
   "Blacklight": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="9" width="18" height="6" rx="3"/><line x1="6" y1="6" x2="6" y2="9" stroke-dasharray="1 1.5" opacity="0.5"/><line x1="10" y1="5" x2="10" y2="9" stroke-dasharray="1 1.5" opacity="0.5"/><line x1="14" y1="5" x2="14" y2="9" stroke-dasharray="1 1.5" opacity="0.5"/><line x1="18" y1="6" x2="18" y2="9" stroke-dasharray="1 1.5" opacity="0.5"/></svg>',
@@ -36,6 +36,7 @@ function deriveFixtureCategory(channels) {
   var hasColor = false;
   var hasUvOnly = true;
   var hasAnyColor = false;
+  var hasIntensity = false;
   var allDimmer = true;
 
   var dimmerTypes = { Intensity: true, Generic: true, NoFunction: true };
@@ -50,6 +51,7 @@ function deriveFixtureCategory(channels) {
     else if (t === "Prism") hasPrism = true;
     else if (t === "ColorWheel") hasColorWheel = true;
     else if (t === "Strobe" || t === "ShutterStrobe") hasStrobe = true;
+    else if (t === "Intensity") hasIntensity = true;
 
     if (t === "ColorIntensity") {
       hasColor = true;
@@ -68,7 +70,7 @@ function deriveFixtureCategory(channels) {
   if (hasStrobe && !hasColor) return "Strobe";
   if (hasAnyColor && hasUvOnly) return "Blacklight";
   if (hasColor) return "Color Changer";
-  if (allDimmer && !hasColor) return "Dimmer";
+  if (allDimmer && hasIntensity && !hasColor) return "Dimmer";
 
   return "Other";
 }

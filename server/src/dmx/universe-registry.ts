@@ -7,6 +7,7 @@ import type {
   UpdateUniverseRequest,
 } from "../types/protocol.js";
 import { DEFAULT_UNIVERSE_ID } from "../types/protocol.js";
+import type { SerialPortInfo } from "./serial-port-scanner.js";
 
 export interface UniverseRegistry {
   readonly getAll: () => readonly UniverseConfig[];
@@ -16,6 +17,7 @@ export interface UniverseRegistry {
   readonly add: (request: AddUniverseRequest) => UniverseConfig;
   readonly update: (id: string, changes: UpdateUniverseRequest) => UniverseConfig | undefined;
   readonly remove: (id: string) => boolean;
+  readonly autoAssignDevices: (devices: readonly SerialPortInfo[]) => readonly UniverseConfig[];
   readonly save: () => Promise<void>;
   readonly load: () => Promise<void>;
 }
@@ -128,6 +130,37 @@ export function createUniverseRegistry(filePath: string): UniverseRegistry {
       const before = universes.length;
       universes = universes.filter((u) => u.id !== id);
       return universes.length < before;
+    },
+
+    autoAssignDevices(devices: readonly SerialPortInfo[]): readonly UniverseConfig[] {
+      const created: UniverseConfig[] = [];
+      let nextIndex = universes.filter((u) => u.id !== DEFAULT_UNIVERSE_ID).length + 1;
+
+      for (const device of devices) {
+        if (!device.serialNumber) continue;
+
+        // Check if device already assigned by serial number
+        const existing = universes.find((u) => u.serialNumber === device.serialNumber);
+        if (existing) {
+          // Update device path if it changed (re-plug to different port)
+          if (existing.devicePath !== device.path) {
+            this.update(existing.id, { devicePath: device.path });
+          }
+          continue;
+        }
+
+        const universe = this.add({
+          name: `Universe ${nextIndex}`,
+          devicePath: device.path,
+          driverType: "enttec-usb-dmx-pro",
+          serialNumber: device.serialNumber,
+        });
+
+        created.push(universe);
+        nextIndex++;
+      }
+
+      return created;
     },
 
     async save(): Promise<void> {

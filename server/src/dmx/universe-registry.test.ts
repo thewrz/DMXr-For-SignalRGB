@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { createUniverseRegistry } from "./universe-registry.js";
 import type { UniverseRegistry } from "./universe-registry.js";
-import type { AddUniverseRequest } from "../types/protocol.js";
+import type { AddUniverseRequest, UniverseConfig } from "../types/protocol.js";
+import type { SerialPortInfo } from "./serial-port-scanner.js";
 import { DEFAULT_UNIVERSE_ID } from "../types/protocol.js";
 import { rm, readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -219,6 +220,83 @@ describe("createUniverseRegistry", () => {
 
     it("throws if no default exists (before load)", () => {
       expect(() => registry.getDefault()).toThrow(/default universe not found/i);
+    });
+  });
+
+  describe("autoAssignDevices", () => {
+    function makeDevice(overrides: Partial<SerialPortInfo> = {}): SerialPortInfo {
+      return {
+        path: "/dev/ttyUSB0",
+        manufacturer: "FTDI",
+        vendorId: "0403",
+        productId: "6001",
+        serialNumber: "EN466833",
+        isEnttec: true,
+        ...overrides,
+      };
+    }
+
+    beforeEach(async () => {
+      await registry.load(); // ensure default universe exists
+    });
+
+    it("creates a universe for each unassigned USB device", () => {
+      const devices = [
+        makeDevice({ path: "/dev/ttyUSB0", serialNumber: "EN001" }),
+        makeDevice({ path: "/dev/ttyUSB1", serialNumber: "EN002" }),
+      ];
+
+      const created = registry.autoAssignDevices(devices);
+
+      expect(created).toHaveLength(2);
+      // Plus the default universe
+      expect(registry.getAll().length).toBeGreaterThanOrEqual(3);
+    });
+
+    it("skips devices that already have a universe (matched by serialNumber)", () => {
+      const devices = [makeDevice({ path: "/dev/ttyUSB0", serialNumber: "EN001" })];
+
+      // First assignment
+      registry.autoAssignDevices(devices);
+      const countAfterFirst = registry.getAll().length;
+
+      // Second call with same device — no new universes
+      const created = registry.autoAssignDevices(devices);
+      expect(created).toHaveLength(0);
+      expect(registry.getAll().length).toBe(countAfterFirst);
+    });
+
+    it("generates meaningful names", () => {
+      const devices = [
+        makeDevice({ path: "/dev/ttyUSB0", serialNumber: "EN001" }),
+        makeDevice({ path: "/dev/ttyUSB1", serialNumber: "EN002" }),
+      ];
+
+      const created = registry.autoAssignDevices(devices);
+
+      expect(created[0].name).toBe("Universe 1");
+      expect(created[1].name).toBe("Universe 2");
+    });
+
+    it("updates devicePath when serialNumber matches but path changed", () => {
+      const devices1 = [makeDevice({ path: "COM3", serialNumber: "EN001" })];
+      registry.autoAssignDevices(devices1);
+
+      // Same serial number, different path (re-plug)
+      const devices2 = [makeDevice({ path: "COM5", serialNumber: "EN001" })];
+      const created = registry.autoAssignDevices(devices2);
+
+      expect(created).toHaveLength(0); // no new universes
+      const universe = registry.getAll().find(
+        (u) => u.serialNumber === "EN001",
+      );
+      expect(universe).toBeDefined();
+      expect(universe!.devicePath).toBe("COM5");
+    });
+
+    it("does nothing when no new devices found", () => {
+      const created = registry.autoAssignDevices([]);
+      expect(created).toHaveLength(0);
     });
   });
 });

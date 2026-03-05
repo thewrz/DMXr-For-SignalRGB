@@ -142,10 +142,12 @@ async function main() {
   manager.blackout();
 
   // Initialize fixture defaults (sets pan/tilt center, strobe open, etc.)
-  manager.resumeNormal();
+  // Use applyRawUpdate to bypass blackout guard — server stays in blackout
+  // until a client explicitly resumes or SignalRGB starts sending colors.
   for (const fixture of fixtureStore.getAll()) {
     const defaults = getFixtureDefaults(fixture);
-    const count = manager.applyFixtureUpdate({ fixture: fixture.id, channels: defaults });
+    manager.applyRawUpdate(defaults);
+    const count = Object.keys(defaults).length;
     pipeLog("info", `Startup defaults for "${fixture.name}": ${count} channels pushed to DMX`);
   }
   pipeLog("info", "Fixture defaults initialization complete");

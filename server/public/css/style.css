@@ -359,10 +359,32 @@ header {
   position: relative;
 }
 
-.universe-map h3 {
+.universe-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-bottom: 0.5rem;
+}
+
+.universe-header h3 {
+  margin: 0;
   font-size: 0.9rem;
   color: var(--text-dim);
+}
+
+.universe-select {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.8rem;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.universe-select:focus {
+  outline: none;
+  border-color: var(--accent);
 }
 
 .channel-grid {

@@ -229,10 +229,10 @@ function dmxrDragDrop() {
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                name: staged.name,
-                dmxStartAddress: address,
-              }),
+              body: JSON.stringify(Object.assign(
+                { name: staged.name, dmxStartAddress: address },
+                this.selectedUniverseId ? { universeId: this.selectedUniverseId } : {}
+              )),
             }
           );
 
@@ -260,6 +260,9 @@ function dmxrDragDrop() {
         channelCount: staged.channelCount,
         channels: staged.channels,
       };
+      if (this.selectedUniverseId) {
+        payload.universeId = this.selectedUniverseId;
+      }
 
       try {
         var res2 = await fetch("/fixtures", {

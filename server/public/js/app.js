@@ -4,6 +4,9 @@ function dmxrApp() {
     serverOnline: false,
     overrideActive: false,
     sidebarOpen: false,
+    // Universe selection
+    selectedUniverseId: "",
+    availableUniverses: [],
     // Sidebar state
     sidebarTab: "search",
     browseSource: "ofl",
@@ -62,6 +65,7 @@ function dmxrApp() {
     overrideTimers: {},
 
     async init() {
+      await this.loadUniverses();
       await this.loadFixtures();
       await this.loadManufacturers();
       await this.loadLibraries();

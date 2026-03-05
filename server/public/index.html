@@ -455,7 +455,17 @@
 
       <!-- Universe Grid (primary patch bay) -->
       <div class="universe-map">
-        <h3>DMX Universe <span class="fixture-count" x-text="'(' + fixtures.length + ' fixture' + (fixtures.length !== 1 ? 's' : '') + ')'"></span></h3>
+        <div class="universe-header">
+          <h3>DMX Universe <span class="fixture-count" x-text="'(' + fixtures.length + ' fixture' + (fixtures.length !== 1 ? 's' : '') + ')'"></span></h3>
+          <select class="universe-select" x-show="availableUniverses.length > 0" x-cloak
+                  @change="switchUniverse($event.target.value)"
+                  :value="selectedUniverseId">
+            <option value="">Default Universe</option>
+            <template x-for="uni in availableUniverses" :key="uni.id">
+              <option :value="uni.id" x-text="uni.name"></option>
+            </template>
+          </select>
+        </div>
         <div class="channel-grid"
              @dragover.prevent="onGridDragOver($event)"
              @drop.prevent="onGridDrop($event)"

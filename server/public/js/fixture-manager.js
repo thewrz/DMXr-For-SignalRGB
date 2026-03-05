@@ -4,9 +4,29 @@
  */
 function dmxrFixtureManager() {
   return {
+    async loadUniverses() {
+      try {
+        var res = await fetch("/universes");
+        if (res.ok) {
+          this.availableUniverses = await res.json();
+        }
+      } catch {
+        // Non-critical — dropdown just won't show extra universes
+      }
+    },
+
+    switchUniverse(universeId) {
+      this.selectedUniverseId = universeId;
+      this.loadFixtures();
+    },
+
     async loadFixtures() {
       try {
-        var res = await fetch("/fixtures");
+        var url = "/fixtures";
+        if (this.selectedUniverseId) {
+          url += "?universeId=" + encodeURIComponent(this.selectedUniverseId);
+        }
+        var res = await fetch(url);
         if (!res.ok) {
           this.serverOnline = false;
           return;
@@ -174,7 +194,12 @@ function dmxrFixtureManager() {
 
     async blackout() {
       try {
-        await fetch("/control/blackout", { method: "POST" });
+        var body = this.selectedUniverseId ? { universeId: this.selectedUniverseId } : {};
+        await fetch("/control/blackout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
         this.overrideActive = true;
       } catch {
         // ignore
@@ -183,7 +208,12 @@ function dmxrFixtureManager() {
 
     async whiteout() {
       try {
-        await fetch("/control/whiteout", { method: "POST" });
+        var body = this.selectedUniverseId ? { universeId: this.selectedUniverseId } : {};
+        await fetch("/control/whiteout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
         this.overrideActive = true;
       } catch {
         // ignore
@@ -192,7 +222,12 @@ function dmxrFixtureManager() {
 
     async resume() {
       try {
-        await fetch("/control/resume", { method: "POST" });
+        var body = this.selectedUniverseId ? { universeId: this.selectedUniverseId } : {};
+        await fetch("/control/resume", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
         this.overrideActive = false;
       } catch {
         // ignore

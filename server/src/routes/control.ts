@@ -1,7 +1,9 @@
 import type { FastifyInstance } from "fastify";
 import type { UniverseManager } from "../dmx/universe-manager.js";
+import type { MultiUniverseCoordinator } from "../dmx/multi-universe-coordinator.js";
 import type { FixtureStore } from "../fixtures/fixture-store.js";
 import type { FixtureConfig, FixtureChannel } from "../types/protocol.js";
+import { DEFAULT_UNIVERSE_ID } from "../types/protocol.js";
 import { mapColor } from "../fixtures/channel-mapper.js";
 import { analyzeFixture } from "../fixtures/fixture-capabilities.js";
 import { pipeLog } from "../logging/pipeline-logger.js";
@@ -33,6 +35,7 @@ function detectResetChannel(channels: readonly FixtureChannel[]): FixtureChannel
 interface ControlRouteDeps {
   readonly manager: UniverseManager;
   readonly store: FixtureStore;
+  readonly coordinator?: MultiUniverseCoordinator;
 }
 
 interface TestBody {
@@ -89,59 +92,105 @@ export function registerControlRoutes(
     holdSnapshots.delete(fixture.id);
   }
 
-  app.post("/control/blackout", async (request) => {
-    deps.manager.blackout();
+  app.post<{ Body: { universeId?: string } }>("/control/blackout", async (request) => {
+    const universeId = request.body?.universeId;
+
+    if (deps.coordinator && universeId) {
+      deps.coordinator.blackout(universeId);
+    } else if (deps.coordinator) {
+      deps.coordinator.blackoutAll();
+    } else {
+      deps.manager.blackout();
+    }
+
     const fixtures = deps.store.getAll();
     request.log.info(
-      { action: "blackout", fixtureCount: fixtures.length },
-      "blackout: all 512 channels → 0",
+      { action: "blackout", fixtureCount: fixtures.length, universeId: universeId ?? "all" },
+      `blackout: ${universeId ?? "all universes"} → 0`,
     );
-    return { success: true, action: "blackout" };
+    return { success: true, action: "blackout", universeId: universeId ?? null };
   });
 
-  app.post("/control/whiteout", async (request) => {
-    const fixtures = deps.store.getAll();
+  app.post<{ Body: { universeId?: string } }>("/control/whiteout", async (request) => {
+    const universeId = request.body?.universeId;
+    const fixtures = universeId
+      ? deps.store.getByUniverse(universeId)
+      : deps.store.getAll();
 
-    // All 512 channels to 255 — works even with no fixtures in store
-    deps.manager.whiteout();
+    if (deps.coordinator && universeId) {
+      deps.coordinator.whiteout(universeId);
+    } else if (deps.coordinator) {
+      deps.coordinator.whiteoutAll();
+    } else {
+      deps.manager.whiteout();
+    }
 
     // Overlay fixture-specific values via mapColor for correct
     // non-color channels (pan center, strobe open, dimmer full, etc.)
-    const allUpdates: Record<number, number> = {};
-    for (const fixture of fixtures) {
-      const channels = mapColor(fixture, 255, 255, 255, 1.0);
-      for (const [addr, val] of Object.entries(channels)) {
-        allUpdates[Number(addr)] = val;
+    let totalChannelsSet = 0;
+    if (deps.coordinator) {
+      const byUniverse = new Map<string, Record<number, number>>();
+      for (const fixture of fixtures) {
+        const uid = fixture.universeId ?? DEFAULT_UNIVERSE_ID;
+        const channels = mapColor(fixture, 255, 255, 255, 1.0);
+        const existing = byUniverse.get(uid) ?? {};
+        const merged = { ...existing };
+        for (const [addr, val] of Object.entries(channels)) {
+          merged[Number(addr)] = val;
+        }
+        byUniverse.set(uid, merged);
       }
-    }
-
-    if (Object.keys(allUpdates).length > 0) {
-      deps.manager.applyRawUpdate(allUpdates);
+      for (const [uid, updates] of byUniverse) {
+        totalChannelsSet += Object.keys(updates).length;
+        deps.coordinator.applyRawUpdate(uid, updates);
+      }
+    } else {
+      const allUpdates: Record<number, number> = {};
+      for (const fixture of fixtures) {
+        const channels = mapColor(fixture, 255, 255, 255, 1.0);
+        for (const [addr, val] of Object.entries(channels)) {
+          allUpdates[Number(addr)] = val;
+        }
+      }
+      totalChannelsSet = Object.keys(allUpdates).length;
+      if (totalChannelsSet > 0) {
+        deps.manager.applyRawUpdate(allUpdates);
+      }
     }
 
     request.log.info(
       {
         action: "whiteout",
         fixtureCount: fixtures.length,
-        channelsSet: Object.keys(allUpdates).length,
+        channelsSet: totalChannelsSet,
       },
-      `whiteout: ${fixtures.length} fixtures, ${Object.keys(allUpdates).length} channels set via mapColor`,
+      `whiteout: ${fixtures.length} fixtures, ${totalChannelsSet} channels set via mapColor`,
     );
 
     return {
       success: true,
       action: "whiteout",
       fixturesUpdated: fixtures.length,
+      universeId: universeId ?? null,
     };
   });
 
-  app.post("/control/resume", async (request) => {
-    deps.manager.resumeNormal();
+  app.post<{ Body: { universeId?: string } }>("/control/resume", async (request) => {
+    const universeId = request.body?.universeId;
+
+    if (deps.coordinator && universeId) {
+      deps.coordinator.resumeNormal(universeId);
+    } else if (deps.coordinator) {
+      deps.coordinator.resumeNormalAll();
+    } else {
+      deps.manager.resumeNormal();
+    }
+
     request.log.info(
-      { action: "resume" },
-      "resume: blackout/whiteout override cleared",
+      { action: "resume", universeId: universeId ?? "all" },
+      `resume: ${universeId ?? "all universes"} override cleared`,
     );
-    return { success: true, action: "resume" };
+    return { success: true, action: "resume", universeId: universeId ?? null };
   });
 
   // Diagnostic: dump DMX channel snapshot for a fixture or address range
@@ -155,7 +204,16 @@ export function registerControlRoutes(
 
       const base = fixture.dmxStartAddress;
       const count = fixture.channelCount;
-      const snapshot = deps.manager.getChannelSnapshot(base, count);
+      const universeId = fixture.universeId ?? DEFAULT_UNIVERSE_ID;
+
+      const manager = deps.coordinator
+        ? (() => { const m = deps.coordinator!; return {
+            getChannelSnapshot: (s: number, c: number) => m.getChannelSnapshot(universeId, s, c),
+            isBlackoutActive: () => m.isBlackoutActive(universeId),
+            getActiveChannelCount: () => m.getActiveChannelCount(universeId),
+          }; })()
+        : deps.manager;
+      const snapshot = manager.getChannelSnapshot(base, count);
 
       const channels = fixture.channels.map((ch) => {
         const addr = base + ch.offset;
@@ -174,7 +232,7 @@ export function registerControlRoutes(
       });
 
       pipeLog("info",
-        `DEBUG fixture "${fixture.name}" (base=${base}):\n` +
+        `DEBUG fixture "${fixture.name}" (base=${base} universe=${universeId}):\n` +
         channels.map((ch) =>
           `  [${ch.offset}] DMX${ch.dmxAddress} ${ch.name.padEnd(16)} ` +
           `buffer=${ch.currentDmxValue} ovr=${ch.overrideEnabled ? "ON" : "off"}(${ch.overrideValue})`
@@ -184,10 +242,11 @@ export function registerControlRoutes(
       return {
         fixture: fixture.name,
         id: fixture.id,
+        universeId,
         dmxStartAddress: base,
         channelCount: count,
-        blackoutActive: deps.manager.isBlackoutActive(),
-        activeChannels: deps.manager.getActiveChannelCount(),
+        blackoutActive: manager.isBlackoutActive(),
+        activeChannels: manager.getActiveChannelCount(),
         channels,
       };
     },
@@ -325,7 +384,7 @@ export function registerControlRoutes(
   );
 
   // ── Raw DMX channel write (debug / probing) ──
-  app.post<{ Body: { channels: Record<string, number> } }>(
+  app.post<{ Body: { channels: Record<string, number>; universeId?: string } }>(
     "/debug/raw",
     {
       schema: {
@@ -337,6 +396,7 @@ export function registerControlRoutes(
               type: "object" as const,
               additionalProperties: { type: "integer" as const, minimum: 0, maximum: 255 },
             },
+            universeId: { type: "string" as const },
           },
         },
       },
@@ -349,9 +409,16 @@ export function registerControlRoutes(
           updates[dmxAddr] = val;
         }
       }
-      deps.manager.applyRawUpdate(updates);
-      pipeLog("info", `DEBUG raw DMX write: ${JSON.stringify(updates)}`);
-      return { success: true, channelsSet: Object.keys(updates).length, updates };
+
+      const uid = request.body.universeId;
+      if (deps.coordinator && uid) {
+        deps.coordinator.applyRawUpdate(uid, updates);
+      } else {
+        deps.manager.applyRawUpdate(updates);
+      }
+
+      pipeLog("info", `DEBUG raw DMX write (universe=${uid ?? "default"}): ${JSON.stringify(updates)}`);
+      return { success: true, channelsSet: Object.keys(updates).length, universeId: uid ?? null, updates };
     },
   );
 

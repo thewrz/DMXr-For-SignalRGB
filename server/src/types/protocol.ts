@@ -1,3 +1,31 @@
+/** Default universe ID for backward compatibility */
+export const DEFAULT_UNIVERSE_ID = "default";
+
+/** Configuration for a single DMX universe */
+export interface UniverseConfig {
+  readonly id: string;
+  readonly name: string;
+  readonly devicePath: string;
+  readonly driverType: string;
+  readonly serialNumber?: string;
+}
+
+/** Request to create a new universe */
+export interface AddUniverseRequest {
+  readonly name: string;
+  readonly devicePath: string;
+  readonly driverType: string;
+  readonly serialNumber?: string;
+}
+
+/** Request to update an existing universe */
+export interface UpdateUniverseRequest {
+  readonly name?: string;
+  readonly devicePath?: string;
+  readonly driverType?: string;
+  readonly serialNumber?: string;
+}
+
 /** Channel number (1-512) mapped to value (0-255) */
 export interface ChannelMap {
   readonly [channel: string]: number;
@@ -36,6 +64,12 @@ export interface HealthResponse {
   readonly udpPort?: number;
   readonly serverId?: string;
   readonly serverName?: string;
+  readonly universes?: readonly {
+    readonly id: string;
+    readonly name: string;
+    readonly state: "connected" | "disconnected" | "reconnecting";
+    readonly activeChannels: number;
+  }[];
 }
 
 /** A single DMX channel within a fixture (derived from OFL definition) */
@@ -56,12 +90,13 @@ export interface ChannelOverride {
 }
 
 /** Fixture data source */
-export type FixtureSource = "ofl" | "local-db" | "custom";
+export type FixtureSource = "ofl" | "local-db" | "custom" | "builtin";
 
 /** Stored fixture configuration */
 export interface FixtureConfig {
   readonly id: string;
   readonly name: string;
+  readonly universeId?: string;
   readonly oflKey?: string;
   readonly oflFixtureName?: string;
   readonly source?: FixtureSource;
@@ -93,6 +128,7 @@ export interface FixtureConfig {
 /** POST /fixtures request body */
 export interface AddFixtureRequest {
   readonly name: string;
+  readonly universeId?: string;
   readonly oflKey?: string;
   readonly oflFixtureName?: string;
   readonly source?: FixtureSource;
@@ -106,6 +142,7 @@ export interface AddFixtureRequest {
 /** PATCH /fixtures/:id request body */
 export interface UpdateFixtureRequest {
   readonly name?: string;
+  readonly universeId?: string;
   readonly dmxStartAddress?: number;
   readonly channelOverrides?: Readonly<Record<number, ChannelOverride>>;
   readonly whiteGateThreshold?: number;

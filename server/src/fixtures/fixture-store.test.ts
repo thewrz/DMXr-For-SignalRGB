@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { createFixtureStore } from "./fixture-store.js";
 import type { FixtureStore } from "./fixture-store.js";
 import type { AddFixtureRequest } from "../types/protocol.js";
-import { rm, readFile } from "node:fs/promises";
+import { DEFAULT_UNIVERSE_ID } from "../types/protocol.js";
+import { rm, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -186,6 +187,54 @@ describe("createFixtureStore", () => {
       const store2 = createFixtureStore(filePath);
       await store2.load();
       expect(store2.getById(fixture.id)!.whiteGateThreshold).toBe(200);
+    });
+  });
+
+  describe("universeId", () => {
+    it("stores universeId when provided", () => {
+      const fixture = store.add(makeRequest({ universeId: "universe-a" }));
+      expect(fixture.universeId).toBe("universe-a");
+    });
+
+    it("defaults universeId to DEFAULT_UNIVERSE_ID when omitted", () => {
+      const fixture = store.add(makeRequest());
+      expect(fixture.universeId).toBe(DEFAULT_UNIVERSE_ID);
+    });
+
+    it("getByUniverse returns only fixtures matching universeId", () => {
+      store.add(makeRequest({ name: "A", dmxStartAddress: 1, universeId: "uni-1" }));
+      store.add(makeRequest({ name: "B", dmxStartAddress: 10, universeId: "uni-2" }));
+      store.add(makeRequest({ name: "C", dmxStartAddress: 20, universeId: "uni-1" }));
+
+      const uni1 = store.getByUniverse("uni-1");
+      expect(uni1).toHaveLength(2);
+      expect(uni1.map((f) => f.name)).toEqual(["A", "C"]);
+    });
+
+    it("update can change universeId", () => {
+      const fixture = store.add(makeRequest({ universeId: "old-uni" }));
+      const updated = store.update(fixture.id, { universeId: "new-uni" });
+      expect(updated!.universeId).toBe("new-uni");
+    });
+
+    it("load migrates legacy fixtures without universeId to default", async () => {
+      // Write a fixture JSON without universeId field
+      const legacy = [
+        {
+          id: "legacy-1",
+          name: "Old PAR",
+          mode: "3ch",
+          dmxStartAddress: 1,
+          channelCount: 1,
+          channels: [{ offset: 0, name: "Dim", type: "Intensity", defaultValue: 0 }],
+        },
+      ];
+      await writeFile(filePath, JSON.stringify(legacy), "utf-8");
+
+      const store2 = createFixtureStore(filePath);
+      await store2.load();
+
+      expect(store2.getAll()[0].universeId).toBe(DEFAULT_UNIVERSE_ID);
     });
   });
 

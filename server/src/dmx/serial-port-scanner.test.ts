@@ -10,6 +10,8 @@ vi.mock("serialport", () => ({
 describe("serial-port-scanner", () => {
   let listSerialPorts: typeof import("./serial-port-scanner.js").listSerialPorts;
   let autoDetectDmxPort: typeof import("./serial-port-scanner.js").autoDetectDmxPort;
+  let listDmxDevices: typeof import("./serial-port-scanner.js").listDmxDevices;
+  let autoDetectDmxPorts: typeof import("./serial-port-scanner.js").autoDetectDmxPorts;
   let mockList: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
@@ -21,6 +23,8 @@ describe("serial-port-scanner", () => {
     const scanner = await import("./serial-port-scanner.js");
     listSerialPorts = scanner.listSerialPorts;
     autoDetectDmxPort = scanner.autoDetectDmxPort;
+    listDmxDevices = scanner.listDmxDevices;
+    autoDetectDmxPorts = scanner.autoDetectDmxPorts;
   });
 
   describe("listSerialPorts", () => {
@@ -135,6 +139,64 @@ describe("serial-port-scanner", () => {
       const result = await autoDetectDmxPort();
 
       expect(result).toBeNull();
+    });
+  });
+
+  describe("listDmxDevices", () => {
+    it("returns only ENTTEC devices", async () => {
+      mockList.mockResolvedValue([
+        { path: "COM1", vendorId: "067B", productId: "2303" },
+        { path: "COM3", vendorId: "0403", productId: "6001", manufacturer: "FTDI", serialNumber: "EN466833" },
+        { path: "COM5", vendorId: "0403", productId: "6001", manufacturer: "FTDI", serialNumber: "EN789012" },
+      ]);
+
+      const devices = await listDmxDevices();
+
+      expect(devices).toHaveLength(2);
+      expect(devices[0].path).toBe("COM3");
+      expect(devices[1].path).toBe("COM5");
+      expect(devices.every((d) => d.isEnttec)).toBe(true);
+    });
+
+    it("returns empty array when no DMX devices found", async () => {
+      mockList.mockResolvedValue([
+        { path: "COM1", vendorId: "067B", productId: "2303" },
+      ]);
+
+      const devices = await listDmxDevices();
+      expect(devices).toEqual([]);
+    });
+
+    it("includes serialNumber for device identity", async () => {
+      mockList.mockResolvedValue([
+        { path: "COM3", vendorId: "0403", productId: "6001", serialNumber: "EN466833" },
+      ]);
+
+      const devices = await listDmxDevices();
+      expect(devices[0].serialNumber).toBe("EN466833");
+    });
+  });
+
+  describe("autoDetectDmxPorts", () => {
+    it("returns all ENTTEC device paths", async () => {
+      mockList.mockResolvedValue([
+        { path: "COM1", vendorId: "067B", productId: "2303" },
+        { path: "COM3", vendorId: "0403", productId: "6001" },
+        { path: "COM5", vendorId: "0403", productId: "6001" },
+      ]);
+
+      const paths = await autoDetectDmxPorts();
+
+      expect(paths).toEqual(["COM3", "COM5"]);
+    });
+
+    it("returns empty array when no ENTTEC devices found", async () => {
+      mockList.mockResolvedValue([
+        { path: "COM1", vendorId: "067B", productId: "2303" },
+      ]);
+
+      const paths = await autoDetectDmxPorts();
+      expect(paths).toEqual([]);
     });
   });
 });

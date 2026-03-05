@@ -67,8 +67,17 @@ export async function listSerialPorts(): Promise<readonly SerialPortInfo[]> {
   }
 }
 
-export async function autoDetectDmxPort(): Promise<string | null> {
+export async function listDmxDevices(): Promise<readonly SerialPortInfo[]> {
   const ports = await listSerialPorts();
-  const enttec = ports.find((p) => p.isEnttec);
-  return enttec?.path ?? null;
+  return ports.filter((p) => p.isEnttec);
+}
+
+export async function autoDetectDmxPort(): Promise<string | null> {
+  const devices = await listDmxDevices();
+  return devices[0]?.path ?? null;
+}
+
+export async function autoDetectDmxPorts(): Promise<readonly string[]> {
+  const devices = await listDmxDevices();
+  return devices.map((d) => d.path);
 }

@@ -24,10 +24,14 @@ import { registerSearchRoutes } from "./routes/search.js";
 import { registerSettingsRoutes } from "./routes/settings.js";
 import { registerMetricsRoute } from "./routes/metrics.js";
 import { registerUserFixtureRoutes } from "./routes/user-fixtures.js";
+import { registerUniverseRoutes } from "./routes/universes.js";
 import { registerApiKeyAuth } from "./middleware/api-key-auth.js";
 import type { LatencyTracker } from "./metrics/latency-tracker.js";
 import type { MdnsAdvertiser } from "./mdns/advertiser.js";
 import type { UdpColorServer } from "./udp/udp-color-server.js";
+import type { MultiUniverseCoordinator } from "./dmx/multi-universe-coordinator.js";
+import type { UniverseRegistry } from "./dmx/universe-registry.js";
+import type { ConnectionPool } from "./dmx/connection-pool.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -48,6 +52,9 @@ interface BuildServerDeps {
   readonly serverId?: string;
   readonly serverName?: string;
   readonly getMdnsAdvertiser?: () => MdnsAdvertiser | undefined;
+  readonly coordinator?: MultiUniverseCoordinator;
+  readonly universeRegistry?: UniverseRegistry;
+  readonly connectionPool?: ConnectionPool;
 }
 
 export async function buildServer(
@@ -116,6 +123,13 @@ export async function buildServer(
     udpServer: deps.udpServer,
     serverId: deps.serverId,
     serverName: deps.serverName,
+    ...(deps.coordinator && deps.universeRegistry && deps.connectionPool ? {
+      universeStatus: {
+        getUniverseConfigs: () => deps.universeRegistry!.getAll(),
+        getConnectionStatuses: () => deps.connectionPool!.getStatus(),
+        coordinator: deps.coordinator,
+      },
+    } : {}),
   });
 
   registerUpdateRoute(app, {
@@ -135,6 +149,7 @@ export async function buildServer(
   registerControlRoutes(app, {
     manager: deps.manager,
     store: deps.fixtureStore,
+    coordinator: deps.coordinator,
   });
 
   registerLibraryRoutes(app, {
@@ -149,6 +164,13 @@ export async function buildServer(
   if (deps.userFixtureStore) {
     registerUserFixtureRoutes(app, {
       store: deps.userFixtureStore,
+    });
+  }
+
+  if (deps.universeRegistry) {
+    registerUniverseRoutes(app, {
+      registry: deps.universeRegistry,
+      fixtureStore: deps.fixtureStore,
     });
   }
 

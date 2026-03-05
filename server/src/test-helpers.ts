@@ -8,6 +8,7 @@ import { createUserFixtureStore } from "./fixtures/user-fixture-store.js";
 import type { UserFixtureStore } from "./fixtures/user-fixture-store.js";
 import type { LibraryRegistry } from "./libraries/types.js";
 import { createLibraryRegistry } from "./libraries/registry.js";
+import { createBuiltinTemplateProvider } from "./libraries/builtin-template-provider.js";
 
 function uniqueFixturesPath(): string {
   return `/tmp/dmxr-test-fixtures-${randomUUID()}.json`;
@@ -124,6 +125,7 @@ export function createMockRegistry(
       getModeChannels: () => [],
       searchFixtures: () => [],
     },
+    createBuiltinTemplateProvider(),
     ...extras,
   ]);
 }

@@ -600,14 +600,28 @@ header {
 }
 .modal-close:hover { color: var(--text); }
 
-/* Source tabs */
-.source-tabs {
-  display: flex;
-  gap: 0;
+/* Source selector dropdown */
+.source-select-wrap {
   margin-bottom: 0.5rem;
-  border-bottom: 1px solid var(--border);
 }
 
+.source-select {
+  width: 100%;
+  padding: 0.45rem 0.6rem;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  appearance: auto;
+}
+.source-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* Sidebar tabs (Search / Browse) */
 .tab {
   padding: 0.5rem 1rem;
   border: none;

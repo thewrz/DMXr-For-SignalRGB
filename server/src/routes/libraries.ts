@@ -62,7 +62,7 @@ function requireProvider(
   return provider;
 }
 
-const FIXTURE_SOURCES: readonly string[] = ["ofl", "local-db", "custom"];
+const FIXTURE_SOURCES: readonly string[] = ["ofl", "local-db", "custom", "builtin"];
 
 function isFixtureSource(value: string): value is FixtureSource {
   return FIXTURE_SOURCES.includes(value);

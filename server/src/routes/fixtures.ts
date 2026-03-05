@@ -22,6 +22,7 @@ const addFixtureSchema = {
     ],
     properties: {
       name: { type: "string" as const, minLength: 1 },
+      universeId: { type: "string" as const },
       oflKey: { type: "string" as const },
       oflFixtureName: { type: "string" as const },
       source: { type: "string" as const, enum: ["ofl", "local-db", "custom"] },
@@ -51,7 +52,11 @@ export function registerFixtureRoutes(
   app: FastifyInstance,
   deps: FixtureRouteDeps,
 ): void {
-  app.get("/fixtures", async () => {
+  app.get<{ Querystring: { universeId?: string } }>("/fixtures", async (request) => {
+    const { universeId } = request.query;
+    if (universeId) {
+      return deps.store.getByUniverse(universeId);
+    }
     return deps.store.getAll();
   });
 
@@ -74,6 +79,8 @@ export function registerFixtureRoutes(
         body.dmxStartAddress,
         channelCount,
         deps.store.getAll(),
+        undefined,
+        body.universeId,
       );
 
       if (!validation.valid) {
@@ -98,6 +105,7 @@ export function registerFixtureRoutes(
           type: "object" as const,
           properties: {
             name: { type: "string" as const, minLength: 1 },
+            universeId: { type: "string" as const },
             dmxStartAddress: { type: "integer" as const, minimum: 1, maximum: 512 },
             channelOverrides: {
               type: "object" as const,
@@ -135,11 +143,13 @@ export function registerFixtureRoutes(
       }
 
       if (request.body.dmxStartAddress !== undefined) {
+        const targetUniverse = request.body.universeId ?? existing.universeId;
         const validation = validateFixtureAddress(
           request.body.dmxStartAddress,
           existing.channelCount,
           deps.store.getAll(),
           existing.id,
+          targetUniverse,
         );
         if (!validation.valid) {
           return reply.status(409).send({ success: false, error: validation.error });

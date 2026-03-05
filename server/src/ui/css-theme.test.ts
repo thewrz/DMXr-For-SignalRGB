@@ -176,9 +176,9 @@ describe('CSS Theme — SignalRGB Aesthetic', () => {
       ).toBe('1px solid var(--border)')
     })
 
-    it('source-tabs has 1px border', () => {
+    it('source-select has border', () => {
       expect(
-        extractPropertyValue(css, '.source-tabs', 'border-bottom')
+        extractPropertyValue(css, '.source-select', 'border')
       ).toBe('1px solid var(--border)')
     })
 

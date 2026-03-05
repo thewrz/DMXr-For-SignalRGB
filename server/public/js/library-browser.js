@@ -135,7 +135,17 @@ function dmxrLibraryBrowser() {
       this.browseSource = source;
       this.browseStep = 1;
       this.libStep = 1;
-      if (source !== "ofl" && this.libMfrs.length === 0) {
+      if (source !== "ofl" && source !== "custom") {
+        // Always reload — each library source has its own manufacturers
+        this.libMfrs = [];
+        this.libFilteredMfrs = [];
+        this.libMfrSearch = "";
+        this.libSelectedMfr = null;
+        this.libFixtures = [];
+        this.libFilteredFixtures = [];
+        this.libSelectedFixture = null;
+        this.libModes = [];
+        this.libChannels = [];
         this.loadLibMfrs(source);
       }
     },

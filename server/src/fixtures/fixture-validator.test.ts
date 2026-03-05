@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { validateFixtureAddress, validateFixtureChannels } from "./fixture-validator.js";
 import type { FixtureConfig, FixtureChannel } from "../types/protocol.js";
+import { DEFAULT_UNIVERSE_ID } from "../types/protocol.js";
 
 function makeFixture(overrides: Partial<FixtureConfig> = {}): FixtureConfig {
   return {
@@ -96,6 +97,54 @@ describe("validateFixtureAddress", () => {
     const result = validateFixtureAddress(2, 3, existing);
     expect(result.valid).toBe(false);
     expect(result.error).toContain("Stage Left");
+  });
+
+  describe("per-universe scoping", () => {
+    it("only checks overlap within the same universeId", () => {
+      const existing = [
+        makeFixture({ id: "a", dmxStartAddress: 1, channelCount: 5, universeId: "uni-1" }),
+      ];
+      // Same address range but on a different universe → no overlap
+      const result = validateFixtureAddress(1, 5, existing, undefined, "uni-2");
+      expect(result.valid).toBe(true);
+    });
+
+    it("detects overlap within the same universe", () => {
+      const existing = [
+        makeFixture({ id: "a", dmxStartAddress: 1, channelCount: 5, universeId: "uni-1" }),
+      ];
+      const result = validateFixtureAddress(3, 3, existing, undefined, "uni-1");
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain("Overlaps");
+    });
+
+    it("allows same address on different universes", () => {
+      const existing = [
+        makeFixture({ id: "a", dmxStartAddress: 1, channelCount: 7, universeId: "uni-1" }),
+        makeFixture({ id: "b", dmxStartAddress: 1, channelCount: 7, universeId: "uni-2" }),
+      ];
+      // Adding to uni-3 at same address → valid
+      const result = validateFixtureAddress(1, 7, existing, undefined, "uni-3");
+      expect(result.valid).toBe(true);
+    });
+
+    it("defaults to DEFAULT_UNIVERSE_ID when universeId omitted", () => {
+      const existing = [
+        makeFixture({ id: "a", dmxStartAddress: 1, channelCount: 5 }),
+      ];
+      // No universeId → checks against default universe (where fixture without universeId lives)
+      const result = validateFixtureAddress(3, 3, existing);
+      expect(result.valid).toBe(false);
+    });
+
+    it("fixtures without universeId treated as default universe", () => {
+      const existing = [
+        makeFixture({ id: "a", dmxStartAddress: 1, channelCount: 5 }), // no universeId
+      ];
+      // Explicitly specifying default universe → should overlap
+      const result = validateFixtureAddress(3, 3, existing, undefined, DEFAULT_UNIVERSE_ID);
+      expect(result.valid).toBe(false);
+    });
   });
 });
 

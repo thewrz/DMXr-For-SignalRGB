@@ -1,14 +1,16 @@
 import { createSocket, type Socket } from "node:dgram";
 import { parseColorPacket, isParseError, FLAG_BLACKOUT, FLAG_PING, encodeColorPacket } from "./packet-parser.js";
-import { processColorBatch, type ColorEntry } from "../fixtures/color-pipeline.js";
+import { processColorBatch, processColorBatchMulti, type ColorEntry } from "../fixtures/color-pipeline.js";
 import type { FixtureStore } from "../fixtures/fixture-store.js";
 import type { UniverseManager } from "../dmx/universe-manager.js";
+import type { MultiUniverseCoordinator } from "../dmx/multi-universe-coordinator.js";
 import type { LatencyTracker } from "../metrics/latency-tracker.js";
 import { pipeLog, shouldSample } from "../logging/pipeline-logger.js";
 
 export interface UdpColorServerDeps {
   readonly fixtureStore: FixtureStore;
   readonly manager: UniverseManager;
+  readonly coordinator?: MultiUniverseCoordinator;
   readonly latencyTracker?: LatencyTracker;
   readonly logger?: {
     readonly info: (msg: string) => void;
@@ -89,7 +91,11 @@ export function createUdpColorServer(deps: UdpColorServerDeps): UdpColorServer {
           // Handle blackout flag
           if (packet.flags & FLAG_BLACKOUT) {
             pipeLog("info", `UDP BLACKOUT packet from ${rinfo.address}:${rinfo.port} seq=${packet.sequence}`);
-            deps.manager.blackout();
+            if (deps.coordinator) {
+              deps.coordinator.blackoutAll();
+            } else {
+              deps.manager.blackout();
+            }
             packetsProcessed++;
             return;
           }
@@ -104,8 +110,10 @@ export function createUdpColorServer(deps: UdpColorServerDeps): UdpColorServer {
             sock.send(reply, rinfo.port, rinfo.address);
           }
 
-          // Skip color processing while override (blackout/whiteout) is active
-          if (deps.manager.isBlackoutActive()) {
+          // Skip color processing while override (blackout/whiteout) is active.
+          // When coordinator is available, defer blackout enforcement to per-universe
+          // managers inside processColorBatchMulti rather than doing a single check here.
+          if (!deps.coordinator && deps.manager.isBlackoutActive()) {
             if (shouldSample("udp:blackout-skip")) {
               pipeLog("debug", "UDP packet skipped (blackout active)");
             }
@@ -134,7 +142,9 @@ export function createUdpColorServer(deps: UdpColorServerDeps): UdpColorServer {
           }
 
           const mapStart = performance.now();
-          const result = processColorBatch(entries, deps.fixtureStore, deps.manager);
+          const result = deps.coordinator
+            ? processColorBatchMulti(entries, deps.fixtureStore, deps.coordinator)
+            : processColorBatch(entries, deps.fixtureStore, deps.manager);
           const mapDuration = performance.now() - mapStart;
 
           if (deps.latencyTracker) {

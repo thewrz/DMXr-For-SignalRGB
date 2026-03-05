@@ -227,5 +227,60 @@ function dmxrLibraryBrowser() {
       }
     },
 
+    // --- OFL fixture export (in-memory def) ---
+
+    exportOflFixture() {
+      var def = this.selectedFixtureDef;
+      if (!def) return;
+
+      var base = buildOflMeta();
+      var ofl = {
+        $schema: base.$schema,
+        name: def.name,
+        categories: def.categories || ["Other"],
+        meta: base.meta,
+        availableChannels: def.availableChannels || {},
+        modes: def.modes || [],
+      };
+
+      triggerJsonDownload(ofl, slugify(def.name) + ".json");
+    },
+
+    // --- Library fixture export (fetches all modes) ---
+
+    async exportLibFixtureOfl() {
+      if (!this.libSelectedFixture || !this.libModes.length) return;
+
+      var self = this;
+      var libId = this.browseSource;
+      var fixtureId = this.libSelectedFixture.id;
+
+      // Fetch channels for every mode in parallel
+      var fetches = this.libModes.map(function(mode) {
+        return fetch(
+          "/libraries/" + libId +
+          "/fixtures/" + fixtureId +
+          "/modes/" + mode.id + "/channels"
+        ).then(function(res) { return res.json(); })
+         .then(function(channels) {
+           return { name: mode.name, channels: channels };
+         });
+      });
+
+      try {
+        var modes = await Promise.all(fetches);
+
+        // Derive category from first mode's channels
+        var firstChannels = modes[0] ? modes[0].channels : [];
+        var category = deriveFixtureCategory(firstChannels, self.libSelectedFixture.name);
+        var oflCategories = DMXR_TO_OFL_CATEGORIES[category] || ["Other"];
+
+        var ofl = buildOflExportJson(self.libSelectedFixture.name, oflCategories, modes);
+        triggerJsonDownload(ofl, slugify(self.libSelectedFixture.name) + ".json");
+      } catch {
+        alert("Export failed — check server connection");
+      }
+    },
+
   };
 }

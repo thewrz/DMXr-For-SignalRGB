@@ -65,6 +65,7 @@ export interface FixtureConfig {
   readonly oflKey?: string;
   readonly oflFixtureName?: string;
   readonly source?: FixtureSource;
+  readonly category?: string;
   readonly mode: string;
   readonly dmxStartAddress: number;
   readonly channelCount: number;
@@ -95,6 +96,7 @@ export interface AddFixtureRequest {
   readonly oflKey?: string;
   readonly oflFixtureName?: string;
   readonly source?: FixtureSource;
+  readonly category?: string;
   readonly mode: string;
   readonly dmxStartAddress: number;
   readonly channelCount: number;

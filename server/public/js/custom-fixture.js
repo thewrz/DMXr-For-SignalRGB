@@ -32,6 +32,8 @@ var FIXTURE_CATEGORIES = [
   "Laser",
   "Effect",
   "Pixel Bar",
+  "Blacklight",
+  "Smoke Machine",
   "Other",
 ];
 
@@ -47,6 +49,11 @@ function dmxrCustomFixture() {
     customChannels: [],
     customError: "",
     customEditId: null,
+
+    // OFL import state
+    _oflImportDef: null,
+    _oflImportModes: [],
+    _oflSelectedModeIndex: 0,
 
     // Constants exposed for templates
     channelTypes: CHANNEL_TYPES,
@@ -72,7 +79,99 @@ function dmxrCustomFixture() {
       this.customModeName = "";
       this.customChannels = [];
       this.customError = "";
+      this._oflImportDef = null;
+      this._oflImportModes = [];
+      this._oflSelectedModeIndex = 0;
       this.customStep = 1;
+    },
+
+    triggerOflImport() {
+      var input = document.getElementById("ofl-import-input");
+      if (input) {
+        input.value = "";
+        input.click();
+      }
+    },
+
+    handleOflFileSelect(event) {
+      var file = event.target.files && event.target.files[0];
+      if (!file) return;
+
+      var self = this;
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        self._parseAndPreviewOfl(e.target.result, file.name);
+      };
+      reader.readAsText(file);
+    },
+
+    _parseAndPreviewOfl(text, filename) {
+      this.customError = "";
+      this._oflImportDef = null;
+      this._oflImportModes = [];
+      this._oflSelectedModeIndex = 0;
+
+      var def;
+      try {
+        def = JSON.parse(text);
+      } catch {
+        this.customError = "Invalid JSON file";
+        return;
+      }
+
+      if (!def.name || !def.modes || !def.availableChannels) {
+        this.customError = "Not a valid OFL fixture file (missing name, modes, or availableChannels)";
+        return;
+      }
+
+      if (def.modes.length === 0) {
+        this.customError = "OFL file has no modes defined";
+        return;
+      }
+
+      this._oflImportDef = def;
+      this._oflImportModes = def.modes.map(function(m) { return m.name; });
+      this._oflSelectedModeIndex = 0;
+
+      // Pre-fill form
+      this.customEditId = null;
+      this.customName = def.name;
+      this.customManufacturer = "";
+      this.customCategory = mapOflCategoryToDmxr(def.categories);
+      this._buildOflChannels();
+      this.customStep = 1;
+    },
+
+    onOflModeSelect(index) {
+      this._oflSelectedModeIndex = index;
+      this._buildOflChannels();
+    },
+
+    _buildOflChannels() {
+      var def = this._oflImportDef;
+      if (!def) return;
+
+      var mode = def.modes[this._oflSelectedModeIndex];
+      if (!mode) return;
+
+      this.customModeName = mode.name;
+      this.customChannels = buildDmxrChannelsFromOfl(
+        def.availableChannels,
+        mode.channels
+      );
+    },
+
+    exportCustomFixtureOfl(tpl) {
+      var oflCategories = DMXR_TO_OFL_CATEGORIES[tpl.category] || ["Other"];
+      var modes = tpl.modes.map(function(m) {
+        return {
+          name: m.name,
+          channels: m.channels,
+        };
+      });
+
+      var ofl = buildOflExportJson(tpl.name, oflCategories, modes);
+      triggerJsonDownload(ofl, slugify(tpl.name) + ".json");
     },
 
     startCustomEdit(template) {
@@ -80,6 +179,9 @@ function dmxrCustomFixture() {
       this.customName = template.name;
       this.customManufacturer = template.manufacturer;
       this.customCategory = template.category;
+      this._oflImportDef = null;
+      this._oflImportModes = [];
+      this._oflSelectedModeIndex = 0;
       // Load first mode for editing
       var mode = template.modes[0];
       this.customModeName = mode ? mode.name : "";
@@ -235,6 +337,7 @@ function dmxrCustomFixture() {
         this.stagedFixture = {
           name: saved.name,
           source: "custom",
+          category: this.customCategory,
           mode: mode.name,
           channelCount: mode.channels.length,
           channels: mode.channels,
@@ -265,6 +368,7 @@ function dmxrCustomFixture() {
       this.stagedFixture = {
         name: template.name,
         source: "custom",
+        category: template.category,
         mode: mode.name,
         channelCount: mode.channels.length,
         channels: mode.channels,

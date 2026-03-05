@@ -53,6 +53,7 @@ export function createFixtureStore(filePath: string): FixtureStore {
         ...(request.oflKey ? { oflKey: request.oflKey } : {}),
         ...(request.oflFixtureName ? { oflFixtureName: request.oflFixtureName } : {}),
         ...(request.source ? { source: request.source } : {}),
+        ...(request.category ? { category: request.category } : {}),
         mode: request.mode,
         dmxStartAddress: request.dmxStartAddress,
         channelCount: request.channels.length,

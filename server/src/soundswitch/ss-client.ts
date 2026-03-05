@@ -52,6 +52,7 @@ export interface SsClient {
   readonly getModeChannels: (modeId: number) => readonly SsAttrRow[];
   readonly mapToFixtureChannels: (modeId: number) => readonly FixtureChannel[];
   readonly searchFixtures: (query: string, limit?: number) => readonly SsSearchResult[];
+  readonly getFixtureCategory: (fixtureId: number) => string;
   readonly close: () => void;
 }
 
@@ -284,6 +285,18 @@ export function createSsClient(dbPath: string): SsClient {
       }));
 
       return channels.sort((a, b) => a.offset - b.offset);
+    },
+
+    getFixtureCategory(fixtureId: number): string {
+      const rows = getDb()
+        .prepare(
+          `SELECT DISTINCT a.type
+           FROM attr a
+           JOIN modes m ON a.mode_id = m.id
+           WHERE m.fixture_id = ?`,
+        )
+        .all(fixtureId) as Array<{ type: number }>;
+      return classifyFixture(rows.map((r) => r.type));
     },
 
     close(): void {

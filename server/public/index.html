@@ -16,7 +16,9 @@
   <script src="/js/settings.js"></script>
   <script src="/js/latency.js"></script>
   <script src="/js/setup-wizard.js"></script>
+  <script src="/js/ofl-export.js"></script>
   <script src="/js/custom-fixture.js"></script>
+  <script src="/js/fixture-icons.js"></script>
   <script src="/js/app.js"></script>
 </head>
 <body x-data="dmxrApp()" x-init="init()">
@@ -73,7 +75,8 @@
           <template x-for="result in unifiedSearchResults" :key="result.key">
             <div class="result-item" @click="selectSearchResult(result)">
               <div class="result-row">
-                <div>
+                <div style="display:flex;align-items:center;gap:0.3rem">
+                  <span class="result-icon" x-html="fixtureIcon(result)"></span>
                   <strong x-text="result.name"></strong>
                   <span class="result-detail" x-show="result.type === 'fixture'" x-text="result.detail"></span>
                 </div>
@@ -136,7 +139,10 @@
               <div class="search-results">
                 <template x-for="f in filteredFixtures" :key="f.key">
                   <div class="result-item" @click="selectFixture(f)">
-                    <strong x-text="f.name"></strong>
+                    <div style="display:flex;align-items:center;gap:0.3rem">
+                      <span class="result-icon" x-html="fixtureIcon(f)"></span>
+                      <strong x-text="f.name"></strong>
+                    </div>
                     <span class="categories" x-text="f.categories.join(', ')"></span>
                   </div>
                 </template>
@@ -162,6 +168,8 @@
 
               <button class="btn btn-primary btn-stage" @click="stageFixture()"
                       :disabled="!fixtureName || channelCount === 0">Stage for Placement</button>
+              <button class="btn btn-sm btn-export" @click="exportOflFixture()"
+                      :disabled="!selectedFixtureDef">Export OFL JSON</button>
             </div>
           </div>
         </template>
@@ -172,17 +180,24 @@
             <!-- Step 0: Template list -->
             <div x-show="customStep === 0">
               <button class="btn btn-primary btn-block" @click="startCustomCreate()">+ Create New Fixture</button>
+              <button class="btn btn-block btn-block-secondary" @click="triggerOflImport()">Import OFL JSON...</button>
+              <input type="file" id="ofl-import-input" accept=".json" style="display:none"
+                     @change="handleOflFileSelect($event)">
               <div class="custom-template-list" x-show="customTemplates.length > 0">
                 <template x-for="tpl in customTemplates" :key="tpl.id">
                   <div class="custom-template-item">
-                    <div class="custom-template-info" @click="stageCustomTemplate(tpl)">
-                      <strong x-text="tpl.name"></strong>
-                      <span class="custom-template-meta"
-                            x-text="tpl.manufacturer + ' &middot; ' + (tpl.modes[0]?.channels.length || 0) + ' ch'"></span>
+                    <div class="custom-template-info" @click="stageCustomTemplate(tpl)" style="display:flex;align-items:center;gap:0.3rem">
+                      <span class="result-icon" x-html="categoryIcon(tpl.category)"></span>
+                      <div>
+                        <strong x-text="tpl.name"></strong>
+                        <span class="custom-template-meta"
+                              x-text="tpl.manufacturer + ' &middot; ' + (tpl.modes[0]?.channels.length || 0) + ' ch'"></span>
+                      </div>
                     </div>
                     <div class="custom-template-actions">
+                      <button class="btn btn-sm" @click.stop="exportCustomFixtureOfl(tpl)" title="Export OFL JSON">&#8615;</button>
                       <button class="btn btn-sm" @click.stop="startCustomEdit(tpl)" title="Edit">&#9998;</button>
-                      <button class="btn btn-sm btn-danger" @click.stop="deleteCustomTemplate(tpl.id)" title="Delete">&times;</button>
+                      <button class="btn btn-sm btn-danger" @click.stop="if(confirm('Delete \'' + tpl.name + '\'?')) deleteCustomTemplate(tpl.id)" title="Delete">&times;</button>
                     </div>
                   </div>
                 </template>
@@ -197,6 +212,17 @@
               <button class="btn btn-sm btn-back" @click="customStep = 0">&larr; My Fixtures</button>
               <h4 x-text="customEditId ? 'Edit Fixture' : 'New Custom Fixture'"></h4>
               <p class="validation-error" x-show="customError" x-text="customError"></p>
+
+              <template x-if="_oflImportModes.length > 1">
+                <div>
+                  <label>Mode to Import</label>
+                  <select @change="onOflModeSelect(parseInt($event.target.value, 10))">
+                    <template x-for="(m, idx) in _oflImportModes" :key="idx">
+                      <option :value="idx" x-text="m" :selected="idx === _oflSelectedModeIndex"></option>
+                    </template>
+                  </select>
+                </div>
+              </template>
 
               <label>Fixture Name</label>
               <input type="text" x-model="customName" placeholder="e.g. My RGB PAR">
@@ -367,6 +393,8 @@
 
               <button class="btn btn-primary btn-stage" @click="stageLibFixture()"
                       :disabled="!fixtureName || !libSelectedModeId">Stage for Placement</button>
+              <button class="btn btn-sm btn-export" @click="exportLibFixtureOfl()"
+                      :disabled="!libSelectedFixture || !libModes.length">Export OFL JSON</button>
             </div>
           </div>
         </template>
@@ -378,6 +406,7 @@
            @dragstart="onStagedDragStart($event)"
            @dragend="onDragEnd()">
         <div class="staged-header">
+          <span class="staged-icon" x-html="fixtureIcon(stagedFixture)"></span>
           <strong x-text="stagedFixture?.name"></strong>
           <button class="btn btn-sm btn-danger" @click="stagedFixture = null">&times;</button>
         </div>
@@ -452,7 +481,10 @@
                @mouseleave="highlightedFixtureId = null">
             <div class="fixture-card-top">
               <div class="fixture-header">
-                <strong x-text="fixture.name"></strong>
+                <div style="display:flex;align-items:center;gap:0.3rem">
+                  <span class="fixture-icon" x-html="fixtureIcon(fixture)"></span>
+                  <strong x-text="fixture.name"></strong>
+                </div>
                 <span class="fixture-meta">
                   <span x-text="fixture.oflFixtureName || fixture.source || ''"></span>
                   <span x-show="fixture.oflFixtureName || fixture.source"> &middot; </span>

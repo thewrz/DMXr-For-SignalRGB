@@ -108,6 +108,7 @@ function dmxrSearch() {
         oflKey: this.selectedMfr.key + "/" + this.selectedFixtureKey,
         oflFixtureName: this.selectedFixtureDef.name,
         source: "ofl",
+        category: (this.selectedFixtureDef.categories || [])[0] || undefined,
         mode: this.selectedMode,
         channelCount: this.channelCount,
         channels: channels,

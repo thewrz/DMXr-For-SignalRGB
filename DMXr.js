@@ -662,6 +662,53 @@ function probeOneServer(host, port) {
 	}
 }
 
+// --------------------------------<( Fixture Category Derivation )>-----------------------
+// Lightweight port of classify-fixture logic for category icons.
+
+function deriveCategoryFromChannels(channels, name) {
+	if (!channels || channels.length === 0) return "Other";
+	var hasPan = false, hasTilt = false, hasGobo = false, hasPrism = false;
+	var hasColorWheel = false, hasStrobe = false, hasColor = false;
+	var hasUvOnly = true, hasIntensity = false, allDimmer = true;
+	for (var i = 0; i < channels.length; i++) {
+		var t = channels[i].type;
+		if (t === "Pan") hasPan = true;
+		else if (t === "Tilt") hasTilt = true;
+		else if (t === "Gobo") hasGobo = true;
+		else if (t === "Prism") hasPrism = true;
+		else if (t === "ColorWheel") hasColorWheel = true;
+		else if (t === "Strobe" || t === "ShutterStrobe") hasStrobe = true;
+		else if (t === "Intensity") hasIntensity = true;
+		if (t === "ColorIntensity") {
+			hasColor = true;
+			if (channels[i].color !== "UV") hasUvOnly = false;
+		}
+		if (t !== "Intensity" && t !== "Generic" && t !== "NoFunction" && t !== "ColorIntensity") {
+			allDimmer = false;
+		}
+	}
+	if (hasPan && hasTilt) return "Moving Head";
+	if (hasPan || hasTilt) return "Scanner";
+	if (hasGobo || hasPrism || hasColorWheel) return "Effect";
+	if (hasStrobe && !hasColor) return "Strobe";
+	if (hasColor && hasUvOnly) return "Blacklight";
+	if (hasColor) return "Color Changer";
+	if (allDimmer && hasIntensity && !hasColor) return "Dimmer";
+
+	// Name heuristic as last resort
+	if (name) {
+		var n = name.toLowerCase();
+		if (/\blaser\b/.test(n)) return "Laser";
+		if (/\bsmoke\b|\bfog\b|\bhaze\b|\bhurricane\b/.test(n)) return "Smoke Machine";
+		if (/\bblinder\b/.test(n)) return "Blinder";
+		if (/\bstrobe\b/.test(n)) return "Strobe";
+		if (/\bbar\b|\bstrip\b|\bpixel\b/.test(n)) return "Pixel Bar";
+		if (/\bspot\b|\bpar\b/.test(n)) return "Color Changer";
+	}
+
+	return "Other";
+}
+
 // --------------------------------<( Bridge Data Class )>--------------------------------
 // Data-only object passed to service.addController(). Device operations happen in
 // the top-level Initialize/Render/Shutdown exports, not here.
@@ -685,6 +732,11 @@ function DMXrBridge(fixture, udpIndex, server, displayName) {
 
 	// UDP fixture index (position in server's fixture array)
 	this._udpIndex = typeof udpIndex === "number" ? udpIndex : -1;
+
+	// Derive fixture category for icon (prefer persisted category)
+	this._category = fixture.category || deriveCategoryFromChannels(fixture.channels || [], fixture.name);
+	this.image = "https://raw.githubusercontent.com/thewrz/DMXr-For-SignalRGB/main/docs/images/fixture-icons/" +
+		this._category.toLowerCase().replace(/ /g, "-") + ".png";
 
 	// Runtime state (managed by top-level lifecycle exports)
 	this._lastR = -1;

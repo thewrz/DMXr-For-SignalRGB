@@ -48,6 +48,11 @@ export function createLocalDbProvider(
       return client.searchFixtures(query, limit);
     },
 
+    getFixtureCategory(fixtureId: number): string | null {
+      if (!client) return null;
+      return client.getFixtureCategory(fixtureId);
+    },
+
     close(): void {
       client?.close();
     },

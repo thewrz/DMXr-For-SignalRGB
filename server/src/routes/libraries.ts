@@ -221,9 +221,11 @@ export function registerLibraryRoutes(
         });
       }
 
+      const category = provider.getFixtureCategory?.(fixtureId) ?? undefined;
       const fixture = deps.store.add({
         name: request.body.name,
         source: isFixtureSource(provider.id) ? provider.id : "custom",
+        ...(category ? { category } : {}),
         mode: modeName,
         dmxStartAddress: request.body.dmxStartAddress,
         channelCount: channels.length,

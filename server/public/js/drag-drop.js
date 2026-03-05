@@ -253,6 +253,8 @@ function dmxrDragDrop() {
         name: staged.name,
         oflKey: staged.oflKey,
         oflFixtureName: staged.oflFixtureName,
+        source: staged.source,
+        category: staged.category,
         mode: staged.mode,
         dmxStartAddress: address,
         channelCount: staged.channelCount,

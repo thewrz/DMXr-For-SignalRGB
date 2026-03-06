@@ -3,34 +3,21 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadConfig } from "./config/server-config.js";
 import { createSettingsStore } from "./config/settings-store.js";
-import { createUniverseManager } from "./dmx/universe-manager.js";
-import { createResilientConnection } from "./dmx/resilient-connection.js";
-import type { ResilientConnection } from "./dmx/resilient-connection.js";
 import { createFixtureStore } from "./fixtures/fixture-store.js";
 import { createUserFixtureStore } from "./fixtures/user-fixture-store.js";
 import { autoDetectDmxPort } from "./dmx/serial-port-scanner.js";
-import { createUniverseRegistry } from "./dmx/universe-registry.js";
-import { createConnectionPool } from "./dmx/connection-pool.js";
-import { createMultiUniverseCoordinator } from "./dmx/multi-universe-coordinator.js";
-import {
-  createMdnsAdvertiser,
-  type MdnsAdvertiser,
-} from "./mdns/advertiser.js";
+import { createMdnsAdvertiser, type MdnsAdvertiser } from "./mdns/advertiser.js";
 import { createOflClient } from "./ofl/ofl-client.js";
-import { createSsClientIfConfigured } from "./soundswitch/ss-client.js";
-import { createLocalDbProvider } from "./libraries/local-db-provider.js";
-import { createUserFixtureProvider } from "./libraries/user-fixture-provider.js";
-import { createBuiltinTemplateProvider } from "./libraries/builtin-template-provider.js";
-import { createOflProvider } from "./libraries/ofl-provider.js";
-import { createLibraryRegistry } from "./libraries/registry.js";
 import { buildServer } from "./server.js";
 import { createUdpColorServer } from "./udp/udp-color-server.js";
-import { createLatencyTracker } from "./metrics/latency-tracker.js";
 import { createDmxMonitor } from "./dmx/dmx-monitor.js";
-import { getFixtureDefaults } from "./fixtures/channel-mapper.js";
-import { computeSafePositions } from "./fixtures/motor-guard.js";
 import { shortId } from "./utils/format.js";
 import { setPipelineLogLevel, parsePipelineLogLevel, pipeLog } from "./logging/pipeline-logger.js";
+import { createDmxStack } from "./bootstrap/dmx-setup.js";
+import { createMultiUniverseStack } from "./bootstrap/multi-universe-setup.js";
+import { createLibraryStack } from "./bootstrap/library-setup.js";
+import { initializeFixtureDefaults } from "./bootstrap/fixture-init.js";
+import { installShutdownHandlers } from "./bootstrap/shutdown.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -53,7 +40,6 @@ async function main() {
   const serverVersion = await readServerVersion();
   const settingsStore = createSettingsStore("./config/settings.json");
   const persistedSettings = await settingsStore.load();
-  // serverId is auto-generated on first load if missing
   const { serverId, serverName } = persistedSettings;
   const config = loadConfig(persistedSettings);
   const startTime = Date.now();
@@ -72,12 +58,10 @@ async function main() {
     }
   }
 
-  // Build an effective config with the resolved device path
   const effectiveConfig = resolvedDevicePath !== config.dmxDevicePath
     ? { ...config, dmxDevicePath: resolvedDevicePath }
     : config;
 
-  // Fall back to null driver if auto-detect failed
   const finalConfig =
     effectiveConfig.dmxDevicePath === "auto" && effectiveConfig.dmxDriver !== "null"
       ? { ...effectiveConfig, dmxDriver: "null" }
@@ -89,105 +73,27 @@ async function main() {
     error: (msg: string) => process.stderr.write(`[DMX] ERROR: ${msg}\n`),
   };
 
-  // Late-binding: manager reference filled after creation
-  let managerRef: ReturnType<typeof createUniverseManager> | null = null;
+  // ── DMX Stack ──
+  const { connection, manager, latencyTracker } = await createDmxStack(finalConfig, consoleLogger);
 
-  const connection = await createResilientConnection({
-    config: finalConfig,
-    logger: consoleLogger,
-    getChannelSnapshot: () => managerRef?.getFullSnapshot() ?? {},
-    onStateChange: (status) => {
-      consoleLogger.info(
-        `Connection state: ${status.state}` +
-        (status.reconnectAttempts > 0 ? ` (attempt ${status.reconnectAttempts})` : "") +
-        (status.lastError ? ` — ${status.lastError}` : ""),
-      );
-    },
-  });
-
-  const latencyTracker = createLatencyTracker();
-
-  const manager = createUniverseManager(connection.universe, {
-    logger: consoleLogger,
-    onDmxError: (err) => process.stderr.write(`[DMX] Send error: ${err}\n`),
-    onDmxSendTiming: (ms) => latencyTracker.recordDmxSend(ms),
-  });
-  managerRef = manager;
-
+  // ── Fixture Stores ──
   const fixtureStore = createFixtureStore(finalConfig.fixturesPath);
   await fixtureStore.load();
-
   const userFixtureStore = createUserFixtureStore(finalConfig.userFixturesPath);
   await userFixtureStore.load();
 
-  pipeLog("info", `Loaded ${fixtureStore.getAll().length} fixtures, initializing defaults...`);
-
-  // Register safe positions for motor channels (Pan/Tilt/Focus/Zoom/Gobo/Iris/Prism).
-  // These are restored after blackout/whiteout to prevent motors from
-  // slamming to mechanical limits at DMX 0 or 255.
-  manager.registerSafePositions(computeSafePositions(fixtureStore.getAll()));
-
-  manager.blackout();
-
-  // Initialize fixture defaults (sets pan/tilt center, strobe open, etc.)
-  // Use applyRawUpdate to bypass blackout guard — server stays in blackout
-  // until a client explicitly resumes or SignalRGB starts sending colors.
-  for (const fixture of fixtureStore.getAll()) {
-    const defaults = getFixtureDefaults(fixture);
-    manager.applyRawUpdate(defaults);
-    const count = Object.keys(defaults).length;
-    pipeLog("info", `Startup defaults for "${fixture.name}": ${count} channels pushed to DMX`);
-  }
-  pipeLog("info", "Fixture defaults initialization complete");
+  // ── Fixture Defaults ──
+  initializeFixtureDefaults(fixtureStore, manager);
 
   // ── Multi-Universe Stack ──
-  const universeRegistry = createUniverseRegistry("./config/universes.json");
-  await universeRegistry.load();
+  const { registry: universeRegistry, pool: connectionPool, coordinator } =
+    await createMultiUniverseStack(finalConfig, consoleLogger, latencyTracker);
 
-  const connectionPool = createConnectionPool({
-    createConnection: async (uniConfig) => {
-      const uniServerConfig = {
-        ...finalConfig,
-        dmxDriver: uniConfig.driverType,
-        dmxDevicePath: uniConfig.devicePath,
-      };
-      return createResilientConnection({
-        config: uniServerConfig,
-        logger: consoleLogger,
-        getChannelSnapshot: () =>
-          connectionPool.getManager(uniConfig.id)?.getFullSnapshot() ?? {},
-      });
-    },
-    createManager: (universe) =>
-      createUniverseManager(universe, {
-        logger: consoleLogger,
-        onDmxError: (err) => process.stderr.write(`[DMX] Send error: ${err}\n`),
-        onDmxSendTiming: (ms) => latencyTracker.recordDmxSend(ms),
-      }),
-  });
-
-  const coordinator = createMultiUniverseCoordinator(() => connectionPool.getAllManagers());
-  pipeLog("info", `Universe registry loaded: ${universeRegistry.getAll().length} universe(s)`);
-
-  // Bootstrap connections for all persisted universes
-  for (const uniConfig of universeRegistry.getAll()) {
-    try {
-      await connectionPool.create(uniConfig);
-      pipeLog("info", `Universe "${uniConfig.name}" (${shortId(uniConfig.id)}) connected`);
-    } catch (err) {
-      consoleLogger.warn(`Failed to initialize universe "${uniConfig.name}": ${err}`);
-    }
-  }
-
+  // ── Library Stack ──
   const oflClient = createOflClient();
-  const { client: ssClient, status: ssStatus } = createSsClientIfConfigured(finalConfig.localDbPath);
+  const registry = createLibraryStack(finalConfig, oflClient, userFixtureStore);
 
-  const oflProvider = createOflProvider(oflClient);
-  const localDbProvider = createLocalDbProvider(ssClient, ssStatus);
-  const userFixtureProvider = createUserFixtureProvider(userFixtureStore);
-  const builtinProvider = createBuiltinTemplateProvider();
-  const registry = createLibraryRegistry([oflProvider, localDbProvider, userFixtureProvider, builtinProvider]);
-
+  // ── UDP + Monitor ──
   const udpServer = createUdpColorServer({
     fixtureStore,
     manager,
@@ -195,9 +101,9 @@ async function main() {
     latencyTracker,
     logger: consoleLogger,
   });
-
   const dmxMonitor = createDmxMonitor({ manager, coordinator });
 
+  // ── HTTP Server ──
   const app = await buildServer({
     config: finalConfig,
     manager,
@@ -221,56 +127,23 @@ async function main() {
     connectionPool,
   });
 
+  // ── Shutdown Handling ──
   let mdnsAdvertiser: MdnsAdvertiser | undefined;
-  let exitBlackoutDone = false;
-  let shuttingDown = false;
 
-  // Last-resort synchronous blackout for unexpected exits
-  process.on("exit", () => {
-    if (!exitBlackoutDone) {
-      exitBlackoutDone = true;
-      coordinator.blackoutAll();
-      manager.blackout();
-    }
+  installShutdownHandlers({
+    app,
+    manager,
+    coordinator,
+    registry,
+    dmxMonitor,
+    udpServer,
+    connectionPool,
+    connection,
+    getMdnsAdvertiser: () => mdnsAdvertiser,
   });
 
-  const shutdown = async (signal: string) => {
-    if (shuttingDown) return;
-    shuttingDown = true;
-
-    app.log.info(`Received ${signal}, shutting down...`);
-    exitBlackoutDone = true;
-    mdnsAdvertiser?.unpublishAll();
-    for (const provider of registry.getAll()) {
-      provider.close?.();
-    }
-    dmxMonitor.close();
-    coordinator.blackoutAll();
-    manager.blackout();
-    await udpServer.close();
-    await app.close();
-    await connectionPool.closeAll();
-    await connection.close();
-    process.exit(0);
-  };
-
-  process.on("SIGINT", () => shutdown("SIGINT"));
-  process.on("SIGTERM", () => shutdown("SIGTERM"));
-  process.on("SIGHUP", () => shutdown("SIGHUP"));
-
-  process.on("uncaughtException", (err) => {
-    process.stderr.write(`[DMXr] FATAL uncaughtException: ${err?.stack ?? err}\n`);
-    shutdown("uncaughtException").catch(() => process.exit(1));
-  });
-
-  process.on("unhandledRejection", (reason) => {
-    process.stderr.write(`[DMXr] FATAL unhandledRejection: ${reason}\n`);
-    shutdown("unhandledRejection").catch(() => process.exit(1));
-  });
-
+  // ── Start Listeners ──
   const boundPort = await listenWithRetry(app, finalConfig);
-
-  // Start UDP color server — use configured port, or HTTP port + 1
   const udpPortTarget = finalConfig.udpPort > 0 ? finalConfig.udpPort : boundPort + 1;
   const boundUdpPort = await udpServer.start(udpPortTarget, finalConfig.host);
 
@@ -283,7 +156,7 @@ async function main() {
     });
   }
 
-  // Startup banner
+  // ── Startup Banner ──
   const devicePathLabel =
     finalConfig.dmxDevicePath === config.dmxDevicePath
       ? finalConfig.dmxDevicePath

@@ -126,8 +126,10 @@ describe("Group control routes", () => {
         { 10: 0, 11: 0, 12: 0 },
       );
 
-      // Channels locked to prevent SignalRGB overwrite
-      expect(dispatcher.lockChannels).toHaveBeenCalledWith([1, 2, 3, 10, 11, 12]);
+      // Channels locked to prevent SignalRGB overwrite (per-fixture with universeId)
+      expect(dispatcher.lockChannels).toHaveBeenCalledTimes(2);
+      expect(dispatcher.lockChannels).toHaveBeenCalledWith("default", [1, 2, 3]);
+      expect(dispatcher.lockChannels).toHaveBeenCalledWith("default", [10, 11, 12]);
     });
 
     it("returns 404 for unknown group", async () => {
@@ -249,8 +251,10 @@ describe("Group control routes", () => {
       expect(body.action).toBe("resume");
       expect(body.fixturesUpdated).toBe(2);
 
-      // Unlock was called with the same addresses that were locked
-      expect(dispatcher.unlockChannels).toHaveBeenCalledWith([1, 2, 3, 10, 11, 12]);
+      // Unlock was called with the same addresses that were locked (per-fixture with universeId)
+      expect(dispatcher.unlockChannels).toHaveBeenCalledTimes(2);
+      expect(dispatcher.unlockChannels).toHaveBeenCalledWith("default", [1, 2, 3]);
+      expect(dispatcher.unlockChannels).toHaveBeenCalledWith("default", [10, 11, 12]);
       // 2 blackout + 2 resume = 4 applyRawUpdate calls
       expect(dispatcher.applyRawUpdate).toHaveBeenCalledTimes(4);
     });

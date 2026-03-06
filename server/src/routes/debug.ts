@@ -1,14 +1,12 @@
 import type { FastifyInstance } from "fastify";
-import type { UniverseManager } from "../dmx/universe-manager.js";
-import type { MultiUniverseCoordinator } from "../dmx/multi-universe-coordinator.js";
 import type { FixtureStore } from "../fixtures/fixture-store.js";
+import type { DmxDispatcher } from "../dmx/dmx-dispatcher.js";
 import { DEFAULT_UNIVERSE_ID } from "../types/protocol.js";
 import { pipeLog } from "../logging/pipeline-logger.js";
 
 export interface DebugRouteDeps {
-  readonly manager: UniverseManager;
+  readonly dispatcher: DmxDispatcher;
   readonly store: FixtureStore;
-  readonly coordinator?: MultiUniverseCoordinator;
 }
 
 export function registerDebugRoutes(
@@ -27,15 +25,7 @@ export function registerDebugRoutes(
       const base = fixture.dmxStartAddress;
       const count = fixture.channelCount;
       const universeId = fixture.universeId ?? DEFAULT_UNIVERSE_ID;
-
-      const manager = deps.coordinator
-        ? (() => { const m = deps.coordinator!; return {
-            getChannelSnapshot: (s: number, c: number) => m.getChannelSnapshot(universeId, s, c),
-            isBlackoutActive: () => m.isBlackoutActive(universeId),
-            getActiveChannelCount: () => m.getActiveChannelCount(universeId),
-          }; })()
-        : deps.manager;
-      const snapshot = manager.getChannelSnapshot(base, count);
+      const snapshot = deps.dispatcher.getChannelSnapshot(universeId, base, count);
 
       const channels = fixture.channels.map((ch) => {
         const addr = base + ch.offset;
@@ -67,8 +57,8 @@ export function registerDebugRoutes(
         universeId,
         dmxStartAddress: base,
         channelCount: count,
-        blackoutActive: manager.isBlackoutActive(),
-        activeChannels: manager.getActiveChannelCount(),
+        blackoutActive: deps.dispatcher.isBlackoutActive(universeId),
+        activeChannels: deps.dispatcher.getActiveChannelCount(universeId),
         channels,
       };
     },
@@ -102,11 +92,7 @@ export function registerDebugRoutes(
       }
 
       const uid = request.body.universeId;
-      if (deps.coordinator && uid) {
-        deps.coordinator.applyRawUpdate(uid, updates);
-      } else {
-        deps.manager.applyRawUpdate(updates);
-      }
+      deps.dispatcher.applyRawUpdate(uid, updates);
 
       pipeLog("info", `DEBUG raw DMX write (universe=${uid ?? "default"}): ${JSON.stringify(updates)}`);
       return { success: true, channelsSet: Object.keys(updates).length, universeId: uid ?? null, updates };

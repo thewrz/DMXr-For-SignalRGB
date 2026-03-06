@@ -1,14 +1,12 @@
 import type { FastifyInstance } from "fastify";
-import type { UniverseManager } from "../dmx/universe-manager.js";
-import type { MultiUniverseCoordinator } from "../dmx/multi-universe-coordinator.js";
 import type { FixtureStore } from "../fixtures/fixture-store.js";
+import type { DmxDispatcher } from "../dmx/dmx-dispatcher.js";
 import { DEFAULT_UNIVERSE_ID } from "../types/protocol.js";
 import { mapColor } from "../fixtures/channel-mapper.js";
 
 export interface ControlModesDeps {
-  readonly manager: UniverseManager;
+  readonly dispatcher: DmxDispatcher;
   readonly store: FixtureStore;
-  readonly coordinator?: MultiUniverseCoordinator;
 }
 
 export function registerControlModeRoutes(
@@ -18,13 +16,7 @@ export function registerControlModeRoutes(
   app.post<{ Body: { universeId?: string } }>("/control/blackout", async (request) => {
     const universeId = request.body?.universeId;
 
-    if (deps.coordinator && universeId) {
-      deps.coordinator.blackout(universeId);
-    } else if (deps.coordinator) {
-      deps.coordinator.blackoutAll();
-    }
-    // Primary manager is not in the connection pool — always update it
-    deps.manager.blackout();
+    deps.dispatcher.blackout(universeId);
 
     const fixtures = deps.store.getAll();
     request.log.info(
@@ -40,45 +32,25 @@ export function registerControlModeRoutes(
       ? deps.store.getByUniverse(universeId)
       : deps.store.getAll();
 
-    if (deps.coordinator && universeId) {
-      deps.coordinator.whiteout(universeId);
-    } else if (deps.coordinator) {
-      deps.coordinator.whiteoutAll();
-    }
-    // Primary manager is not in the connection pool — always update it
-    deps.manager.whiteout();
+    deps.dispatcher.whiteout(universeId);
 
     // Overlay fixture-specific values via mapColor for correct
     // non-color channels (pan center, strobe open, dimmer full, etc.)
     let totalChannelsSet = 0;
-    if (deps.coordinator) {
-      const byUniverse = new Map<string, Record<number, number>>();
-      for (const fixture of fixtures) {
-        const uid = fixture.universeId ?? DEFAULT_UNIVERSE_ID;
-        const channels = mapColor(fixture, 255, 255, 255, 1.0);
-        const existing = byUniverse.get(uid) ?? {};
-        const merged = { ...existing };
-        for (const [addr, val] of Object.entries(channels)) {
-          merged[Number(addr)] = val;
-        }
-        byUniverse.set(uid, merged);
+    const byUniverse = new Map<string, Record<number, number>>();
+    for (const fixture of fixtures) {
+      const uid = fixture.universeId ?? DEFAULT_UNIVERSE_ID;
+      const channels = mapColor(fixture, 255, 255, 255, 1.0);
+      const existing = byUniverse.get(uid) ?? {};
+      const merged = { ...existing };
+      for (const [addr, val] of Object.entries(channels)) {
+        merged[Number(addr)] = val;
       }
-      for (const [uid, updates] of byUniverse) {
-        totalChannelsSet += Object.keys(updates).length;
-        deps.coordinator.applyRawUpdate(uid, updates);
-      }
-    } else {
-      const allUpdates: Record<number, number> = {};
-      for (const fixture of fixtures) {
-        const channels = mapColor(fixture, 255, 255, 255, 1.0);
-        for (const [addr, val] of Object.entries(channels)) {
-          allUpdates[Number(addr)] = val;
-        }
-      }
-      totalChannelsSet = Object.keys(allUpdates).length;
-      if (totalChannelsSet > 0) {
-        deps.manager.applyRawUpdate(allUpdates);
-      }
+      byUniverse.set(uid, merged);
+    }
+    for (const [uid, updates] of byUniverse) {
+      totalChannelsSet += Object.keys(updates).length;
+      deps.dispatcher.applyRawUpdate(uid, updates);
     }
 
     request.log.info(
@@ -102,13 +74,7 @@ export function registerControlModeRoutes(
   app.post<{ Body: { universeId?: string } }>("/control/resume", async (request) => {
     const universeId = request.body?.universeId;
 
-    if (deps.coordinator && universeId) {
-      deps.coordinator.resumeNormal(universeId);
-    } else if (deps.coordinator) {
-      deps.coordinator.resumeNormalAll();
-    }
-    // Primary manager is not in the connection pool — always update it
-    deps.manager.resumeNormal();
+    deps.dispatcher.resumeNormal(universeId);
 
     request.log.info(
       { action: "resume", universeId: universeId ?? "all" },

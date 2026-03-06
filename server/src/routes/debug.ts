@@ -3,6 +3,7 @@ import type { FixtureStore } from "../fixtures/fixture-store.js";
 import type { DmxDispatcher } from "../dmx/dmx-dispatcher.js";
 import { DEFAULT_UNIVERSE_ID } from "../types/protocol.js";
 import { pipeLog } from "../logging/pipeline-logger.js";
+import { errorResponse, successResponse } from "./response-helpers.js";
 
 export interface DebugRouteDeps {
   readonly dispatcher: DmxDispatcher;
@@ -19,7 +20,7 @@ export function registerDebugRoutes(
     async (request, reply) => {
       const fixture = deps.store.getById(request.params.id);
       if (!fixture) {
-        return reply.status(404).send({ error: "Fixture not found" });
+        return reply.status(404).send(errorResponse("Fixture not found"));
       }
 
       const base = fixture.dmxStartAddress;
@@ -95,7 +96,7 @@ export function registerDebugRoutes(
       deps.dispatcher.applyRawUpdate(uid, updates);
 
       pipeLog("info", `DEBUG raw DMX write (universe=${uid ?? "default"}): ${JSON.stringify(updates)}`);
-      return { success: true, channelsSet: Object.keys(updates).length, universeId: uid ?? null, updates };
+      return successResponse({ channelsSet: Object.keys(updates).length, universeId: uid ?? null, updates });
     },
   );
 }

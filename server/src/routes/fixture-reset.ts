@@ -3,6 +3,7 @@ import type { UniverseManager } from "../dmx/universe-manager.js";
 import type { FixtureStore } from "../fixtures/fixture-store.js";
 import type { FixtureChannel } from "../types/protocol.js";
 import { pipeLog } from "../logging/pipeline-logger.js";
+import { errorResponse, successResponse } from "./response-helpers.js";
 
 /** Name patterns that indicate a channel capable of triggering a fixture reset.
  *  Checked case-insensitively against the channel name. */
@@ -42,7 +43,7 @@ export function registerFixtureResetRoutes(
     async (request, reply) => {
       const fixture = deps.store.getById(request.params.id);
       if (!fixture) {
-        return reply.status(404).send({ error: "Fixture not found" });
+        return reply.status(404).send(errorResponse("Fixture not found"));
       }
 
       const config = fixture.resetConfig;
@@ -51,10 +52,9 @@ export function registerFixtureResetRoutes(
         : detectResetChannel(fixture.channels);
 
       if (!resetChannel) {
-        return reply.status(400).send({
-          error: "No reset channel detected",
-          hint: "Configure resetConfig on this fixture via PATCH",
-        });
+        return reply.status(400).send(
+          errorResponse("No reset channel detected", "Configure resetConfig on this fixture via PATCH"),
+        );
       }
 
       const resetValue = config?.value ?? DEFAULT_RESET_VALUE;
@@ -82,15 +82,14 @@ export function registerFixtureResetRoutes(
       timer.unref();
       activeTimers.set(`reset:${fixture.id}`, timer);
 
-      return {
-        success: true,
-        action: "reset",
+      return successResponse({
+        action: "reset" as const,
         fixtureId: fixture.id,
         channel: resetChannel.name,
         dmxAddress: dmxAddr,
         value: resetValue,
         holdMs,
-      };
+      });
     },
   );
 
@@ -99,7 +98,7 @@ export function registerFixtureResetRoutes(
     async (request, reply) => {
       const fixture = deps.store.getById(request.params.id);
       if (!fixture) {
-        return reply.status(404).send({ error: "Fixture not found" });
+        return reply.status(404).send(errorResponse("Fixture not found"));
       }
 
       const config = fixture.resetConfig;

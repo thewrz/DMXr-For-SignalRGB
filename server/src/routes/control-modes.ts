@@ -3,6 +3,7 @@ import type { FixtureStore } from "../fixtures/fixture-store.js";
 import type { DmxDispatcher } from "../dmx/dmx-dispatcher.js";
 import { DEFAULT_UNIVERSE_ID } from "../types/protocol.js";
 import { mapColor } from "../fixtures/channel-mapper.js";
+import { successResponse } from "./response-helpers.js";
 
 export interface ControlModesDeps {
   readonly dispatcher: DmxDispatcher;
@@ -23,7 +24,7 @@ export function registerControlModeRoutes(
       { action: "blackout", fixtureCount: fixtures.length, universeId: universeId ?? "all" },
       `blackout: ${universeId ?? "all universes"} → 0`,
     );
-    return { success: true, action: "blackout", controlMode: "blackout" as const, universeId: universeId ?? null };
+    return successResponse({ action: "blackout" as const, controlMode: "blackout" as const, universeId: universeId ?? null });
   });
 
   app.post<{ Body: { universeId?: string } }>("/control/whiteout", async (request) => {
@@ -62,13 +63,12 @@ export function registerControlModeRoutes(
       `whiteout: ${fixtures.length} fixtures, ${totalChannelsSet} channels set via mapColor`,
     );
 
-    return {
-      success: true,
-      action: "whiteout",
+    return successResponse({
+      action: "whiteout" as const,
       controlMode: "whiteout" as const,
       fixturesUpdated: fixtures.length,
       universeId: universeId ?? null,
-    };
+    });
   });
 
   app.post<{ Body: { universeId?: string } }>("/control/resume", async (request) => {
@@ -80,6 +80,6 @@ export function registerControlModeRoutes(
       { action: "resume", universeId: universeId ?? "all" },
       `resume: ${universeId ?? "all universes"} override cleared`,
     );
-    return { success: true, action: "resume", controlMode: "normal" as const, universeId: universeId ?? null };
+    return successResponse({ action: "resume" as const, controlMode: "normal" as const, universeId: universeId ?? null });
   });
 }

@@ -132,8 +132,22 @@ function buildOflExportJson(name, oflCategories, modes) {
     var mode = modes[m];
     var modeChannelNames = [];
 
-    for (var i = 0; i < mode.channels.length; i++) {
-      var ch = mode.channels[i];
+    // If a channelRemap is provided, reorder channels to reflect physical order
+    var modeChannels = mode.channels;
+    if (mode.channelRemap && typeof mode.channelRemap === "object") {
+      var reordered = modeChannels.slice();
+      for (var srcStr in mode.channelRemap) {
+        var src = parseInt(srcStr, 10);
+        var tgt = mode.channelRemap[srcStr];
+        if (src >= 0 && src < modeChannels.length && tgt >= 0 && tgt < modeChannels.length) {
+          reordered[tgt] = modeChannels[src];
+        }
+      }
+      modeChannels = reordered;
+    }
+
+    for (var i = 0; i < modeChannels.length; i++) {
+      var ch = modeChannels[i];
       var baseName = ch.name || ("Channel " + (i + 1));
 
       var capFn = DMXR_TO_OFL_CAPABILITY[ch.type];

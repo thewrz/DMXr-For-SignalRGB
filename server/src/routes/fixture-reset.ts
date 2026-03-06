@@ -4,6 +4,7 @@ import type { FixtureStore } from "../fixtures/fixture-store.js";
 import type { FixtureChannel } from "../types/protocol.js";
 import { pipeLog } from "../logging/pipeline-logger.js";
 import { errorResponse, successResponse } from "./response-helpers.js";
+import { resolveAddress } from "../fixtures/channel-remap.js";
 
 /** Name patterns that indicate a channel capable of triggering a fixture reset.
  *  Checked case-insensitively against the channel name. */
@@ -59,7 +60,7 @@ export function registerFixtureResetRoutes(
 
       const resetValue = config?.value ?? DEFAULT_RESET_VALUE;
       const holdMs = config?.holdMs ?? DEFAULT_RESET_HOLD_MS;
-      const dmxAddr = fixture.dmxStartAddress + resetChannel.offset;
+      const dmxAddr = resolveAddress(fixture, resetChannel.offset);
 
       const existingTimer = activeTimers.get(`reset:${fixture.id}`);
       if (existingTimer) {
@@ -113,7 +114,7 @@ export function registerFixtureResetRoutes(
         channel: resetChannel ? {
           offset: resetChannel.offset,
           name: resetChannel.name,
-          dmxAddress: fixture.dmxStartAddress + resetChannel.offset,
+          dmxAddress: resolveAddress(fixture, resetChannel.offset),
         } : null,
         value: config?.value ?? DEFAULT_RESET_VALUE,
         holdMs: config?.holdMs ?? DEFAULT_RESET_HOLD_MS,

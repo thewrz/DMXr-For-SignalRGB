@@ -109,5 +109,6 @@ function dmxrApp() {
     dmxrBatch(),
     dmxrConfig(),
     dmxrColorSwatch(),
+    dmxrChannelRemap(),
   );
 }

@@ -10,6 +10,76 @@ import {
 } from "../test-helpers.js";
 import type { FixtureStore } from "../fixtures/fixture-store.js";
 import type { FastifyInstance } from "fastify";
+import type { FixtureConfig } from "../types/protocol.js";
+import { buildFlashValues } from "./fixture-test.js";
+
+describe("buildFlashValues", () => {
+  const rgbFixture: FixtureConfig = {
+    id: "test-rgb",
+    name: "RGB PAR",
+    mode: "3ch",
+    dmxStartAddress: 1,
+    channelCount: 3,
+    channels: [
+      { offset: 0, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
+      { offset: 1, name: "Green", type: "ColorIntensity", color: "Green", defaultValue: 0 },
+      { offset: 2, name: "Blue", type: "ColorIntensity", color: "Blue", defaultValue: 0 },
+    ],
+  };
+
+  const moverFixture: FixtureConfig = {
+    id: "test-mover",
+    name: "Moving Head",
+    mode: "5ch",
+    dmxStartAddress: 10,
+    channelCount: 5,
+    channels: [
+      { offset: 0, name: "Pan", type: "Pan", defaultValue: 128 },
+      { offset: 1, name: "Tilt", type: "Tilt", defaultValue: 128 },
+      { offset: 2, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
+      { offset: 3, name: "Green", type: "ColorIntensity", color: "Green", defaultValue: 0 },
+      { offset: 4, name: "Blue", type: "ColorIntensity", color: "Blue", defaultValue: 0 },
+    ],
+  };
+
+  it("channelOffset=0 on 3ch RGB: only Red gets 255, others retain snapshot", () => {
+    const snapshot: Record<number, number> = { 1: 100, 2: 150, 3: 200 };
+    const result = buildFlashValues(rgbFixture, snapshot, 0);
+
+    expect(result[1]).toBe(255); // Red (offset 0) → flash
+    expect(result[2]).toBe(150); // Green (offset 1) → snapshot
+    expect(result[3]).toBe(200); // Blue (offset 2) → snapshot
+  });
+
+  it("channelOffset on a non-color channel (Pan on mover): that channel gets 255", () => {
+    const snapshot: Record<number, number> = { 10: 64, 11: 64, 12: 0, 13: 0, 14: 0 };
+    const result = buildFlashValues(moverFixture, snapshot, 0); // Pan at offset 0
+
+    expect(result[10]).toBe(255); // Pan → flash
+    expect(result[11]).toBe(64);  // Tilt → snapshot
+    expect(result[12]).toBe(0);   // Red → snapshot
+    expect(result[13]).toBe(0);   // Green → snapshot
+    expect(result[14]).toBe(0);   // Blue → snapshot
+  });
+
+  it("out-of-range channelOffset returns all-snapshot values (no flash)", () => {
+    const snapshot: Record<number, number> = { 1: 100, 2: 150, 3: 200 };
+    const result = buildFlashValues(rgbFixture, snapshot, 99);
+
+    expect(result[1]).toBe(100);
+    expect(result[2]).toBe(150);
+    expect(result[3]).toBe(200);
+  });
+
+  it("no channelOffset (undefined): existing behavior — all color/intensity channels get 255", () => {
+    const snapshot: Record<number, number> = { 1: 100, 2: 150, 3: 200 };
+    const result = buildFlashValues(rgbFixture, snapshot);
+
+    expect(result[1]).toBe(255);
+    expect(result[2]).toBe(255);
+    expect(result[3]).toBe(255);
+  });
+});
 
 describe("Control routes", () => {
   let app: FastifyInstance;
@@ -507,6 +577,134 @@ describe("Control routes", () => {
 
       expect(res.statusCode).toBe(200);
       expect(res.json().action).toBe("flash-click");
+    });
+
+    it("flash with channelOffset flashes only that channel", async () => {
+      const addRes = await app.inject({
+        method: "POST",
+        url: "/fixtures",
+        payload: {
+          name: "Offset PAR",
+          oflKey: "test/test",
+          oflFixtureName: "Test",
+          mode: "3-channel",
+          dmxStartAddress: 110,
+          channelCount: 3,
+          channels: [
+            { offset: 0, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
+            { offset: 1, name: "Green", type: "ColorIntensity", color: "Green", defaultValue: 0 },
+            { offset: 2, name: "Blue", type: "ColorIntensity", color: "Blue", defaultValue: 0 },
+          ],
+        },
+      });
+      const { id } = addRes.json();
+
+      const res = await app.inject({
+        method: "POST",
+        url: `/fixtures/${id}/test`,
+        payload: { action: "flash", channelOffset: 0, durationMs: 100 },
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json().success).toBe(true);
+
+      const lastUpdate = mockUniverse.updateCalls[mockUniverse.updateCalls.length - 1];
+      expect(lastUpdate[110]).toBe(255); // Red (offset 0) → flash
+      expect(lastUpdate[111]).toBe(0);   // Green → snapshot (default 0)
+      expect(lastUpdate[112]).toBe(0);   // Blue → snapshot (default 0)
+    });
+
+    it("rejects negative channelOffset with 400", async () => {
+      const addRes = await app.inject({
+        method: "POST",
+        url: "/fixtures",
+        payload: {
+          name: "Neg PAR",
+          oflKey: "test/test",
+          oflFixtureName: "Test",
+          mode: "3-channel",
+          dmxStartAddress: 120,
+          channelCount: 3,
+          channels: [
+            { offset: 0, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
+            { offset: 1, name: "Green", type: "ColorIntensity", color: "Green", defaultValue: 0 },
+            { offset: 2, name: "Blue", type: "ColorIntensity", color: "Blue", defaultValue: 0 },
+          ],
+        },
+      });
+      const { id } = addRes.json();
+
+      const res = await app.inject({
+        method: "POST",
+        url: `/fixtures/${id}/test`,
+        payload: { action: "flash", channelOffset: -1 },
+      });
+
+      expect(res.statusCode).toBe(400);
+    });
+
+    it("rejects channelOffset >= channelCount with 400", async () => {
+      const addRes = await app.inject({
+        method: "POST",
+        url: "/fixtures",
+        payload: {
+          name: "OOB PAR",
+          oflKey: "test/test",
+          oflFixtureName: "Test",
+          mode: "3-channel",
+          dmxStartAddress: 130,
+          channelCount: 3,
+          channels: [
+            { offset: 0, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
+            { offset: 1, name: "Green", type: "ColorIntensity", color: "Green", defaultValue: 0 },
+            { offset: 2, name: "Blue", type: "ColorIntensity", color: "Blue", defaultValue: 0 },
+          ],
+        },
+      });
+      const { id } = addRes.json();
+
+      const res = await app.inject({
+        method: "POST",
+        url: `/fixtures/${id}/test`,
+        payload: { action: "flash", channelOffset: 3 },
+      });
+
+      expect(res.statusCode).toBe(400);
+      expect(res.json().error).toContain("channelOffset");
+    });
+
+    it("flash without channelOffset is backward-compatible full flash", async () => {
+      const addRes = await app.inject({
+        method: "POST",
+        url: "/fixtures",
+        payload: {
+          name: "Compat PAR",
+          oflKey: "test/test",
+          oflFixtureName: "Test",
+          mode: "3-channel",
+          dmxStartAddress: 140,
+          channelCount: 3,
+          channels: [
+            { offset: 0, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
+            { offset: 1, name: "Green", type: "ColorIntensity", color: "Green", defaultValue: 0 },
+            { offset: 2, name: "Blue", type: "ColorIntensity", color: "Blue", defaultValue: 0 },
+          ],
+        },
+      });
+      const { id } = addRes.json();
+
+      const res = await app.inject({
+        method: "POST",
+        url: `/fixtures/${id}/test`,
+        payload: { action: "flash", durationMs: 100 },
+      });
+
+      expect(res.statusCode).toBe(200);
+
+      const lastUpdate = mockUniverse.updateCalls[mockUniverse.updateCalls.length - 1];
+      expect(lastUpdate[140]).toBe(255);
+      expect(lastUpdate[141]).toBe(255);
+      expect(lastUpdate[142]).toBe(255);
     });
 
     it("flash-release with no active hold is a no-op", async () => {

@@ -1671,3 +1671,153 @@ header {
     display: none;
   }
 }
+
+/* ── Channel Remap Modal ───────────────────── */
+
+.remap-modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.5rem;
+  width: 90%;
+  max-width: 520px;
+  max-height: 80vh;
+  overflow-y: auto;
+  position: relative;
+}
+
+.remap-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.remap-header h3 { margin: 0; }
+
+.remap-summary {
+  font-size: 0.8rem;
+  color: var(--accent);
+  margin-bottom: 0.75rem;
+}
+
+.remap-list {
+  max-height: 400px;
+  overflow-y: auto;
+  margin-bottom: 1rem;
+}
+
+.remap-slot {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+  padding: 0.15rem 0;
+  transition: background 0.15s;
+}
+
+.remap-slot.remap-drag-over {
+  background: rgba(100,150,255,0.06);
+  border-radius: 4px;
+}
+
+.remap-slot-label {
+  width: 2.5rem;
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  text-align: right;
+  user-select: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.remap-bubble {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: grab;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.remap-bubble:hover {
+  background: rgba(255,255,255,0.03);
+}
+
+.remap-drag-over .remap-bubble {
+  border-color: var(--accent);
+}
+
+.remap-bubble.remap-changed {
+  border-left: 3px solid var(--accent);
+}
+
+.remap-handle {
+  cursor: grab;
+  color: var(--text-dim);
+  font-size: 1.1rem;
+  line-height: 1;
+  user-select: none;
+}
+
+.remap-color-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+  border: 1px solid rgba(255,255,255,0.15);
+}
+
+.remap-ch-name {
+  flex: 1;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.remap-type-badge {
+  flex-shrink: 0;
+}
+
+.remap-origin {
+  font-size: 0.65rem;
+  color: var(--accent);
+  opacity: 0.8;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.remap-test-btn {
+  flex-shrink: 0;
+}
+
+.remap-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.remap-preset-notice {
+  background: rgba(100,150,255,0.1);
+  border: 1px solid rgba(100,150,255,0.25);
+  border-radius: 4px;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8rem;
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.btn-xs {
+  padding: 0.15rem 0.5rem;
+  font-size: 0.7rem;
+  border-radius: 3px;
+}

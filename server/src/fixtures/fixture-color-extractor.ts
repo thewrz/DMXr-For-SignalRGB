@@ -1,4 +1,5 @@
 import type { FixtureChannel } from "../types/protocol.js";
+import { resolveOffset } from "./channel-remap.js";
 
 export interface ColorGroup {
   readonly r: number;
@@ -20,6 +21,7 @@ export function extractFixtureColor(
   channels: readonly FixtureChannel[],
   dmxStartAddress: number,
   channelValues: Record<number, number>,
+  channelRemap?: Readonly<Record<number, number>>,
 ): FixtureColorState {
   let r = 0;
   let g = 0;
@@ -29,8 +31,9 @@ export function extractFixtureColor(
   let hasColor = false;
   let activeNonMotor = false;
 
+  const remapCtx = { channelRemap };
   for (const ch of channels) {
-    const addr = dmxStartAddress + ch.offset;
+    const addr = dmxStartAddress + resolveOffset(remapCtx, ch.offset);
     const val = channelValues[addr] ?? 0;
 
     if (!MOTOR_TYPES.has(ch.type) && val > 0) {
@@ -63,7 +66,7 @@ export function extractFixtureColor(
     let maxVal = 0;
     for (const ch of channels) {
       if (!MOTOR_TYPES.has(ch.type)) {
-        const val = channelValues[dmxStartAddress + ch.offset] ?? 0;
+        const val = channelValues[dmxStartAddress + resolveOffset(remapCtx, ch.offset)] ?? 0;
         if (val > maxVal) maxVal = val;
       }
     }

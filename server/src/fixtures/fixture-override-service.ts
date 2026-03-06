@@ -6,6 +6,7 @@ import {
   clampMotor,
 } from "./motor-guard.js";
 import { shortId } from "../utils/format.js";
+import { resolveAddress } from "./channel-remap.js";
 
 export interface OverrideResult {
   readonly channels: Record<number, number>;
@@ -57,10 +58,12 @@ export function computeOverrideChannels(
     } else {
       value = clamp(channel.defaultValue);
     }
-    channels[base + offset] = value;
+    const addr = resolveAddress(fixture, offset);
+    channels[addr] = value;
 
+    const remapTag = addr !== base + offset ? ` remap→DMX${addr}` : "";
     logLines.push(
-      `  [${offset}] DMX${base + offset} ${channel.name.padEnd(16)} ` +
+      `  [${offset}${remapTag}] DMX${addr} ${channel.name.padEnd(16)} ` +
       `type=${channel.type.padEnd(15)} enabled=${override.enabled} ` +
       `value=${override.value} → DMX=${value}`,
     );

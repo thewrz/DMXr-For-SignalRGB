@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import type { DmxMonitor } from "../dmx/dmx-monitor.js";
 import type { FixtureStore } from "../fixtures/fixture-store.js";
 import { extractFixtureColor } from "../fixtures/fixture-color-extractor.js";
+import { resolveAddress } from "../fixtures/channel-remap.js";
 
 interface FixtureColorRouteDeps {
   readonly monitor: DmxMonitor;
@@ -20,7 +21,7 @@ function buildColorSnapshot(deps: FixtureColorRouteDeps, universeId?: string) {
     channelValues = {};
     for (const f of fixtures) {
       for (const ch of f.channels) {
-        channelValues[f.dmxStartAddress + ch.offset] = overrideValue;
+        channelValues[resolveAddress(f, ch.offset)] = overrideValue;
       }
     }
   }
@@ -28,7 +29,7 @@ function buildColorSnapshot(deps: FixtureColorRouteDeps, universeId?: string) {
   return {
     fixtures: fixtures.map((f) => ({
       id: f.id,
-      color: extractFixtureColor(f.channels, f.dmxStartAddress, channelValues),
+      color: extractFixtureColor(f.channels, f.dmxStartAddress, channelValues, f.channelRemap),
     })),
   };
 }

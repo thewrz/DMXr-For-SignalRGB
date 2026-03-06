@@ -4,6 +4,7 @@ import type { UniverseManager } from "../dmx/universe-manager.js";
 import type { AddFixtureRequest, UpdateFixtureRequest } from "../types/protocol.js";
 import { validateFixtureAddress, validateFixtureChannels, findNextAvailableAddress } from "../fixtures/fixture-validator.js";
 import { computeOverrideChannels } from "../fixtures/fixture-override-service.js";
+import { validateChannelRemap } from "../fixtures/channel-remap.js";
 import { pipeLog, resetSample } from "../logging/pipeline-logger.js";
 
 interface FixtureRouteDeps {
@@ -44,6 +45,10 @@ const addFixtureSchema = {
             defaultValue: { type: "integer" as const, minimum: 0, maximum: 255 },
           },
         },
+      },
+      channelRemap: {
+        type: "object" as const,
+        additionalProperties: { type: "integer" as const, minimum: 0 },
       },
     },
   },
@@ -91,6 +96,13 @@ export function registerFixtureRoutes(
         });
       }
 
+      if (body.channelRemap !== undefined) {
+        const remapValidation = validateChannelRemap(body.channelRemap, channelCount);
+        if (!remapValidation.valid) {
+          return reply.status(400).send({ success: false, error: remapValidation.error });
+        }
+      }
+
       const fixture = deps.store.add(body);
       await deps.store.save();
 
@@ -119,6 +131,10 @@ export function registerFixtureRoutes(
                 },
                 additionalProperties: false,
               },
+            },
+            channelRemap: {
+              type: "object" as const,
+              additionalProperties: { type: "integer" as const, minimum: 0 },
             },
             whiteGateThreshold: { type: "integer" as const, minimum: 0, maximum: 255 },
             motorGuardEnabled: { type: "boolean" as const },
@@ -154,6 +170,16 @@ export function registerFixtureRoutes(
         );
         if (!validation.valid) {
           return reply.status(409).send({ success: false, error: validation.error });
+        }
+      }
+
+      if (request.body.channelRemap !== undefined) {
+        const remapValidation = validateChannelRemap(
+          request.body.channelRemap,
+          existing.channelCount,
+        );
+        if (!remapValidation.valid) {
+          return reply.status(400).send({ success: false, error: remapValidation.error });
         }
       }
 
@@ -291,6 +317,7 @@ export function registerFixtureRoutes(
       oflFixtureName?: string;
       source?: string;
       category?: string;
+      channelRemap?: Readonly<Record<number, number>>;
     };
   }>(
     "/fixtures/batch",
@@ -312,6 +339,10 @@ export function registerFixtureRoutes(
             oflFixtureName: { type: "string" as const },
             source: { type: "string" as const, enum: ["ofl", "local-db", "custom"] },
             category: { type: "string" as const },
+            channelRemap: {
+              type: "object" as const,
+              additionalProperties: { type: "integer" as const, minimum: 0 },
+            },
           },
         },
       },
@@ -323,6 +354,13 @@ export function registerFixtureRoutes(
       const channelValidation = validateFixtureChannels(body.channels, body.channelCount);
       if (!channelValidation.valid) {
         return reply.status(400).send({ success: false, error: channelValidation.error });
+      }
+
+      if (body.channelRemap !== undefined) {
+        const remapValidation = validateChannelRemap(body.channelRemap, channelCount);
+        if (!remapValidation.valid) {
+          return reply.status(400).send({ success: false, error: remapValidation.error });
+        }
       }
 
       const spacing = body.spacing ?? channelCount;
@@ -378,6 +416,7 @@ export function registerFixtureRoutes(
           ...(body.oflFixtureName ? { oflFixtureName: body.oflFixtureName } : {}),
           ...(body.source ? { source: body.source as AddFixtureRequest["source"] } : {}),
           ...(body.category ? { category: body.category } : {}),
+          ...(body.channelRemap ? { channelRemap: body.channelRemap } : {}),
         });
       }
 

@@ -144,6 +144,36 @@ describe("Fixture routes", () => {
       expect(res.statusCode).toBe(201);
     });
 
+    it("creates fixture with channelRemap", async () => {
+      const res = await app.inject({
+        method: "POST",
+        url: "/fixtures",
+        payload: { ...validFixtureBody, channelRemap: { 1: 2, 2: 1 } },
+      });
+      expect(res.statusCode).toBe(201);
+      expect(res.json().channelRemap).toEqual({ "1": 2, "2": 1 });
+    });
+
+    it("returns 400 for invalid channelRemap (duplicate targets)", async () => {
+      const res = await app.inject({
+        method: "POST",
+        url: "/fixtures",
+        payload: { ...validFixtureBody, channelRemap: { 0: 1, 1: 1 } },
+      });
+      expect(res.statusCode).toBe(400);
+      expect(res.json().error).toContain("Duplicate target");
+    });
+
+    it("creates fixture without channelRemap (backward-compat)", async () => {
+      const res = await app.inject({
+        method: "POST",
+        url: "/fixtures",
+        payload: validFixtureBody,
+      });
+      expect(res.statusCode).toBe(201);
+      expect(res.json().channelRemap).toBeUndefined();
+    });
+
     it("returns 409 for address exceeding 512", async () => {
       const res = await app.inject({
         method: "POST",
@@ -662,6 +692,19 @@ describe("Fixture routes", () => {
 
       expect(res.statusCode).toBe(400);
       expect(res.json().error).toContain("channelCount");
+    });
+
+    it("creates batch fixtures with channelRemap", async () => {
+      const res = await app.inject({
+        method: "POST",
+        url: "/fixtures/batch",
+        payload: { ...batchBody, channelRemap: { 1: 2, 2: 1 } },
+      });
+      expect(res.statusCode).toBe(201);
+      const fixtures = res.json();
+      for (const f of fixtures) {
+        expect(f.channelRemap).toEqual({ "1": 2, "2": 1 });
+      }
     });
 
     it("propagates oflKey and source to all fixtures", async () => {

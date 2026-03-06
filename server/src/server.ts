@@ -13,6 +13,7 @@ import type { OflClient } from "./ofl/ofl-client.js";
 import type { LibraryRegistry } from "./libraries/types.js";
 import type { ConnectionStatus } from "./dmx/connection-state.js";
 import type { SettingsStore } from "./config/settings-store.js";
+import type { RemapPresetStore } from "./config/remap-preset-store.js";
 import { registerHealthRoute } from "./routes/health.js";
 import { registerUpdateRoute } from "./routes/update.js";
 import { registerFixtureRoutes } from "./routes/fixtures.js";
@@ -28,6 +29,7 @@ import { registerUniverseRoutes } from "./routes/universes.js";
 import { registerMonitorRoutes } from "./routes/monitor.js";
 import { registerFixtureColorRoutes } from "./routes/fixture-colors.js";
 import { registerConfigRoutes } from "./routes/config.js";
+import { registerRemapPresetRoutes } from "./routes/remap-presets.js";
 import { registerApiKeyAuth } from "./middleware/api-key-auth.js";
 import type { DmxMonitor } from "./dmx/dmx-monitor.js";
 import type { LatencyTracker } from "./metrics/latency-tracker.js";
@@ -60,6 +62,7 @@ interface BuildServerDeps {
   readonly coordinator?: MultiUniverseCoordinator;
   readonly universeRegistry?: UniverseRegistry;
   readonly connectionPool?: ConnectionPool;
+  readonly remapPresetStore?: RemapPresetStore;
 }
 
 export async function buildServer(
@@ -214,6 +217,10 @@ export async function buildServer(
       latencyTracker: deps.latencyTracker,
       udpServer: deps.udpServer,
     });
+  }
+
+  if (deps.remapPresetStore) {
+    registerRemapPresetRoutes(app, { store: deps.remapPresetStore });
   }
 
   app.setErrorHandler((error: FastifyError, request, reply) => {

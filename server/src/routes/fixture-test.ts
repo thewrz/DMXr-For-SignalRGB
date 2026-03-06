@@ -3,6 +3,7 @@ import type { UniverseManager } from "../dmx/universe-manager.js";
 import type { FixtureStore } from "../fixtures/fixture-store.js";
 import type { FixtureConfig } from "../types/protocol.js";
 import { analyzeFixture } from "../fixtures/fixture-capabilities.js";
+import { resolveAddress } from "../fixtures/channel-remap.js";
 
 export interface FixtureTestDeps {
   readonly manager: UniverseManager;
@@ -12,6 +13,7 @@ export interface FixtureTestDeps {
 interface TestBody {
   readonly action: "flash" | "flash-hold" | "flash-release" | "flash-click" | "identify";
   readonly durationMs?: number;
+  readonly channelOffset?: number;
 }
 
 const testSchema = {
@@ -24,6 +26,7 @@ const testSchema = {
         enum: ["flash", "flash-hold", "flash-release", "flash-click", "identify"],
       },
       durationMs: { type: "integer" as const, minimum: 100, maximum: 5000 },
+      channelOffset: { type: "integer" as const, minimum: 0 },
     },
   },
 };
@@ -32,21 +35,28 @@ const FLASH_HOLD_SAFETY_MS = 10_000;
 const FLASH_CLICK_SUSTAIN_MS = 2_000;
 
 function getFixtureAddresses(fixture: FixtureConfig): number[] {
-  return fixture.channels.map((ch) => fixture.dmxStartAddress + ch.offset);
+  return fixture.channels.map((ch) => resolveAddress(fixture, ch.offset));
 }
 
 export function buildFlashValues(
   fixture: FixtureConfig,
   snapshot: Record<number, number>,
+  channelOffset?: number,
 ): Record<number, number> {
-  const start = fixture.dmxStartAddress;
   const result: Record<number, number> = {};
   const caps = analyzeFixture(fixture.channels);
+  const singleChannel = channelOffset !== undefined;
 
   for (const channel of fixture.channels) {
-    const addr = start + channel.offset;
+    const addr = resolveAddress(fixture, channel.offset);
 
-    if (channel.type === "ColorIntensity" || channel.type === "Intensity") {
+    if (singleChannel) {
+      // Single-channel mode: only the targeted offset gets 255
+      result[addr] =
+        channel.offset === channelOffset
+          ? 255
+          : (snapshot[addr] ?? channel.defaultValue);
+    } else if (channel.type === "ColorIntensity" || channel.type === "Intensity") {
       result[addr] = 255;
     } else if (channel.type === "Strobe" || channel.type === "ShutterStrobe") {
       result[addr] = caps.strobeMode === "effect" ? 0 : 255;
@@ -96,9 +106,15 @@ export function registerFixtureTestRoutes(
         return reply.status(404).send({ error: "Fixture not found" });
       }
 
-      const { action, durationMs = 500 } = request.body;
+      const { action, durationMs = 500, channelOffset } = request.body;
       const start = fixture.dmxStartAddress;
       const count = fixture.channelCount;
+
+      if (channelOffset !== undefined && channelOffset >= fixture.channelCount) {
+        return reply.status(400).send({
+          error: `channelOffset ${channelOffset} out of range (fixture has ${fixture.channelCount} channels)`,
+        });
+      }
 
       // Cancel any existing timer for this fixture (safety or timed flash)
       const existingTimer = activeTimers.get(fixture.id);
@@ -109,7 +125,7 @@ export function registerFixtureTestRoutes(
 
       if (action === "flash") {
         const snapshot = deps.manager.getChannelSnapshot(start, count);
-        const flashValues = buildFlashValues(fixture, snapshot);
+        const flashValues = buildFlashValues(fixture, snapshot, channelOffset);
         deps.manager.applyRawUpdate(flashValues);
 
         request.log.info(
@@ -142,7 +158,7 @@ export function registerFixtureTestRoutes(
         const snapshot = deps.manager.getChannelSnapshot(start, count);
         holdSnapshots.set(fixture.id, snapshot);
 
-        const flashValues = buildFlashValues(fixture, snapshot);
+        const flashValues = buildFlashValues(fixture, snapshot, channelOffset);
         const addresses = getFixtureAddresses(fixture);
         deps.manager.applyRawUpdate(flashValues);
         deps.manager.lockChannels(addresses);
@@ -174,7 +190,7 @@ export function registerFixtureTestRoutes(
         const snapshot = deps.manager.getChannelSnapshot(start, count);
         holdSnapshots.set(fixture.id, snapshot);
 
-        const flashValues = buildFlashValues(fixture, snapshot);
+        const flashValues = buildFlashValues(fixture, snapshot, channelOffset);
         const addresses = getFixtureAddresses(fixture);
         deps.manager.applyRawUpdate(flashValues);
         deps.manager.lockChannels(addresses);

@@ -20,6 +20,7 @@ function dmxrBatch() {
         libFixtureId: staged.libFixtureId,
         libModeId: staged.libModeId,
         category: staged.category,
+        channelRemap: staged.channelRemap,
       };
       this.batchCount = 2;
       this.batchSpacing = staged.channelCount;
@@ -132,6 +133,7 @@ function dmxrBatch() {
       if (config.oflFixtureName) body.oflFixtureName = config.oflFixtureName;
       if (config.source) body.source = config.source;
       if (config.category) body.category = config.category;
+      if (config.channelRemap) body.channelRemap = config.channelRemap;
       if (this.selectedUniverseId) body.universeId = this.selectedUniverseId;
 
       try {

@@ -107,6 +107,9 @@ export interface FixtureConfig {
   readonly channelCount: number;
   readonly channels: readonly FixtureChannel[];
   readonly channelOverrides?: Readonly<Record<number, ChannelOverride>>;
+  /** Optional channel remap: logical offset → physical offset.
+   *  Example: { 1: 2, 2: 1 } swaps Green and Blue channels. */
+  readonly channelRemap?: Readonly<Record<number, number>>;
   readonly whiteGateThreshold?: number;
   /** Motor guard: clamp Pan/Tilt/Focus/Zoom to prevent mechanical extremes.
    *  Default true. When enabled, motor channels are clamped to
@@ -138,6 +141,7 @@ export interface AddFixtureRequest {
   readonly dmxStartAddress: number;
   readonly channelCount: number;
   readonly channels: readonly FixtureChannel[];
+  readonly channelRemap?: Readonly<Record<number, number>>;
 }
 
 /** PATCH /fixtures/:id request body */
@@ -146,6 +150,7 @@ export interface UpdateFixtureRequest {
   readonly universeId?: string;
   readonly dmxStartAddress?: number;
   readonly channelOverrides?: Readonly<Record<number, ChannelOverride>>;
+  readonly channelRemap?: Readonly<Record<number, number>>;
   readonly whiteGateThreshold?: number;
   readonly motorGuardEnabled?: boolean;
   readonly motorGuardBuffer?: number;

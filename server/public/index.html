@@ -23,6 +23,7 @@
   <script src="/js/batch.js"></script>
   <script src="/js/config.js"></script>
   <script src="/js/color-swatch.js"></script>
+  <script src="/js/channel-remap.js"></script>
   <script src="/js/app.js"></script>
 </head>
 <body x-data="dmxrApp()" x-init="init()">
@@ -176,6 +177,14 @@
               <label>Display Name</label>
               <input type="text" x-model="fixtureName" placeholder="e.g. Stage Left PAR">
 
+              <div class="remap-preset-notice" x-show="remapPresetAvailable" x-cloak>
+                Saved remap available for this mode.
+                <button class="btn btn-xs" @click="applyPreset()">Apply</button>
+                <button class="btn btn-xs" @click="remapPresetAvailable = false">Skip</button>
+              </div>
+
+              <button class="btn btn-sm" @click="openRemapModalForStaging()"
+                      :disabled="channelCount === 0">Remap Channels...</button>
               <button class="btn btn-primary btn-stage" @click="stageFixture()"
                       :disabled="!fixtureName || channelCount === 0">Stage for Placement</button>
               <button class="btn btn-sm btn-stage" @click="stageFixture(); $nextTick(() => openBatchModal())"
@@ -403,6 +412,14 @@
               <label>Display Name</label>
               <input type="text" x-model="fixtureName">
 
+              <div class="remap-preset-notice" x-show="remapPresetAvailable" x-cloak>
+                Saved remap available for this mode.
+                <button class="btn btn-xs" @click="applyPreset()">Apply</button>
+                <button class="btn btn-xs" @click="remapPresetAvailable = false">Skip</button>
+              </div>
+
+              <button class="btn btn-sm" @click="openRemapModalForStaging()"
+                      :disabled="channelCount === 0">Remap Channels...</button>
               <button class="btn btn-primary btn-stage" @click="stageLibFixture()"
                       :disabled="!fixtureName || !libSelectedModeId">Stage for Placement</button>
               <button class="btn btn-sm btn-stage" @click="stageLibFixture(); $nextTick(() => openBatchModal())"
@@ -541,6 +558,8 @@
                             @touchend="flashEnd(fixture.id)"
                             @touchcancel="flashEnd(fixture.id)"
                             class="overflow-item">Flash (hold)</button>
+                    <button @click="openRemapModal(fixture.id); open = false"
+                            class="overflow-item">Remap Channels</button>
                     <button @click="startDuplicate(fixture.id); open = false"
                             class="overflow-item">Duplicate</button>
                     <button x-show="hasResetChannel(fixture)"
@@ -1013,6 +1032,68 @@
           <button class="btn" @click="wizardBack()">Back</button>
           <button class="btn btn-primary" @click="wizardFinish()">Finish Setup</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Channel Remap Modal -->
+  <div class="modal-overlay" x-show="remapModalOpen" x-cloak
+       @click.self="closeRemapModal()"
+       @keydown.escape.window="remapModalOpen && closeRemapModal()">
+    <div class="remap-modal">
+      <div class="remap-header">
+        <h3>Remap Channels</h3>
+        <button class="modal-close" @click="closeRemapModal()">&times;</button>
+      </div>
+
+      <p class="remap-summary" x-show="getRemapCount() > 0"
+         x-text="getRemapCount() + ' channel' + (getRemapCount() !== 1 ? 's' : '') + ' remapped'"></p>
+
+      <div class="remap-preset-notice" x-show="remapPresetAvailable && remapPresetData" x-cloak>
+        Saved preset available
+        <button class="btn btn-xs" @click="applyPreset()">Apply</button>
+        <button class="btn btn-xs" @click="remapPresetAvailable = false">Skip</button>
+      </div>
+
+      <div class="remap-list">
+        <template x-for="(ch, index) in remapChannels" :key="ch.offset">
+          <div class="remap-slot"
+               @dragover.prevent="onRemapDragOver(index, $event)"
+               @dragleave="onRemapDragLeave()"
+               @drop.prevent="onRemapDrop(index)"
+               :class="{ 'remap-drag-over': remapDropIndex === index }">
+            <span class="remap-slot-label" x-text="'ch ' + (index + 1)"></span>
+            <div class="remap-bubble"
+                 :class="{ 'remap-changed': isChannelRemapped(index) }"
+                 draggable="true"
+                 @dragstart="onRemapDragStart(index, $event)"
+                 @dragend="onRemapDragEnd()">
+              <span class="remap-handle" title="Drag to swap">&equiv;</span>
+              <span class="remap-color-dot"
+                    :style="'background:' + getChannelColorCSS(ch)"></span>
+              <span class="remap-ch-name" x-text="ch.name"></span>
+              <span class="remap-type-badge badge" x-text="ch.type"></span>
+              <span class="remap-origin" x-show="isChannelRemapped(index)"
+                    x-text="'from ch ' + (ch.offset + 1)"></span>
+              <button class="btn btn-xs remap-test-btn"
+                      x-show="remapFixtureId"
+                      @click="testRemapChannel(ch.offset)"
+                      title="Flash this channel">Test</button>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <p class="validation-error" x-show="remapError" x-text="remapError"></p>
+
+      <div class="remap-actions">
+        <button class="btn btn-primary" @click="saveRemap()"
+                :disabled="remapSaving">Save</button>
+        <button class="btn" @click="resetRemap()">Reset</button>
+        <button class="btn btn-sm" @click="saveRemapAsPreset()"
+                :disabled="getRemapCount() === 0"
+                x-show="remapPresetKey">Save Preset</button>
+        <button class="btn btn-sm" @click="closeRemapModal()">Cancel</button>
       </div>
     </div>
   </div>

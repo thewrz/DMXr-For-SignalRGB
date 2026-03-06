@@ -66,6 +66,9 @@ export function createFixtureStore(filePath: string): FixtureStore {
         dmxStartAddress: request.dmxStartAddress,
         channelCount: request.channels.length,
         channels: request.channels,
+        ...(request.channelRemap && Object.keys(request.channelRemap).length > 0
+          ? { channelRemap: request.channelRemap }
+          : {}),
       };
 
       fixtures = [...fixtures, fixture];
@@ -88,6 +91,9 @@ export function createFixtureStore(filePath: string): FixtureStore {
           dmxStartAddress: request.dmxStartAddress,
           channelCount: request.channels.length,
           channels: request.channels,
+          ...(request.channelRemap && Object.keys(request.channelRemap).length > 0
+            ? { channelRemap: request.channelRemap }
+            : {}),
         };
         created.push(fixture);
       }
@@ -106,6 +112,11 @@ export function createFixtureStore(filePath: string): FixtureStore {
         ...(changes.universeId !== undefined ? { universeId: changes.universeId } : {}),
         ...(changes.dmxStartAddress !== undefined ? { dmxStartAddress: changes.dmxStartAddress } : {}),
         ...(changes.channelOverrides !== undefined ? { channelOverrides: changes.channelOverrides } : {}),
+        ...(changes.channelRemap !== undefined
+          ? (Object.keys(changes.channelRemap).length > 0
+            ? { channelRemap: changes.channelRemap }
+            : { channelRemap: undefined })
+          : {}),
         ...(changes.whiteGateThreshold !== undefined ? { whiteGateThreshold: changes.whiteGateThreshold } : {}),
         ...(changes.motorGuardEnabled !== undefined ? { motorGuardEnabled: changes.motorGuardEnabled } : {}),
         ...(changes.motorGuardBuffer !== undefined ? { motorGuardBuffer: changes.motorGuardBuffer } : {}),

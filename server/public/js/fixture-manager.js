@@ -444,6 +444,91 @@ function dmxrFixtureManager() {
       }, 150);
     },
 
+    // --- Duplicate ---
+
+    findNextAvailableAddress(channelCount, excludeId) {
+      var occupied = [];
+      for (var i = 0; i < this.fixtures.length; i++) {
+        var f = this.fixtures[i];
+        if (excludeId && f.id === excludeId) continue;
+        occupied.push({ start: f.dmxStartAddress, end: f.dmxStartAddress + f.channelCount - 1 });
+      }
+      occupied.sort(function(a, b) { return a.start - b.start; });
+
+      for (var addr = 1; addr <= 512 - channelCount + 1; addr++) {
+        var fits = true;
+        for (var j = 0; j < occupied.length; j++) {
+          if (addr <= occupied[j].end && addr + channelCount - 1 >= occupied[j].start) {
+            fits = false;
+            addr = occupied[j].end; // loop will increment
+            break;
+          }
+        }
+        if (fits) return addr;
+      }
+      return 1;
+    },
+
+    startDuplicate(fixtureId) {
+      var fixture = this.fixtures.find(function(f) { return f.id === fixtureId; });
+      if (!fixture) return;
+      this.dupeFixtureId = fixtureId;
+      this.dupeName = fixture.name + " (copy)";
+      this.dupeAddress = this.findNextAvailableAddress(fixture.channelCount);
+      this.dupeError = "";
+    },
+
+    cancelDuplicate() {
+      this.dupeFixtureId = null;
+      this.dupeName = "";
+      this.dupeAddress = 1;
+      this.dupeError = "";
+    },
+
+    validateDupeAddress(fixture) {
+      this.dupeError = "";
+      if (this.dupeAddress < 1) {
+        this.dupeError = "Start address must be >= 1";
+        return;
+      }
+      var end = this.dupeAddress + fixture.channelCount - 1;
+      if (end > 512) {
+        this.dupeError = "Extends beyond channel 512 (needs " + this.dupeAddress + "-" + end + ")";
+        return;
+      }
+      for (var i = 0; i < this.fixtures.length; i++) {
+        var f = this.fixtures[i];
+        var fEnd = f.dmxStartAddress + f.channelCount - 1;
+        if (this.dupeAddress <= fEnd && end >= f.dmxStartAddress) {
+          this.dupeError = "Overlaps with \"" + f.name + "\" (DMX " + f.dmxStartAddress + "-" + fEnd + ")";
+          return;
+        }
+      }
+    },
+
+    async confirmDuplicate(fixtureId) {
+      if (this.dupeError) return;
+      try {
+        var res = await fetch("/fixtures/" + fixtureId + "/duplicate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: this.dupeName,
+            dmxStartAddress: this.dupeAddress,
+          }),
+        });
+        if (res.ok) {
+          this.cancelDuplicate();
+          await this.loadFixtures();
+        } else {
+          var err = await res.json().catch(function() { return {}; });
+          this.dupeError = err.error || "Duplicate failed";
+        }
+      } catch {
+        this.dupeError = "Network error";
+      }
+    },
+
     async patchFixture(fixtureId, changes) {
       try {
         var res = await fetch("/fixtures/" + fixtureId, {

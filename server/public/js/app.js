@@ -55,6 +55,21 @@ function dmxrApp() {
     libSelectedModeId: null,
     libChannels: [],
 
+    // Duplicate popover state
+    dupeFixtureId: null,
+    dupeName: "",
+    dupeAddress: 1,
+    dupeError: "",
+
+    // Batch modal state
+    batchModalOpen: false,
+    batchConfig: null,
+    batchPreviewAddresses: [],
+    batchError: "",
+    batchCount: 1,
+    batchStartAddress: 1,
+    batchSpacing: 1,
+
     // Unified search debounce
     searchTimer: null,
     searchAbort: null,
@@ -90,5 +105,6 @@ function dmxrApp() {
     dmxrCustomFixture(),
     dmxrFixtureIcons(),
     dmxrDmxMonitor(),
+    dmxrBatch(),
   );
 }

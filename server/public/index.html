@@ -20,6 +20,7 @@
   <script src="/js/custom-fixture.js"></script>
   <script src="/js/fixture-icons.js"></script>
   <script src="/js/dmx-monitor.js"></script>
+  <script src="/js/batch.js"></script>
   <script src="/js/app.js"></script>
 </head>
 <body x-data="dmxrApp()" x-init="init()">
@@ -82,22 +83,19 @@
         <div class="search-results" x-show="unifiedSearchResults.length > 0">
           <template x-for="result in unifiedSearchResults" :key="result.key">
             <div class="result-item" @click="selectSearchResult(result)">
-              <div class="result-row">
-                <div style="display:flex;align-items:center;gap:0.3rem">
-                  <span class="result-icon" x-html="fixtureIcon(result)"></span>
-                  <strong x-text="result.name"></strong>
-                  <span class="result-detail" x-show="result.type === 'fixture'" x-text="result.detail"></span>
-                </div>
+              <div class="result-name-row">
+                <span class="result-icon" x-html="fixtureIcon(result)"></span>
+                <strong x-text="result.name"></strong>
+              </div>
+              <div class="result-badges-row">
                 <span class="source-badge" :class="'badge-' + result.source"
                       x-text="result.source === 'ofl' ? 'OFL' : result.sourceLabel"></span>
-              </div>
-              <div class="result-meta">
                 <span class="result-type-badge" :class="result.type === 'fixture' ? 'badge-fixture' : 'badge-mfr'"
                       x-text="result.type === 'manufacturer' ? 'Manufacturer' : 'Fixture'"></span>
                 <template x-for="cat in (result.categories || [])" :key="cat">
                   <span class="category-badge" x-text="cat"></span>
                 </template>
-                <span class="count" x-show="result.type === 'manufacturer'" x-text="result.detail"></span>
+                <span class="result-detail" x-text="result.detail"></span>
               </div>
             </div>
           </template>
@@ -178,6 +176,8 @@
 
               <button class="btn btn-primary btn-stage" @click="stageFixture()"
                       :disabled="!fixtureName || channelCount === 0">Stage for Placement</button>
+              <button class="btn btn-sm btn-stage" @click="stageFixture(); $nextTick(() => openBatchModal())"
+                      :disabled="!fixtureName || channelCount === 0">Batch Add...</button>
               <button class="btn btn-sm btn-export" @click="exportOflFixture()"
                       :disabled="!selectedFixtureDef">Export OFL JSON</button>
             </div>
@@ -403,6 +403,8 @@
 
               <button class="btn btn-primary btn-stage" @click="stageLibFixture()"
                       :disabled="!fixtureName || !libSelectedModeId">Stage for Placement</button>
+              <button class="btn btn-sm btn-stage" @click="stageLibFixture(); $nextTick(() => openBatchModal())"
+                      :disabled="!fixtureName || !libSelectedModeId">Batch Add...</button>
               <button class="btn btn-sm btn-export" @click="exportLibFixtureOfl()"
                       :disabled="!libSelectedFixture || !libModes.length">Export OFL JSON</button>
             </div>
@@ -532,7 +534,22 @@
                         :title="'Send DMX reset command (' + getResetChannelName(fixture) + ')'">
                   <span x-text="isResetting(fixture.id) ? 'Resetting...' : 'Reset'"></span>
                 </button>
+                <button class="btn btn-sm" @click="startDuplicate(fixture.id)">Dupe</button>
                 <button class="btn btn-sm btn-danger" @click="removeFixture(fixture.id)">Remove</button>
+              </div>
+            </div>
+            <!-- Duplicate Popover -->
+            <div class="dupe-popover" x-show="dupeFixtureId === fixture.id" x-cloak>
+              <label>Name</label>
+              <input type="text" x-model="dupeName">
+              <label>DMX Start Address</label>
+              <input type="number" x-model.number="dupeAddress" min="1" max="512"
+                     @input="validateDupeAddress(fixture)">
+              <p class="validation-error" x-show="dupeError" x-text="dupeError"></p>
+              <div style="display:flex;gap:0.5rem;margin-top:0.5rem">
+                <button class="btn btn-sm btn-primary" @click="confirmDuplicate(fixture.id)"
+                        :disabled="!!dupeError">Duplicate</button>
+                <button class="btn btn-sm" @click="cancelDuplicate()">Cancel</button>
               </div>
             </div>
             <div class="fixture-details">
@@ -794,6 +811,49 @@
       </div>
 
       <button class="modal-close" @click="closeLatency()">&times;</button>
+    </div>
+  </div>
+
+  <!-- Batch Add Modal -->
+  <div class="modal-overlay" x-show="batchModalOpen" x-cloak @click.self="closeBatchModal()">
+    <div class="modal" style="max-width:500px">
+      <h2>Batch Add Fixtures</h2>
+      <p style="font-size:0.85rem;color:var(--text-dim);margin-bottom:1rem"
+         x-text="batchConfig ? batchConfig.name + ' \u00b7 ' + batchConfig.channelCount + ' ch' : ''"></p>
+
+      <label>Count (1-32)</label>
+      <input type="number" x-model.number="batchCount" min="1" max="32"
+             @input="updateBatchPreview()">
+
+      <label>Start Address</label>
+      <input type="number" x-model.number="batchStartAddress" min="1" max="512"
+             @input="updateBatchPreview()">
+
+      <label>Spacing (channels between each fixture start)</label>
+      <input type="number" x-model.number="batchSpacing" min="1" max="512"
+             @input="updateBatchPreview()">
+
+      <p class="validation-error" x-show="batchError" x-text="batchError"></p>
+
+      <label>Preview</label>
+      <div class="batch-preview-list">
+        <template x-for="(item, idx) in batchPreviewAddresses" :key="idx">
+          <div class="batch-preview-item" :class="{ 'batch-preview-error': item.conflict }">
+            <span x-text="item.name"></span>
+            <span class="batch-preview-range" x-text="'DMX ' + item.start + '-' + item.end"></span>
+            <span x-show="item.conflict" style="color:var(--danger);font-size:0.7rem" x-text="item.conflict"></span>
+          </div>
+        </template>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn" @click="closeBatchModal()">Cancel</button>
+        <button class="btn btn-primary" @click="submitBatch()"
+                :disabled="batchError || batchPreviewAddresses.some(p => p.conflict)"
+                x-text="'Add ' + batchCount + ' Fixture' + (batchCount !== 1 ? 's' : '')"></button>
+      </div>
+
+      <button class="modal-close" @click="closeBatchModal()">&times;</button>
     </div>
   </div>
 

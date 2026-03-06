@@ -105,6 +105,50 @@ describe("Fixture color routes", () => {
       expect(body.fixtures[0].color.active).toBe(false);
     });
 
+    it("returns all-zero colors during blackout", async () => {
+      fixtureStore.add({
+        name: "Test PAR",
+        mode: "3ch",
+        dmxStartAddress: 1,
+        channelCount: 3,
+        channels: [
+          { offset: 0, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
+          { offset: 1, name: "Green", type: "ColorIntensity", color: "Green", defaultValue: 0 },
+          { offset: 2, name: "Blue", type: "ColorIntensity", color: "Blue", defaultValue: 0 },
+        ],
+      });
+
+      manager.applyFixtureUpdate({ fixture: "par", channels: { "1": 255, "2": 128, "3": 64 } });
+      manager.blackout();
+
+      const res = await app.inject({ method: "GET", url: "/api/fixtures/colors" });
+      const body = res.json();
+      expect(body.fixtures[0].color.groups[0]).toEqual({ r: 0, g: 0, b: 0, w: 0 });
+      expect(body.fixtures[0].color.active).toBe(false);
+    });
+
+    it("returns all-255 colors during whiteout", async () => {
+      fixtureStore.add({
+        name: "Test PAR",
+        mode: "3ch",
+        dmxStartAddress: 1,
+        channelCount: 3,
+        channels: [
+          { offset: 0, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
+          { offset: 1, name: "Green", type: "ColorIntensity", color: "Green", defaultValue: 0 },
+          { offset: 2, name: "Blue", type: "ColorIntensity", color: "Blue", defaultValue: 0 },
+        ],
+      });
+
+      manager.applyFixtureUpdate({ fixture: "par", channels: { "1": 100, "2": 50, "3": 25 } });
+      manager.whiteout();
+
+      const res = await app.inject({ method: "GET", url: "/api/fixtures/colors" });
+      const body = res.json();
+      expect(body.fixtures[0].color.groups[0]).toEqual({ r: 255, g: 255, b: 255, w: 0 });
+      expect(body.fixtures[0].color.active).toBe(true);
+    });
+
     it("SSE stream returns initial frame with correct content type", async () => {
       const res = await app.inject({
         method: "GET",

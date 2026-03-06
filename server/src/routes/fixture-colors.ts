@@ -12,10 +12,23 @@ function buildColorSnapshot(deps: FixtureColorRouteDeps, universeId?: string) {
   const snapshot = deps.monitor.getSnapshot(universeId);
   const fixtures = deps.fixtureStore.getAll();
 
+  // During blackout/whiteout the hardware output diverges from activeChannels,
+  // so synthesize channel values that match what the fixtures actually output.
+  let channelValues = snapshot.channels;
+  if (snapshot.controlMode === "blackout" || snapshot.controlMode === "whiteout") {
+    const overrideValue = snapshot.controlMode === "blackout" ? 0 : 255;
+    channelValues = {};
+    for (const f of fixtures) {
+      for (const ch of f.channels) {
+        channelValues[f.dmxStartAddress + ch.offset] = overrideValue;
+      }
+    }
+  }
+
   return {
     fixtures: fixtures.map((f) => ({
       id: f.id,
-      color: extractFixtureColor(f.channels, f.dmxStartAddress, snapshot.channels),
+      color: extractFixtureColor(f.channels, f.dmxStartAddress, channelValues),
     })),
   };
 }

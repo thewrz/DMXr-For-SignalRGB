@@ -389,19 +389,19 @@ header {
   flex-shrink: 0;
   transition: background 0.15s, border-color 0.15s;
   position: relative;
+  overflow: hidden;
 }
 .color-swatch-inactive {
   opacity: 0.3;
 }
 .color-swatch-white {
   position: absolute;
-  bottom: -2px;
-  right: -2px;
-  width: 0.5rem;
-  height: 0.5rem;
-  border-radius: 3px;
+  bottom: 0;
+  right: 0;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
   background: #fff;
-  border: 1px solid var(--border);
 }
 
 .fixture-meta {

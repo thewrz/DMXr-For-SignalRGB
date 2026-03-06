@@ -161,6 +161,29 @@ export interface UpdateFixtureRequest {
   };
 }
 
+/** Stored fixture group configuration */
+export interface FixtureGroup {
+  readonly id: string;
+  readonly name: string;
+  readonly fixtureIds: readonly string[];
+  readonly color?: string;
+  readonly createdAt: string;
+}
+
+/** POST /groups request body */
+export interface AddGroupRequest {
+  readonly name: string;
+  readonly fixtureIds: readonly string[];
+  readonly color?: string;
+}
+
+/** PATCH /groups/:id request body */
+export interface UpdateGroupRequest {
+  readonly name?: string;
+  readonly fixtureIds?: string[];
+  readonly color?: string;
+}
+
 /** POST /update/colors request body */
 export interface ColorUpdatePayload {
   readonly fixtures: readonly {

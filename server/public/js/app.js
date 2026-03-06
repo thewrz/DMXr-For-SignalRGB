@@ -87,6 +87,7 @@ function dmxrApp() {
       await this.loadManufacturers();
       await this.loadLibraries();
       await this.loadCustomTemplates();
+      await this.loadGroups();
       this.loadServerName();
       this.pollFixtures();
       await this.checkWizardNeeded();
@@ -110,5 +111,6 @@ function dmxrApp() {
     dmxrConfig(),
     dmxrColorSwatch(),
     dmxrChannelRemap(),
+    dmxrGroups(),
   );
 }

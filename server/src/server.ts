@@ -14,6 +14,7 @@ import type { LibraryRegistry } from "./libraries/types.js";
 import type { ConnectionStatus } from "./dmx/connection-state.js";
 import type { SettingsStore } from "./config/settings-store.js";
 import type { RemapPresetStore } from "./config/remap-preset-store.js";
+import type { GroupStore } from "./fixtures/group-store.js";
 import { registerHealthRoute } from "./routes/health.js";
 import { registerUpdateRoute } from "./routes/update.js";
 import { registerFixtureRoutes } from "./routes/fixtures.js";
@@ -30,6 +31,9 @@ import { registerMonitorRoutes } from "./routes/monitor.js";
 import { registerFixtureColorRoutes } from "./routes/fixture-colors.js";
 import { registerConfigRoutes } from "./routes/config.js";
 import { registerRemapPresetRoutes } from "./routes/remap-presets.js";
+import { registerGroupRoutes } from "./routes/groups.js";
+import { registerGroupControlRoutes } from "./routes/group-control.js";
+import { createDmxDispatcher } from "./dmx/dmx-dispatcher.js";
 import { registerApiKeyAuth } from "./middleware/api-key-auth.js";
 import type { DmxMonitor } from "./dmx/dmx-monitor.js";
 import type { LatencyTracker } from "./metrics/latency-tracker.js";
@@ -63,6 +67,7 @@ interface BuildServerDeps {
   readonly universeRegistry?: UniverseRegistry;
   readonly connectionPool?: ConnectionPool;
   readonly remapPresetStore?: RemapPresetStore;
+  readonly groupStore?: GroupStore;
 }
 
 export async function buildServer(
@@ -221,6 +226,20 @@ export async function buildServer(
 
   if (deps.remapPresetStore) {
     registerRemapPresetRoutes(app, { store: deps.remapPresetStore });
+  }
+
+  if (deps.groupStore) {
+    registerGroupRoutes(app, {
+      groupStore: deps.groupStore,
+      fixtureStore: deps.fixtureStore,
+    });
+
+    const groupDispatcher = createDmxDispatcher(deps.manager, deps.coordinator);
+    registerGroupControlRoutes(app, {
+      groupStore: deps.groupStore,
+      fixtureStore: deps.fixtureStore,
+      dispatcher: groupDispatcher,
+    });
   }
 
   app.setErrorHandler((error: FastifyError, request, reply) => {

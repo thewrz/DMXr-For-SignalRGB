@@ -4,6 +4,7 @@ import type { UniverseManager } from "../dmx/universe-manager.js";
 import type { AddFixtureRequest, UpdateFixtureRequest } from "../types/protocol.js";
 import { validateFixtureAddress, validateFixtureChannels, findNextAvailableAddress } from "../fixtures/fixture-validator.js";
 import { MOTOR_CHANNEL_TYPES, DEFAULT_MOTOR_GUARD_BUFFER } from "../fixtures/motor-guard.js";
+import { shortId } from "../utils/format.js";
 import { pipeLog, resetSample } from "../logging/pipeline-logger.js";
 
 interface FixtureRouteDeps {
@@ -165,7 +166,7 @@ export function registerFixtureRoutes(
         const base = updated.dmxStartAddress;
         const channels: Record<number, number> = {};
         const logLines: string[] = [
-          `PATCH override "${updated.name}" (id=${updated.id.slice(0, 8)} base=${base}):`,
+          `PATCH override "${updated.name}" (id=${shortId(updated.id)} base=${base}):`,
         ];
 
         for (const [offsetStr, override] of Object.entries(request.body.channelOverrides)) {

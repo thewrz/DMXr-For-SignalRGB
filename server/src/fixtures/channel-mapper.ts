@@ -2,6 +2,7 @@ import type { FixtureConfig } from "../types/protocol.js";
 import { analyzeFixture } from "./fixture-capabilities.js";
 import { pipeLog, shouldSample } from "../logging/pipeline-logger.js";
 import { MOTOR_CHANNEL_TYPES, DEFAULT_MOTOR_GUARD_BUFFER, clampMotor } from "./motor-guard.js";
+import { shortId } from "../utils/format.js";
 
 export const DEFAULT_WHITE_GATE_THRESHOLD = 240;
 
@@ -37,7 +38,7 @@ export function mapColor(
 
   if (trace) {
     reasons.push(
-      `mapColor "${fixture.name}" (id=${fixture.id.slice(0, 8)} base=${base}) ` +
+      `mapColor "${fixture.name}" (id=${shortId(fixture.id)} base=${base}) ` +
       `rgb=(${r},${g},${b}) br=${brightness.toFixed(2)}`,
     );
     reasons.push(
@@ -210,7 +211,7 @@ export function getFixtureDefaults(fixture: FixtureConfig): Record<number, numbe
   const result: Record<number, number> = {};
   const base = fixture.dmxStartAddress;
   const lines: string[] = [
-    `getFixtureDefaults "${fixture.name}" (id=${fixture.id.slice(0, 8)} base=${base}):`,
+    `getFixtureDefaults "${fixture.name}" (id=${shortId(fixture.id)} base=${base}):`,
   ];
 
   const motorGuardOn = fixture.motorGuardEnabled !== false;

@@ -29,6 +29,7 @@ import { createLatencyTracker } from "./metrics/latency-tracker.js";
 import { createDmxMonitor } from "./dmx/dmx-monitor.js";
 import { getFixtureDefaults } from "./fixtures/channel-mapper.js";
 import { computeSafePositions } from "./fixtures/motor-guard.js";
+import { shortId } from "./utils/format.js";
 import { setPipelineLogLevel, parsePipelineLogLevel, pipeLog } from "./logging/pipeline-logger.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -172,7 +173,7 @@ async function main() {
   for (const uniConfig of universeRegistry.getAll()) {
     try {
       await connectionPool.create(uniConfig);
-      pipeLog("info", `Universe "${uniConfig.name}" (${uniConfig.id.slice(0, 8)}) connected`);
+      pipeLog("info", `Universe "${uniConfig.name}" (${shortId(uniConfig.id)}) connected`);
     } catch (err) {
       consoleLogger.warn(`Failed to initialize universe "${uniConfig.name}": ${err}`);
     }
@@ -288,7 +289,7 @@ async function main() {
       ? finalConfig.dmxDevicePath
       : `${finalConfig.dmxDevicePath} (auto-detected)`;
 
-  const serverLabel = serverName || "DMXr-" + serverId.slice(0, 8);
+  const serverLabel = serverName || "DMXr-" + shortId(serverId);
 
   process.stdout.write(
     "\n" +
@@ -296,7 +297,7 @@ async function main() {
     `  ║  DMXr Server v${serverVersion.padEnd(22)}║\n` +
     "  ╚══════════════════════════════════════╝\n" +
     "\n" +
-    `  Server ID:   ${serverId.slice(0, 8)} (${serverLabel})\n` +
+    `  Server ID:   ${shortId(serverId)} (${serverLabel})\n` +
     `  HTTP Port:   ${boundPort}\n` +
     `  UDP Port:    ${boundUdpPort}\n` +
     `  DMX Driver:  ${finalConfig.dmxDriver}\n` +

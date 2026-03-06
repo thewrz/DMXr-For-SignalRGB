@@ -18,6 +18,8 @@ export interface DmxDispatcher {
   readonly isBlackoutActive: (universeId?: string) => boolean;
   readonly getControlMode: (universeId?: string) => ControlMode;
   readonly getActiveChannelCount: (universeId?: string) => number;
+  readonly lockChannels: (addresses: readonly number[]) => void;
+  readonly unlockChannels: (addresses: readonly number[]) => void;
 }
 
 export function createDmxDispatcher(
@@ -94,6 +96,14 @@ export function createDmxDispatcher(
         return coordinator.getActiveChannelCount(universeId);
       }
       return manager.getActiveChannelCount();
+    },
+
+    lockChannels(addresses) {
+      manager.lockChannels(addresses);
+    },
+
+    unlockChannels(addresses) {
+      manager.unlockChannels(addresses);
     },
   };
 }

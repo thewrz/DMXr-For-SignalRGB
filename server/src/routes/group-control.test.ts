@@ -76,6 +76,8 @@ function createMockDispatcher(): DmxDispatcher {
     isBlackoutActive: vi.fn(() => false),
     getControlMode: vi.fn(() => "normal" as const),
     getActiveChannelCount: vi.fn(() => 0),
+    lockChannels: vi.fn(),
+    unlockChannels: vi.fn(),
   };
 }
 
@@ -100,7 +102,7 @@ describe("Group control routes", () => {
   });
 
   describe("POST /groups/:id/blackout", () => {
-    it("zeros all channels for group fixtures", async () => {
+    it("zeros all channels for group fixtures and locks them", async () => {
       const res = await app.inject({
         method: "POST",
         url: "/groups/group-1/blackout",
@@ -123,6 +125,9 @@ describe("Group control routes", () => {
         "default",
         { 10: 0, 11: 0, 12: 0 },
       );
+
+      // Channels locked to prevent SignalRGB overwrite
+      expect(dispatcher.lockChannels).toHaveBeenCalledWith([1, 2, 3, 10, 11, 12]);
     });
 
     it("returns 404 for unknown group", async () => {
@@ -225,7 +230,14 @@ describe("Group control routes", () => {
   });
 
   describe("POST /groups/:id/resume", () => {
-    it("restores fixture defaults for group fixtures", async () => {
+    it("unlocks channels and restores fixture defaults", async () => {
+      // First blackout to lock channels
+      await app.inject({
+        method: "POST",
+        url: "/groups/group-1/blackout",
+      });
+
+      // Now resume
       const res = await app.inject({
         method: "POST",
         url: "/groups/group-1/resume",
@@ -237,7 +249,10 @@ describe("Group control routes", () => {
       expect(body.action).toBe("resume");
       expect(body.fixturesUpdated).toBe(2);
 
-      expect(dispatcher.applyRawUpdate).toHaveBeenCalledTimes(2);
+      // Unlock was called with the same addresses that were locked
+      expect(dispatcher.unlockChannels).toHaveBeenCalledWith([1, 2, 3, 10, 11, 12]);
+      // 2 blackout + 2 resume = 4 applyRawUpdate calls
+      expect(dispatcher.applyRawUpdate).toHaveBeenCalledTimes(4);
     });
 
     it("returns 404 for unknown group", async () => {

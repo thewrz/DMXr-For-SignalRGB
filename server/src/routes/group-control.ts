@@ -24,6 +24,10 @@ function resolveGroupFixtures(deps: GroupControlDeps, groupId: string) {
   return { group, fixtures };
 }
 
+function getFixtureAddresses(fixture: FixtureConfig): number[] {
+  return fixture.channels.map((ch) => fixture.dmxStartAddress + ch.offset);
+}
+
 function buildZeroChannels(fixture: FixtureConfig): Record<number, number> {
   const result: Record<number, number> = {};
   const base = fixture.dmxStartAddress;
@@ -37,6 +41,17 @@ export function registerGroupControlRoutes(
   app: FastifyInstance,
   deps: GroupControlDeps,
 ): void {
+  // Track locked channels per group so resume can unlock them
+  const groupLockedAddresses = new Map<string, number[]>();
+
+  function unlockGroup(groupId: string): void {
+    const locked = groupLockedAddresses.get(groupId);
+    if (locked) {
+      deps.dispatcher.unlockChannels(locked);
+      groupLockedAddresses.delete(groupId);
+    }
+  }
+
   app.post<{ Params: { id: string } }>(
     "/groups/:id/blackout",
     async (request, reply) => {
@@ -48,15 +63,24 @@ export function registerGroupControlRoutes(
 
       const { group, fixtures } = resolved;
 
+      // Unlock any previous override for this group
+      unlockGroup(group.id);
+
+      const allAddresses: number[] = [];
       for (const fixture of fixtures) {
         const universeId = fixture.universeId ?? DEFAULT_UNIVERSE_ID;
         const zeros = buildZeroChannels(fixture);
         deps.dispatcher.applyRawUpdate(universeId, zeros);
+        allAddresses.push(...getFixtureAddresses(fixture));
       }
+
+      // Lock channels so incoming color frames don't overwrite
+      deps.dispatcher.lockChannels(allAddresses);
+      groupLockedAddresses.set(group.id, allAddresses);
 
       request.log.info(
         { action: "group-blackout", groupId: group.id, fixtureCount: fixtures.length },
-        `group blackout: "${group.name}" → ${fixtures.length} fixtures zeroed`,
+        `group blackout: "${group.name}" → ${fixtures.length} fixtures zeroed, ${allAddresses.length} channels locked`,
       );
 
       return successResponse({
@@ -78,15 +102,24 @@ export function registerGroupControlRoutes(
 
       const { group, fixtures } = resolved;
 
+      // Unlock any previous override for this group
+      unlockGroup(group.id);
+
+      const allAddresses: number[] = [];
       for (const fixture of fixtures) {
         const universeId = fixture.universeId ?? DEFAULT_UNIVERSE_ID;
         const channels = mapColor(fixture, 255, 255, 255, 1.0);
         deps.dispatcher.applyRawUpdate(universeId, channels);
+        allAddresses.push(...getFixtureAddresses(fixture));
       }
+
+      // Lock channels so incoming color frames don't overwrite
+      deps.dispatcher.lockChannels(allAddresses);
+      groupLockedAddresses.set(group.id, allAddresses);
 
       request.log.info(
         { action: "group-whiteout", groupId: group.id, fixtureCount: fixtures.length },
-        `group whiteout: "${group.name}" → ${fixtures.length} fixtures maxed`,
+        `group whiteout: "${group.name}" → ${fixtures.length} fixtures maxed, ${allAddresses.length} channels locked`,
       );
 
       return successResponse({
@@ -110,6 +143,7 @@ export function registerGroupControlRoutes(
       const durationMs = request.body?.durationMs ?? 500;
 
       const snapshots: Array<{ universeId: string; channels: Record<number, number> }> = [];
+      const allAddresses: number[] = [];
 
       for (const fixture of fixtures) {
         const universeId = fixture.universeId ?? DEFAULT_UNIVERSE_ID;
@@ -122,12 +156,17 @@ export function registerGroupControlRoutes(
 
         const whiteChannels = mapColor(fixture, 255, 255, 255, 1.0);
         deps.dispatcher.applyRawUpdate(universeId, whiteChannels);
+        allAddresses.push(...getFixtureAddresses(fixture));
       }
+
+      // Lock during flash so SignalRGB doesn't overwrite mid-flash
+      deps.dispatcher.lockChannels(allAddresses);
 
       setTimeout(() => {
         for (const { universeId, channels } of snapshots) {
           deps.dispatcher.applyRawUpdate(universeId, channels);
         }
+        deps.dispatcher.unlockChannels(allAddresses);
       }, durationMs);
 
       request.log.info(
@@ -155,6 +194,9 @@ export function registerGroupControlRoutes(
 
       const { group, fixtures } = resolved;
 
+      // Unlock any channels locked by blackout/whiteout
+      unlockGroup(group.id);
+
       for (const fixture of fixtures) {
         const universeId = fixture.universeId ?? DEFAULT_UNIVERSE_ID;
         const defaults = getFixtureDefaults(fixture);
@@ -163,7 +205,7 @@ export function registerGroupControlRoutes(
 
       request.log.info(
         { action: "group-resume", groupId: group.id, fixtureCount: fixtures.length },
-        `group resume: "${group.name}" → ${fixtures.length} fixtures restored to defaults`,
+        `group resume: "${group.name}" → ${fixtures.length} fixtures unlocked and restored to defaults`,
       );
 
       return successResponse({

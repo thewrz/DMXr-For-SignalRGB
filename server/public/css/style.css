@@ -1891,16 +1891,18 @@ header {
   padding: 0.5rem;
   margin-bottom: 0.75rem;
 }
-.group-fixture-item {
+.group-fixture-list label.group-fixture-item {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   padding: 0.3rem 0;
+  margin: 0;
   cursor: pointer;
   font-size: 0.85rem;
 }
 .group-fixture-item input[type="checkbox"] {
   margin: 0;
+  flex-shrink: 0;
 }
 .fixture-group-badges {
   display: flex;

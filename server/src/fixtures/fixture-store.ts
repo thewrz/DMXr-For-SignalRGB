@@ -66,6 +66,9 @@ export function createFixtureStore(filePath: string): FixtureStore {
         dmxStartAddress: request.dmxStartAddress,
         channelCount: request.channels.length,
         channels: request.channels,
+        ...(request.channelRemap && Object.keys(request.channelRemap).length > 0
+          ? { channelRemap: request.channelRemap }
+          : {}),
       };
 
       fixtures = [...fixtures, fixture];
@@ -88,6 +91,9 @@ export function createFixtureStore(filePath: string): FixtureStore {
           dmxStartAddress: request.dmxStartAddress,
           channelCount: request.channels.length,
           channels: request.channels,
+          ...(request.channelRemap && Object.keys(request.channelRemap).length > 0
+            ? { channelRemap: request.channelRemap }
+            : {}),
         };
         created.push(fixture);
       }

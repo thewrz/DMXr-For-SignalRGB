@@ -103,7 +103,7 @@ function dmxrSearch() {
       var channels = this.buildChannelsPayload();
       if (!channels) return;
 
-      this.stagedFixture = {
+      var staged = {
         name: this.fixtureName,
         oflKey: this.selectedMfr.key + "/" + this.selectedFixtureKey,
         oflFixtureName: this.selectedFixtureDef.name,
@@ -113,12 +113,17 @@ function dmxrSearch() {
         channelCount: this.channelCount,
         channels: channels,
       };
+      if (this.pendingChannelRemap && Object.keys(this.pendingChannelRemap).length > 0) {
+        staged.channelRemap = this.pendingChannelRemap;
+      }
+      this.stagedFixture = staged;
+      this.pendingChannelRemap = null;
     },
 
     stageLibFixture() {
       if (!this.fixtureName || !this.libSelectedModeId || this.libChannels.length === 0) return;
 
-      this.stagedFixture = {
+      var libStaged = {
         name: this.fixtureName,
         source: this.browseSource,
         libraryId: this.browseSource,
@@ -128,6 +133,11 @@ function dmxrSearch() {
         channelCount: this.libChannels.length,
         channels: this.libChannels,
       };
+      if (this.pendingChannelRemap && Object.keys(this.pendingChannelRemap).length > 0) {
+        libStaged.channelRemap = this.pendingChannelRemap;
+      }
+      this.stagedFixture = libStaged;
+      this.pendingChannelRemap = null;
     },
   };
 }

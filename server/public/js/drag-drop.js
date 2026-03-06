@@ -260,6 +260,9 @@ function dmxrDragDrop() {
         channelCount: staged.channelCount,
         channels: staged.channels,
       };
+      if (staged.channelRemap) {
+        payload.channelRemap = staged.channelRemap;
+      }
       if (this.selectedUniverseId) {
         payload.universeId = this.selectedUniverseId;
       }

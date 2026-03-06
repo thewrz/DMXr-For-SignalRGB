@@ -141,6 +141,7 @@ export interface AddFixtureRequest {
   readonly dmxStartAddress: number;
   readonly channelCount: number;
   readonly channels: readonly FixtureChannel[];
+  readonly channelRemap?: Readonly<Record<number, number>>;
 }
 
 /** PATCH /fixtures/:id request body */

@@ -3,6 +3,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadConfig } from "./config/server-config.js";
 import { createSettingsStore } from "./config/settings-store.js";
+import { createRemapPresetStore } from "./config/remap-preset-store.js";
 import { createFixtureStore } from "./fixtures/fixture-store.js";
 import { createUserFixtureStore } from "./fixtures/user-fixture-store.js";
 import { autoDetectDmxPort } from "./dmx/serial-port-scanner.js";
@@ -76,6 +77,10 @@ async function main() {
   // ── DMX Stack ──
   const { connection, manager, latencyTracker } = await createDmxStack(finalConfig, consoleLogger);
 
+  // ── Remap Presets ──
+  const remapPresetStore = createRemapPresetStore("./config/remap-presets.json");
+  await remapPresetStore.load();
+
   // ── Fixture Stores ──
   const fixtureStore = createFixtureStore(finalConfig.fixturesPath);
   await fixtureStore.load();
@@ -125,6 +130,7 @@ async function main() {
     coordinator,
     universeRegistry,
     connectionPool,
+    remapPresetStore,
   });
 
   // ── Shutdown Handling ──

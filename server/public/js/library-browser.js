@@ -127,6 +127,10 @@ function dmxrLibraryBrowser() {
         this.channelNames = [];
       }
       this.validateAddress();
+      this.pendingChannelRemap = null;
+      if (this.selectedMfr && this.selectedFixtureKey && this.selectedMode) {
+        this.checkRemapPreset(this.selectedMfr.key + "/" + this.selectedFixtureKey + "/" + this.selectedMode);
+      }
     },
 
     // --- Library (non-OFL) browsing ---
@@ -220,6 +224,10 @@ function dmxrLibraryBrowser() {
       }
       await this.loadLibChannels();
       this.validateAddress();
+      this.pendingChannelRemap = null;
+      if (this.libSelectedFixture && mode) {
+        this.checkRemapPreset(this.browseSource + "/" + this.libSelectedFixture.id + "/" + (mode.name || mode.id));
+      }
     },
 
     async loadLibChannels() {

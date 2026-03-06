@@ -46,6 +46,10 @@ const addFixtureSchema = {
           },
         },
       },
+      channelRemap: {
+        type: "object" as const,
+        additionalProperties: { type: "integer" as const, minimum: 0 },
+      },
     },
   },
 };
@@ -90,6 +94,13 @@ export function registerFixtureRoutes(
           success: false,
           error: validation.error,
         });
+      }
+
+      if (body.channelRemap !== undefined) {
+        const remapValidation = validateChannelRemap(body.channelRemap, channelCount);
+        if (!remapValidation.valid) {
+          return reply.status(400).send({ success: false, error: remapValidation.error });
+        }
       }
 
       const fixture = deps.store.add(body);
@@ -306,6 +317,7 @@ export function registerFixtureRoutes(
       oflFixtureName?: string;
       source?: string;
       category?: string;
+      channelRemap?: Readonly<Record<number, number>>;
     };
   }>(
     "/fixtures/batch",
@@ -327,6 +339,10 @@ export function registerFixtureRoutes(
             oflFixtureName: { type: "string" as const },
             source: { type: "string" as const, enum: ["ofl", "local-db", "custom"] },
             category: { type: "string" as const },
+            channelRemap: {
+              type: "object" as const,
+              additionalProperties: { type: "integer" as const, minimum: 0 },
+            },
           },
         },
       },
@@ -338,6 +354,13 @@ export function registerFixtureRoutes(
       const channelValidation = validateFixtureChannels(body.channels, body.channelCount);
       if (!channelValidation.valid) {
         return reply.status(400).send({ success: false, error: channelValidation.error });
+      }
+
+      if (body.channelRemap !== undefined) {
+        const remapValidation = validateChannelRemap(body.channelRemap, channelCount);
+        if (!remapValidation.valid) {
+          return reply.status(400).send({ success: false, error: remapValidation.error });
+        }
       }
 
       const spacing = body.spacing ?? channelCount;
@@ -393,6 +416,7 @@ export function registerFixtureRoutes(
           ...(body.oflFixtureName ? { oflFixtureName: body.oflFixtureName } : {}),
           ...(body.source ? { source: body.source as AddFixtureRequest["source"] } : {}),
           ...(body.category ? { category: body.category } : {}),
+          ...(body.channelRemap ? { channelRemap: body.channelRemap } : {}),
         });
       }
 

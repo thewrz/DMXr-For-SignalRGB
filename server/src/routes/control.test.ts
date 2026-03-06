@@ -50,7 +50,7 @@ describe("Control routes", () => {
   });
 
   describe("POST /control/whiteout", () => {
-    it.skip("blackouts first then sets fixture channels via mapColor", async () => {
+    it("sets all channels to 255 then overlays fixture values via mapColor", async () => {
       // Add a fixture so whiteout has something to light up
       await app.inject({
         method: "POST",
@@ -80,8 +80,8 @@ describe("Control routes", () => {
       expect(res.json().action).toBe("whiteout");
       expect(res.json().fixturesUpdated).toBe(1);
 
-      // Blackout (updateAll(0)) should have been called first
-      expect(mockUniverse.updateAllCalls).toContain(0);
+      // Whiteout sets all channels to 255 via updateAll(255)
+      expect(mockUniverse.updateAllCalls).toContain(255);
 
       // Then mapColor(fixture, 255, 255, 255, 1.0) applied via update()
       const whiteUpdate = mockUniverse.updateCalls.find(
@@ -90,7 +90,7 @@ describe("Control routes", () => {
       expect(whiteUpdate).toBeDefined();
     });
 
-    it.skip("returns success with no fixtures configured", async () => {
+    it("returns success with no fixtures configured", async () => {
       const res = await app.inject({
         method: "POST",
         url: "/control/whiteout",
@@ -100,8 +100,8 @@ describe("Control routes", () => {
       expect(res.json().success).toBe(true);
       expect(res.json().fixturesUpdated).toBe(0);
 
-      // Still blackouts even with no fixtures
-      expect(mockUniverse.updateAllCalls).toContain(0);
+      // Whiteout sets all to 255 even with no fixtures
+      expect(mockUniverse.updateAllCalls).toContain(255);
     });
   });
 

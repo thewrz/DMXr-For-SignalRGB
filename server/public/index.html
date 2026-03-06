@@ -511,9 +511,10 @@
                    :style="getSwatchStyle(fixture.id)"
                    :title="getSwatchTitle(fixture.id)"
                    :class="{ 'color-swatch-inactive': !isFixtureActive(fixture.id) }">
-                <span class="color-swatch-white"
+                <span class="color-swatch-white" x-cloak
                       x-show="getWhiteLevel(fixture.id) > 0"
-                      :style="'opacity:' + (getWhiteLevel(fixture.id) / 255)"></span>
+                      x-transition.opacity
+                      :style="'opacity:' + Math.max(0.45, getWhiteLevel(fixture.id) / 255)"></span>
               </div>
               <span class="fixture-icon" x-html="fixtureIcon(fixture)"></span>
               <strong class="fixture-name" x-text="fixture.name"></strong>

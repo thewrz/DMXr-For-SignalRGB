@@ -396,12 +396,13 @@ header {
 }
 .color-swatch-white {
   position: absolute;
-  bottom: 0;
-  right: 0;
-  width: 0.45rem;
-  height: 0.45rem;
+  bottom: 2px;
+  right: 2px;
+  width: 0.4rem;
+  height: 0.4rem;
   border-radius: 50%;
   background: #fff;
+  outline: 1px solid rgba(0, 0, 0, 0.3);
 }
 
 .fixture-meta {

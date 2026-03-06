@@ -9,6 +9,7 @@ import type { UserFixtureStore } from "./fixtures/user-fixture-store.js";
 import type { LibraryRegistry } from "./libraries/types.js";
 import { createLibraryRegistry } from "./libraries/registry.js";
 import { createBuiltinTemplateProvider } from "./libraries/builtin-template-provider.js";
+import type { AddFixtureRequest } from "./types/protocol.js";
 
 function uniqueFixturesPath(): string {
   return `/tmp/dmxr-test-fixtures-${randomUUID()}.json`;
@@ -128,4 +129,65 @@ export function createMockRegistry(
     createBuiltinTemplateProvider(),
     ...extras,
   ]);
+}
+
+// ── Test Fixture Factories ──────────────────────────────────
+
+/** Standard 3-channel RGB PAR fixture payload. */
+export function makeTestPar(
+  overrides: Partial<AddFixtureRequest> & { dmxStartAddress: number },
+): AddFixtureRequest {
+  return {
+    name: "Test PAR",
+    oflKey: "test/test",
+    oflFixtureName: "Test",
+    mode: "3-channel",
+    channelCount: 3,
+    channels: [
+      { offset: 0, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
+      { offset: 1, name: "Green", type: "ColorIntensity", color: "Green", defaultValue: 0 },
+      { offset: 2, name: "Blue", type: "ColorIntensity", color: "Blue", defaultValue: 0 },
+    ],
+    ...overrides,
+  };
+}
+
+/** 5-channel moving head with Pan/Tilt + RGB. */
+export function makeTestMovingHead(
+  overrides: Partial<AddFixtureRequest> & { dmxStartAddress: number },
+): AddFixtureRequest {
+  return {
+    name: "Test Moving Head",
+    oflKey: "test/mover",
+    oflFixtureName: "Mover",
+    mode: "5ch",
+    channelCount: 5,
+    channels: [
+      { offset: 0, name: "Pan", type: "Pan", defaultValue: 128 },
+      { offset: 1, name: "Tilt", type: "Tilt", defaultValue: 128 },
+      { offset: 2, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
+      { offset: 3, name: "Green", type: "ColorIntensity", color: "Green", defaultValue: 0 },
+      { offset: 4, name: "Blue", type: "ColorIntensity", color: "Blue", defaultValue: 0 },
+    ],
+    ...overrides,
+  };
+}
+
+/** Basic strobe fixture (dimmer + strobe + mode). */
+export function makeTestStrobe(
+  overrides: Partial<AddFixtureRequest> & { dmxStartAddress: number },
+): AddFixtureRequest {
+  return {
+    name: "Test Strobe",
+    oflKey: "test/strobe",
+    oflFixtureName: "Strobe",
+    mode: "3ch",
+    channelCount: 3,
+    channels: [
+      { offset: 0, name: "Dimmer", type: "Intensity", defaultValue: 0 },
+      { offset: 1, name: "Strobe", type: "Strobe", defaultValue: 0 },
+      { offset: 2, name: "Mode", type: "Generic", defaultValue: 128 },
+    ],
+    ...overrides,
+  };
 }

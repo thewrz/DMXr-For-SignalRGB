@@ -1057,26 +1057,29 @@
 
       <div class="remap-list">
         <template x-for="(ch, index) in remapChannels" :key="ch.offset">
-          <div class="remap-row"
-               :class="{
-                 'remap-drag-over': remapDropIndex === index,
-                 'remap-changed': isChannelRemapped(index)
-               }"
-               draggable="true"
-               @dragstart="onRemapDragStart(index, $event)"
+          <div class="remap-slot"
                @dragover.prevent="onRemapDragOver(index, $event)"
                @dragleave="onRemapDragLeave()"
                @drop.prevent="onRemapDrop(index)"
-               @dragend="onRemapDragEnd()">
-            <span class="remap-handle" title="Drag to swap">&equiv;</span>
-            <span class="remap-color-dot"
-                  :style="'background:' + getChannelColorCSS(ch)"></span>
-            <span class="remap-ch-name" x-text="ch.name"></span>
-            <span class="remap-type-badge badge" x-text="ch.type"></span>
-            <button class="btn btn-xs remap-test-btn"
-                    x-show="remapFixtureId"
-                    @click="testRemapChannel(ch.offset)"
-                    title="Flash this channel">Test</button>
+               :class="{ 'remap-drag-over': remapDropIndex === index }">
+            <span class="remap-slot-label" x-text="'ch ' + (index + 1)"></span>
+            <div class="remap-bubble"
+                 :class="{ 'remap-changed': isChannelRemapped(index) }"
+                 draggable="true"
+                 @dragstart="onRemapDragStart(index, $event)"
+                 @dragend="onRemapDragEnd()">
+              <span class="remap-handle" title="Drag to swap">&equiv;</span>
+              <span class="remap-color-dot"
+                    :style="'background:' + getChannelColorCSS(ch)"></span>
+              <span class="remap-ch-name" x-text="ch.name"></span>
+              <span class="remap-type-badge badge" x-text="ch.type"></span>
+              <span class="remap-origin" x-show="isChannelRemapped(index)"
+                    x-text="'from ch ' + (ch.offset + 1)"></span>
+              <button class="btn btn-xs remap-test-btn"
+                      x-show="remapFixtureId"
+                      @click="testRemapChannel(ch.offset)"
+                      title="Flash this channel">Test</button>
+            </div>
           </div>
         </template>
       </div>

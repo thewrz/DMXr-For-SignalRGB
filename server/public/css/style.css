@@ -1707,28 +1707,51 @@ header {
   margin-bottom: 1rem;
 }
 
-.remap-row {
+.remap-slot {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.45rem 0.5rem;
+  margin-bottom: 0.25rem;
+  padding: 0.15rem 0;
+  transition: background 0.15s;
+}
+
+.remap-slot.remap-drag-over {
+  background: rgba(100,150,255,0.06);
+  border-radius: 4px;
+}
+
+.remap-slot-label {
+  width: 2.5rem;
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  text-align: right;
+  user-select: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.remap-bubble {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.5rem;
   border: 1px solid var(--border);
   border-radius: 4px;
-  margin-bottom: 0.25rem;
   cursor: grab;
   transition: border-color 0.15s, background 0.15s;
 }
 
-.remap-row:hover {
+.remap-bubble:hover {
   background: rgba(255,255,255,0.03);
 }
 
-.remap-row.remap-drag-over {
+.remap-drag-over .remap-bubble {
   border-color: var(--accent);
-  background: rgba(100,150,255,0.08);
 }
 
-.remap-row.remap-changed {
+.remap-bubble.remap-changed {
   border-left: 3px solid var(--accent);
 }
 
@@ -1758,6 +1781,14 @@ header {
 }
 
 .remap-type-badge {
+  flex-shrink: 0;
+}
+
+.remap-origin {
+  font-size: 0.65rem;
+  color: var(--accent);
+  opacity: 0.8;
+  white-space: nowrap;
   flex-shrink: 0;
 }
 

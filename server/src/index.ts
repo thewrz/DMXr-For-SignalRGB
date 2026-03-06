@@ -28,6 +28,7 @@ import { createUdpColorServer } from "./udp/udp-color-server.js";
 import { createLatencyTracker } from "./metrics/latency-tracker.js";
 import { createDmxMonitor } from "./dmx/dmx-monitor.js";
 import { getFixtureDefaults } from "./fixtures/channel-mapper.js";
+import { computeSafePositions } from "./fixtures/motor-guard.js";
 import { setPipelineLogLevel, parsePipelineLogLevel, pipeLog } from "./logging/pipeline-logger.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -120,24 +121,10 @@ async function main() {
 
   pipeLog("info", `Loaded ${fixtureStore.getAll().length} fixtures, initializing defaults...`);
 
-  // Register safe positions for motor channels (Pan/Tilt/Focus/Zoom etc.)
+  // Register safe positions for motor channels (Pan/Tilt/Focus/Zoom/Gobo/Iris/Prism).
   // These are restored after blackout/whiteout to prevent motors from
   // slamming to mechanical limits at DMX 0 or 255.
-  const MOTOR_TYPES = new Set(["Pan", "Tilt", "Focus", "Zoom", "Gobo", "Iris", "Prism"]);
-  const motorSafePositions: Record<number, number> = {};
-  for (const fixture of fixtureStore.getAll()) {
-    const base = fixture.dmxStartAddress;
-    for (const ch of fixture.channels) {
-      if (MOTOR_TYPES.has(ch.type)) {
-        const addr = base + ch.offset;
-        const override = fixture.channelOverrides?.[ch.offset];
-        motorSafePositions[addr] = override?.enabled
-          ? override.value
-          : (ch.defaultValue > 0 ? ch.defaultValue : 128);
-      }
-    }
-  }
-  manager.registerSafePositions(motorSafePositions);
+  manager.registerSafePositions(computeSafePositions(fixtureStore.getAll()));
 
   manager.blackout();
 

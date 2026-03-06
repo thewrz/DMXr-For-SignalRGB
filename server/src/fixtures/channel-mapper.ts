@@ -1,6 +1,7 @@
 import type { FixtureConfig } from "../types/protocol.js";
 import { analyzeFixture } from "./fixture-capabilities.js";
 import { pipeLog, shouldSample } from "../logging/pipeline-logger.js";
+import { MOTOR_CHANNEL_TYPES, DEFAULT_MOTOR_GUARD_BUFFER, clampMotor } from "./motor-guard.js";
 
 export const DEFAULT_WHITE_GATE_THRESHOLD = 240;
 
@@ -244,14 +245,3 @@ function clamp(value: number): number {
   return Math.max(0, Math.min(255, Math.round(value)));
 }
 
-const DEFAULT_MOTOR_GUARD_BUFFER = 4;
-
-/** Motor-safe clamp: prevents DMX extremes that can jam cheap fixture
- *  motors at mechanical limits. Buffer of 4 → clamps to 2-253. */
-function clampMotor(value: number, buffer = DEFAULT_MOTOR_GUARD_BUFFER): number {
-  const min = Math.floor(buffer / 2);
-  const max = 255 - Math.ceil(buffer / 2);
-  return Math.max(min, Math.min(max, Math.round(value)));
-}
-
-const MOTOR_CHANNEL_TYPES = new Set(["Pan", "Tilt", "Focus", "Zoom"]);

@@ -3,6 +3,7 @@ import type { FixtureStore } from "../fixtures/fixture-store.js";
 import type { UniverseManager } from "../dmx/universe-manager.js";
 import type { AddFixtureRequest, UpdateFixtureRequest } from "../types/protocol.js";
 import { validateFixtureAddress, validateFixtureChannels, findNextAvailableAddress } from "../fixtures/fixture-validator.js";
+import { MOTOR_CHANNEL_TYPES, DEFAULT_MOTOR_GUARD_BUFFER } from "../fixtures/motor-guard.js";
 import { pipeLog, resetSample } from "../logging/pipeline-logger.js";
 
 interface FixtureRouteDeps {
@@ -176,10 +177,8 @@ export function registerFixtureRoutes(
           }
 
           const motorGuardOn = updated.motorGuardEnabled !== false;
-          const isMotor = motorGuardOn && (
-            channel.type === "Pan" || channel.type === "Tilt" ||
-            channel.type === "Focus" || channel.type === "Zoom");
-          const motorBuffer = updated.motorGuardBuffer ?? 4;
+          const isMotor = motorGuardOn && MOTOR_CHANNEL_TYPES.has(channel.type);
+          const motorBuffer = updated.motorGuardBuffer ?? DEFAULT_MOTOR_GUARD_BUFFER;
           const min = isMotor ? Math.floor(motorBuffer / 2) : 0;
           const max = isMotor ? 255 - Math.ceil(motorBuffer / 2) : 255;
 

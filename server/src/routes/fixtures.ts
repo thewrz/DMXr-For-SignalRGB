@@ -3,8 +3,7 @@ import type { FixtureStore } from "../fixtures/fixture-store.js";
 import type { UniverseManager } from "../dmx/universe-manager.js";
 import type { AddFixtureRequest, UpdateFixtureRequest } from "../types/protocol.js";
 import { validateFixtureAddress, validateFixtureChannels, findNextAvailableAddress } from "../fixtures/fixture-validator.js";
-import { MOTOR_CHANNEL_TYPES, DEFAULT_MOTOR_GUARD_BUFFER } from "../fixtures/motor-guard.js";
-import { shortId } from "../utils/format.js";
+import { computeOverrideChannels } from "../fixtures/fixture-override-service.js";
 import { pipeLog, resetSample } from "../logging/pipeline-logger.js";
 
 interface FixtureRouteDeps {
@@ -163,47 +162,7 @@ export function registerFixtureRoutes(
       // Immediately push override values to DMX so changes take effect
       // without waiting for the next color frame from SignalRGB.
       if (updated && request.body.channelOverrides && deps.manager) {
-        const base = updated.dmxStartAddress;
-        const channels: Record<number, number> = {};
-        const logLines: string[] = [
-          `PATCH override "${updated.name}" (id=${shortId(updated.id)} base=${base}):`,
-        ];
-
-        for (const [offsetStr, override] of Object.entries(request.body.channelOverrides)) {
-          const offset = Number(offsetStr);
-          const channel = updated.channels.find((ch) => ch.offset === offset);
-          if (!channel) {
-            logLines.push(`  [${offset}] SKIP — no matching channel definition`);
-            continue;
-          }
-
-          const motorGuardOn = updated.motorGuardEnabled !== false;
-          const isMotor = motorGuardOn && MOTOR_CHANNEL_TYPES.has(channel.type);
-          const motorBuffer = updated.motorGuardBuffer ?? DEFAULT_MOTOR_GUARD_BUFFER;
-          const min = isMotor ? Math.floor(motorBuffer / 2) : 0;
-          const max = isMotor ? 255 - Math.ceil(motorBuffer / 2) : 255;
-
-          let value: number;
-          if (override.enabled) {
-            value = Math.max(min, Math.min(max, Math.round(override.value)));
-          } else if (isMotor) {
-            // Auto mode on motor channels: use safe center (128) if
-            // defaultValue is 0 — same logic as mapColor to prevent
-            // motors from slamming to mechanical limits.
-            const isFine = /fine/i.test(channel.name);
-            const raw = isFine ? channel.defaultValue : (channel.defaultValue > 0 ? channel.defaultValue : 128);
-            value = Math.max(min, Math.min(max, raw));
-          } else {
-            value = Math.max(min, Math.min(max, channel.defaultValue));
-          }
-          channels[base + offset] = value;
-
-          logLines.push(
-            `  [${offset}] DMX${base + offset} ${channel.name.padEnd(16)} ` +
-            `type=${channel.type.padEnd(15)} enabled=${override.enabled} ` +
-            `value=${override.value} → DMX=${value}`,
-          );
-        }
+        const { channels, logLines } = computeOverrideChannels(updated, request.body.channelOverrides);
 
         pipeLog("info", logLines.join("\n"));
 

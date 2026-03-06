@@ -406,6 +406,280 @@ describe("Fixture routes", () => {
     });
   });
 
+  describe("POST /fixtures/:id/duplicate", () => {
+    it("duplicates fixture with auto-calculated address", async () => {
+      const addRes = await app.inject({
+        method: "POST",
+        url: "/fixtures",
+        payload: validFixtureBody,
+      });
+      const { id } = addRes.json();
+
+      const dupRes = await app.inject({
+        method: "POST",
+        url: `/fixtures/${id}/duplicate`,
+        payload: {},
+      });
+
+      expect(dupRes.statusCode).toBe(201);
+      const body = dupRes.json();
+      expect(body.name).toBe("Test PAR (copy)");
+      expect(body.dmxStartAddress).toBe(4); // 1 + 3 channels
+      expect(body.channelCount).toBe(3);
+      expect(body.id).not.toBe(id);
+    });
+
+    it("uses custom name when provided", async () => {
+      const addRes = await app.inject({
+        method: "POST",
+        url: "/fixtures",
+        payload: validFixtureBody,
+      });
+      const { id } = addRes.json();
+
+      const dupRes = await app.inject({
+        method: "POST",
+        url: `/fixtures/${id}/duplicate`,
+        payload: { name: "Stage Right PAR" },
+      });
+
+      expect(dupRes.statusCode).toBe(201);
+      expect(dupRes.json().name).toBe("Stage Right PAR");
+    });
+
+    it("uses explicit address when provided", async () => {
+      const addRes = await app.inject({
+        method: "POST",
+        url: "/fixtures",
+        payload: validFixtureBody,
+      });
+      const { id } = addRes.json();
+
+      const dupRes = await app.inject({
+        method: "POST",
+        url: `/fixtures/${id}/duplicate`,
+        payload: { dmxStartAddress: 100 },
+      });
+
+      expect(dupRes.statusCode).toBe(201);
+      expect(dupRes.json().dmxStartAddress).toBe(100);
+    });
+
+    it("returns 404 for unknown source fixture", async () => {
+      const res = await app.inject({
+        method: "POST",
+        url: "/fixtures/nonexistent/duplicate",
+        payload: {},
+      });
+
+      expect(res.statusCode).toBe(404);
+    });
+
+    it("returns 409 when explicit address overlaps", async () => {
+      const addRes = await app.inject({
+        method: "POST",
+        url: "/fixtures",
+        payload: validFixtureBody,
+      });
+      const { id } = addRes.json();
+
+      const dupRes = await app.inject({
+        method: "POST",
+        url: `/fixtures/${id}/duplicate`,
+        payload: { dmxStartAddress: 2 },
+      });
+
+      expect(dupRes.statusCode).toBe(409);
+    });
+
+    it("returns 409 when no space available for auto-address", async () => {
+      // Fill up the universe with a fixture spanning channels 1-512
+      const bigFixture = {
+        name: "Big",
+        mode: "512ch",
+        dmxStartAddress: 1,
+        channelCount: 512,
+        channels: Array.from({ length: 512 }, (_, i) => ({
+          offset: i,
+          name: `Ch ${i + 1}`,
+          type: "Generic",
+          defaultValue: 0,
+        })),
+      };
+      const addRes = await app.inject({
+        method: "POST",
+        url: "/fixtures",
+        payload: bigFixture,
+      });
+      const { id } = addRes.json();
+
+      const dupRes = await app.inject({
+        method: "POST",
+        url: `/fixtures/${id}/duplicate`,
+        payload: {},
+      });
+
+      expect(dupRes.statusCode).toBe(409);
+      expect(dupRes.json().error).toContain("No available");
+    });
+
+    it("copies oflKey and source from original", async () => {
+      const addRes = await app.inject({
+        method: "POST",
+        url: "/fixtures",
+        payload: { ...validFixtureBody, source: "ofl" },
+      });
+      const { id } = addRes.json();
+
+      const dupRes = await app.inject({
+        method: "POST",
+        url: `/fixtures/${id}/duplicate`,
+        payload: {},
+      });
+
+      const body = dupRes.json();
+      expect(body.oflKey).toBe("cameo/flat-pro-18");
+      expect(body.source).toBe("ofl");
+    });
+  });
+
+  describe("POST /fixtures/batch", () => {
+    const batchBody = {
+      name: "PAR",
+      mode: "3-channel",
+      startAddress: 1,
+      count: 4,
+      channelCount: 3,
+      channels: [
+        { offset: 0, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
+        { offset: 1, name: "Green", type: "ColorIntensity", color: "Green", defaultValue: 0 },
+        { offset: 2, name: "Blue", type: "ColorIntensity", color: "Blue", defaultValue: 0 },
+      ],
+    };
+
+    it("creates multiple fixtures with auto-spaced addresses", async () => {
+      const res = await app.inject({
+        method: "POST",
+        url: "/fixtures/batch",
+        payload: batchBody,
+      });
+
+      expect(res.statusCode).toBe(201);
+      const fixtures = res.json();
+      expect(fixtures).toHaveLength(4);
+      expect(fixtures[0].name).toBe("PAR 1");
+      expect(fixtures[1].name).toBe("PAR 2");
+      expect(fixtures[2].name).toBe("PAR 3");
+      expect(fixtures[3].name).toBe("PAR 4");
+      expect(fixtures[0].dmxStartAddress).toBe(1);
+      expect(fixtures[1].dmxStartAddress).toBe(4);
+      expect(fixtures[2].dmxStartAddress).toBe(7);
+      expect(fixtures[3].dmxStartAddress).toBe(10);
+    });
+
+    it("uses custom spacing", async () => {
+      const res = await app.inject({
+        method: "POST",
+        url: "/fixtures/batch",
+        payload: { ...batchBody, spacing: 5 },
+      });
+
+      expect(res.statusCode).toBe(201);
+      const fixtures = res.json();
+      expect(fixtures[0].dmxStartAddress).toBe(1);
+      expect(fixtures[1].dmxStartAddress).toBe(6);
+      expect(fixtures[2].dmxStartAddress).toBe(11);
+      expect(fixtures[3].dmxStartAddress).toBe(16);
+    });
+
+    it("uses plain name (no suffix) for count=1", async () => {
+      const res = await app.inject({
+        method: "POST",
+        url: "/fixtures/batch",
+        payload: { ...batchBody, count: 1 },
+      });
+
+      expect(res.statusCode).toBe(201);
+      expect(res.json()[0].name).toBe("PAR");
+    });
+
+    it("returns 409 when batch extends beyond channel 512", async () => {
+      const res = await app.inject({
+        method: "POST",
+        url: "/fixtures/batch",
+        payload: { ...batchBody, startAddress: 500, count: 5 },
+      });
+
+      expect(res.statusCode).toBe(409);
+      expect(res.json().error).toContain("beyond channel 512");
+    });
+
+    it("returns 400 when spacing < channelCount", async () => {
+      const res = await app.inject({
+        method: "POST",
+        url: "/fixtures/batch",
+        payload: { ...batchBody, spacing: 2 },
+      });
+
+      expect(res.statusCode).toBe(400);
+      expect(res.json().error).toContain("Spacing");
+    });
+
+    it("returns 409 when batch overlaps existing fixture", async () => {
+      await app.inject({
+        method: "POST",
+        url: "/fixtures",
+        payload: { ...validFixtureBody, dmxStartAddress: 5 },
+      });
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/fixtures/batch",
+        payload: { ...batchBody, startAddress: 1, count: 3 },
+      });
+
+      // Fixture 2 at DMX 4 overlaps with existing at DMX 5-7
+      expect(res.statusCode).toBe(409);
+      expect(res.json().error).toContain("Fixture 2");
+    });
+
+    it("returns 400 for missing required fields", async () => {
+      const res = await app.inject({
+        method: "POST",
+        url: "/fixtures/batch",
+        payload: { name: "Test" },
+      });
+
+      expect(res.statusCode).toBe(400);
+    });
+
+    it("returns 400 for channelCount mismatch", async () => {
+      const res = await app.inject({
+        method: "POST",
+        url: "/fixtures/batch",
+        payload: { ...batchBody, channelCount: 5 },
+      });
+
+      expect(res.statusCode).toBe(400);
+      expect(res.json().error).toContain("channelCount");
+    });
+
+    it("propagates oflKey and source to all fixtures", async () => {
+      const res = await app.inject({
+        method: "POST",
+        url: "/fixtures/batch",
+        payload: { ...batchBody, oflKey: "cameo/flat-pro-18", source: "ofl" },
+      });
+
+      expect(res.statusCode).toBe(201);
+      const fixtures = res.json();
+      for (const f of fixtures) {
+        expect(f.oflKey).toBe("cameo/flat-pro-18");
+        expect(f.source).toBe("ofl");
+      }
+    });
+  });
+
   describe("DELETE /fixtures/:id", () => {
     it("removes fixture and returns success", async () => {
       const addRes = await app.inject({

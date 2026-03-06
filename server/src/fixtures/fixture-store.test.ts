@@ -72,6 +72,40 @@ describe("createFixtureStore", () => {
     });
   });
 
+  describe("addBatch", () => {
+    it("creates multiple fixtures atomically", () => {
+      const requests = [
+        makeRequest({ name: "PAR 1", dmxStartAddress: 1 }),
+        makeRequest({ name: "PAR 2", dmxStartAddress: 10 }),
+        makeRequest({ name: "PAR 3", dmxStartAddress: 20 }),
+      ];
+      const created = store.addBatch(requests);
+
+      expect(created).toHaveLength(3);
+      expect(store.getAll()).toHaveLength(3);
+      expect(created[0].name).toBe("PAR 1");
+      expect(created[1].name).toBe("PAR 2");
+      expect(created[2].name).toBe("PAR 3");
+    });
+
+    it("assigns unique IDs to each fixture", () => {
+      const requests = [
+        makeRequest({ name: "A", dmxStartAddress: 1 }),
+        makeRequest({ name: "B", dmxStartAddress: 10 }),
+      ];
+      const created = store.addBatch(requests);
+
+      expect(created[0].id).not.toBe(created[1].id);
+    });
+
+    it("preserves existing fixtures", () => {
+      store.add(makeRequest({ name: "Existing", dmxStartAddress: 100 }));
+      store.addBatch([makeRequest({ name: "New", dmxStartAddress: 1 })]);
+
+      expect(store.getAll()).toHaveLength(2);
+    });
+  });
+
   describe("getById", () => {
     it("returns fixture by id", () => {
       const added = store.add(makeRequest());

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { validateFixtureAddress, validateFixtureChannels } from "./fixture-validator.js";
+import { validateFixtureAddress, validateFixtureChannels, findNextAvailableAddress } from "./fixture-validator.js";
 import type { FixtureConfig, FixtureChannel } from "../types/protocol.js";
 import { DEFAULT_UNIVERSE_ID } from "../types/protocol.js";
 
@@ -145,6 +145,71 @@ describe("validateFixtureAddress", () => {
       const result = validateFixtureAddress(3, 3, existing, undefined, DEFAULT_UNIVERSE_ID);
       expect(result.valid).toBe(false);
     });
+  });
+});
+
+describe("findNextAvailableAddress", () => {
+  it("returns 1 when no fixtures exist", () => {
+    expect(findNextAvailableAddress(3, [])).toBe(1);
+  });
+
+  it("returns address after existing fixture", () => {
+    const existing = [makeFixture({ dmxStartAddress: 1, channelCount: 5 })];
+    expect(findNextAvailableAddress(3, existing)).toBe(6);
+  });
+
+  it("finds gap between fixtures", () => {
+    const existing = [
+      makeFixture({ id: "a", dmxStartAddress: 1, channelCount: 3 }),
+      makeFixture({ id: "b", dmxStartAddress: 10, channelCount: 3 }),
+    ];
+    // Gap at 4-9 (6 channels), 3ch fixture fits at 4
+    expect(findNextAvailableAddress(3, existing)).toBe(4);
+  });
+
+  it("skips gap too small and finds next one", () => {
+    const existing = [
+      makeFixture({ id: "a", dmxStartAddress: 1, channelCount: 3 }),
+      makeFixture({ id: "b", dmxStartAddress: 5, channelCount: 3 }),
+      makeFixture({ id: "c", dmxStartAddress: 20, channelCount: 3 }),
+    ];
+    // Gap at 4 (1 channel) too small for 3ch, gap at 8-19 (12 channels) fits
+    expect(findNextAvailableAddress(3, existing)).toBe(8);
+  });
+
+  it("returns undefined when no space available", () => {
+    const existing = [makeFixture({ dmxStartAddress: 1, channelCount: 512 })];
+    expect(findNextAvailableAddress(1, existing)).toBeUndefined();
+  });
+
+  it("respects afterAddress parameter", () => {
+    const existing = [
+      makeFixture({ id: "a", dmxStartAddress: 1, channelCount: 3 }),
+    ];
+    // afterAddress=10 skips the gap at 4
+    expect(findNextAvailableAddress(3, existing, undefined, 10)).toBe(10);
+  });
+
+  it("scopes to universe", () => {
+    const existing = [
+      makeFixture({ id: "a", dmxStartAddress: 1, channelCount: 5, universeId: "uni-1" }),
+    ];
+    // Different universe → address 1 is free
+    expect(findNextAvailableAddress(3, existing, "uni-2")).toBe(1);
+  });
+
+  it("handles unsorted fixtures", () => {
+    const existing = [
+      makeFixture({ id: "b", dmxStartAddress: 10, channelCount: 3 }),
+      makeFixture({ id: "a", dmxStartAddress: 1, channelCount: 3 }),
+    ];
+    expect(findNextAvailableAddress(3, existing)).toBe(4);
+  });
+
+  it("returns undefined when remaining space at end is too small", () => {
+    const existing = [makeFixture({ dmxStartAddress: 1, channelCount: 510 })];
+    // Only 2 channels left (511-512), need 3
+    expect(findNextAvailableAddress(3, existing)).toBeUndefined();
   });
 });
 

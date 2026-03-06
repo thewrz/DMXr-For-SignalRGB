@@ -66,6 +66,49 @@ export function validateFixtureChannels(
   };
 }
 
+/**
+ * Find the next DMX start address that can fit a fixture of the given channel count
+ * without overlapping any existing fixtures on the same universe.
+ * Returns undefined if no space is available.
+ */
+export function findNextAvailableAddress(
+  channelCount: number,
+  existingFixtures: readonly FixtureConfig[],
+  universeId?: string,
+  afterAddress?: number,
+): number | undefined {
+  const targetUniverse = universeId ?? DEFAULT_UNIVERSE_ID;
+
+  const sameUniverse = existingFixtures
+    .filter((f) => (f.universeId ?? DEFAULT_UNIVERSE_ID) === targetUniverse)
+    .sort((a, b) => a.dmxStartAddress - b.dmxStartAddress);
+
+  const start = afterAddress ?? MIN_ADDRESS;
+
+  // Try fitting into each gap between existing fixtures
+  let candidate = start;
+  for (const fixture of sameUniverse) {
+    const fixtureEnd = fixture.dmxStartAddress + fixture.channelCount - 1;
+
+    if (candidate + channelCount - 1 < fixture.dmxStartAddress) {
+      // Fits before this fixture
+      return candidate;
+    }
+
+    // Move past this fixture
+    if (fixtureEnd >= candidate) {
+      candidate = fixtureEnd + 1;
+    }
+  }
+
+  // Try after all existing fixtures
+  if (candidate + channelCount - 1 <= MAX_ADDRESS) {
+    return candidate;
+  }
+
+  return undefined;
+}
+
 export function validateFixtureAddress(
   startAddress: number,
   channelCount: number,

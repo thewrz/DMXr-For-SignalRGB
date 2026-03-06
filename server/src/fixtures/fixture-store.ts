@@ -9,6 +9,7 @@ export interface FixtureStore {
   readonly getById: (id: string) => FixtureConfig | undefined;
   readonly getByUniverse: (universeId: string) => readonly FixtureConfig[];
   readonly add: (request: AddFixtureRequest) => FixtureConfig;
+  readonly addBatch: (requests: readonly AddFixtureRequest[]) => readonly FixtureConfig[];
   readonly update: (id: string, changes: UpdateFixtureRequest) => FixtureConfig | undefined;
   readonly remove: (id: string) => boolean;
   readonly save: () => Promise<void>;
@@ -69,6 +70,30 @@ export function createFixtureStore(filePath: string): FixtureStore {
 
       fixtures = [...fixtures, fixture];
       return fixture;
+    },
+
+    addBatch(requests: readonly AddFixtureRequest[]): readonly FixtureConfig[] {
+      const created: FixtureConfig[] = [];
+
+      for (const request of requests) {
+        const fixture: FixtureConfig = {
+          id: randomUUID(),
+          name: request.name,
+          universeId: request.universeId ?? DEFAULT_UNIVERSE_ID,
+          ...(request.oflKey ? { oflKey: request.oflKey } : {}),
+          ...(request.oflFixtureName ? { oflFixtureName: request.oflFixtureName } : {}),
+          ...(request.source ? { source: request.source } : {}),
+          ...(request.category ? { category: request.category } : {}),
+          mode: request.mode,
+          dmxStartAddress: request.dmxStartAddress,
+          channelCount: request.channels.length,
+          channels: request.channels,
+        };
+        created.push(fixture);
+      }
+
+      fixtures = [...fixtures, ...created];
+      return created;
     },
 
     update(id: string, changes: UpdateFixtureRequest): FixtureConfig | undefined {

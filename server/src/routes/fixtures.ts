@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import type { FixtureStore } from "../fixtures/fixture-store.js";
 import type { UniverseManager } from "../dmx/universe-manager.js";
 import type { AddFixtureRequest, UpdateFixtureRequest } from "../types/protocol.js";
-import { validateFixtureAddress, validateFixtureChannels } from "../fixtures/fixture-validator.js";
+import { validateFixtureAddress, validateFixtureChannels, findNextAvailableAddress } from "../fixtures/fixture-validator.js";
 import { pipeLog, resetSample } from "../logging/pipeline-logger.js";
 
 interface FixtureRouteDeps {
@@ -239,6 +239,193 @@ export function registerFixtureRoutes(
       await deps.store.save();
 
       return { success: true };
+    },
+  );
+
+  app.post<{
+    Params: { id: string };
+    Body: { dmxStartAddress?: number; name?: string; universeId?: string };
+  }>(
+    "/fixtures/:id/duplicate",
+    {
+      schema: {
+        body: {
+          type: "object" as const,
+          properties: {
+            dmxStartAddress: { type: "integer" as const, minimum: 1, maximum: 512 },
+            name: { type: "string" as const, minLength: 1 },
+            universeId: { type: "string" as const },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const source = deps.store.getById(request.params.id);
+      if (!source) {
+        return reply.status(404).send({ success: false, error: "Fixture not found" });
+      }
+
+      const targetUniverse = request.body.universeId ?? source.universeId;
+      const channelCount = source.channelCount;
+
+      let startAddress = request.body.dmxStartAddress;
+      if (startAddress === undefined) {
+        const afterSource = source.dmxStartAddress + source.channelCount;
+        const found = findNextAvailableAddress(
+          channelCount,
+          deps.store.getAll(),
+          targetUniverse,
+          afterSource,
+        );
+        if (found === undefined) {
+          return reply.status(409).send({
+            success: false,
+            error: "No available DMX address space for duplicate fixture",
+          });
+        }
+        startAddress = found;
+      }
+
+      const validation = validateFixtureAddress(
+        startAddress,
+        channelCount,
+        deps.store.getAll(),
+        undefined,
+        targetUniverse,
+      );
+      if (!validation.valid) {
+        return reply.status(409).send({ success: false, error: validation.error });
+      }
+
+      const duplicateName = request.body.name ?? `${source.name} (copy)`;
+
+      const fixture = deps.store.add({
+        name: duplicateName,
+        universeId: targetUniverse,
+        ...(source.oflKey ? { oflKey: source.oflKey } : {}),
+        ...(source.oflFixtureName ? { oflFixtureName: source.oflFixtureName } : {}),
+        ...(source.source ? { source: source.source } : {}),
+        ...(source.category ? { category: source.category } : {}),
+        mode: source.mode,
+        dmxStartAddress: startAddress,
+        channelCount: source.channelCount,
+        channels: source.channels,
+      });
+
+      await deps.store.save();
+
+      return reply.status(201).send(fixture);
+    },
+  );
+
+  app.post<{
+    Body: {
+      name: string;
+      mode: string;
+      channels: AddFixtureRequest["channels"];
+      channelCount: number;
+      startAddress: number;
+      count: number;
+      spacing?: number;
+      universeId?: string;
+      oflKey?: string;
+      oflFixtureName?: string;
+      source?: string;
+      category?: string;
+    };
+  }>(
+    "/fixtures/batch",
+    {
+      schema: {
+        body: {
+          type: "object" as const,
+          required: ["name", "mode", "channels", "channelCount", "startAddress", "count"],
+          properties: {
+            name: { type: "string" as const, minLength: 1 },
+            mode: { type: "string" as const, minLength: 1 },
+            channels: addFixtureSchema.body.properties.channels,
+            channelCount: { type: "integer" as const, minimum: 1 },
+            startAddress: { type: "integer" as const, minimum: 1, maximum: 512 },
+            count: { type: "integer" as const, minimum: 1, maximum: 32 },
+            spacing: { type: "integer" as const, minimum: 1 },
+            universeId: { type: "string" as const },
+            oflKey: { type: "string" as const },
+            oflFixtureName: { type: "string" as const },
+            source: { type: "string" as const, enum: ["ofl", "local-db", "custom"] },
+            category: { type: "string" as const },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const body = request.body;
+      const channelCount = body.channels.length;
+
+      const channelValidation = validateFixtureChannels(body.channels, body.channelCount);
+      if (!channelValidation.valid) {
+        return reply.status(400).send({ success: false, error: channelValidation.error });
+      }
+
+      const spacing = body.spacing ?? channelCount;
+
+      // Validate that the entire batch fits within DMX range
+      const lastStart = body.startAddress + spacing * (body.count - 1);
+      const lastEnd = lastStart + channelCount - 1;
+      if (lastEnd > 512) {
+        return reply.status(409).send({
+          success: false,
+          error: `Batch extends beyond channel 512 (last fixture needs ${lastStart}-${lastEnd})`,
+        });
+      }
+
+      // Validate no intra-batch overlaps (spacing < channelCount)
+      if (spacing < channelCount) {
+        return reply.status(400).send({
+          success: false,
+          error: `Spacing (${spacing}) is less than channel count (${channelCount}) — fixtures would overlap each other`,
+        });
+      }
+
+      // Validate each fixture address against existing fixtures
+      const existingFixtures = deps.store.getAll();
+      for (let i = 0; i < body.count; i++) {
+        const address = body.startAddress + spacing * i;
+        const validation = validateFixtureAddress(
+          address,
+          channelCount,
+          existingFixtures,
+          undefined,
+          body.universeId,
+        );
+        if (!validation.valid) {
+          return reply.status(409).send({
+            success: false,
+            error: `Fixture ${i + 1} at DMX ${address}: ${validation.error}`,
+          });
+        }
+      }
+
+      // Build batch requests
+      const requests: AddFixtureRequest[] = [];
+      for (let i = 0; i < body.count; i++) {
+        requests.push({
+          name: body.count === 1 ? body.name : `${body.name} ${i + 1}`,
+          mode: body.mode,
+          dmxStartAddress: body.startAddress + spacing * i,
+          channelCount: body.channelCount,
+          channels: body.channels,
+          universeId: body.universeId,
+          ...(body.oflKey ? { oflKey: body.oflKey } : {}),
+          ...(body.oflFixtureName ? { oflFixtureName: body.oflFixtureName } : {}),
+          ...(body.source ? { source: body.source as AddFixtureRequest["source"] } : {}),
+          ...(body.category ? { category: body.category } : {}),
+        });
+      }
+
+      const created = deps.store.addBatch(requests);
+      await deps.store.save();
+
+      return reply.status(201).send(created);
     },
   );
 }

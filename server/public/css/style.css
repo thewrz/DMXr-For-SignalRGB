@@ -977,6 +977,34 @@ header {
   line-height: 1;
 }
 
+/* Config backup */
+.config-backup-section {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+.config-preview-summary {
+  background: var(--surface2);
+  border-radius: 6px;
+  padding: 0.75rem;
+}
+.config-preview-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.2rem 0;
+  font-size: 0.85rem;
+}
+.config-preview-label {
+  color: var(--text-dim);
+}
+.config-import-result {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background: rgba(46, 204, 113, 0.1);
+  border: 1px solid var(--success);
+  border-radius: 6px;
+}
+
 .library-status-message {
   padding: 0.75rem;
   font-size: 0.85rem;

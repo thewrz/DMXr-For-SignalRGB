@@ -106,5 +106,6 @@ function dmxrApp() {
     dmxrFixtureIcons(),
     dmxrDmxMonitor(),
     dmxrBatch(),
+    dmxrConfig(),
   );
 }

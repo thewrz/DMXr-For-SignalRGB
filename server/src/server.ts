@@ -26,6 +26,7 @@ import { registerMetricsRoute } from "./routes/metrics.js";
 import { registerUserFixtureRoutes } from "./routes/user-fixtures.js";
 import { registerUniverseRoutes } from "./routes/universes.js";
 import { registerMonitorRoutes } from "./routes/monitor.js";
+import { registerConfigRoutes } from "./routes/config.js";
 import { registerApiKeyAuth } from "./middleware/api-key-auth.js";
 import type { DmxMonitor } from "./dmx/dmx-monitor.js";
 import type { LatencyTracker } from "./metrics/latency-tracker.js";
@@ -187,6 +188,12 @@ export async function buildServer(
       settingsStore: deps.settingsStore,
       serverVersion: deps.serverVersion ?? "0.0.0",
       getMdnsAdvertiser: deps.getMdnsAdvertiser,
+    });
+
+    registerConfigRoutes(app, {
+      fixtureStore: deps.fixtureStore,
+      settingsStore: deps.settingsStore,
+      serverVersion: deps.serverVersion ?? "0.0.0",
     });
   }
 

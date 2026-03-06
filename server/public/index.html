@@ -21,6 +21,7 @@
   <script src="/js/fixture-icons.js"></script>
   <script src="/js/dmx-monitor.js"></script>
   <script src="/js/batch.js"></script>
+  <script src="/js/config.js"></script>
   <script src="/js/app.js"></script>
 </head>
 <body x-data="dmxrApp()" x-init="init()">
@@ -666,6 +667,14 @@
             <span x-text="restarting ? 'Restarting...' : 'Restart Now'"></span>
           </button>
         </div>
+
+        <div class="config-backup-section">
+          <label style="font-size:0.85rem;color:var(--text);font-weight:600">Configuration Backup</label>
+          <div style="display:flex;gap:0.5rem;margin-top:0.5rem">
+            <button class="btn btn-sm" @click="exportConfig()">Export Config</button>
+            <button class="btn btn-sm" @click="openImportModal()">Import Config</button>
+          </div>
+        </div>
       </div>
 
       <button class="modal-close" @click="closeSettings()">&times;</button>
@@ -811,6 +820,67 @@
       </div>
 
       <button class="modal-close" @click="closeLatency()">&times;</button>
+    </div>
+  </div>
+
+  <!-- Config Import Modal -->
+  <div class="modal-overlay" x-show="configImportOpen" x-cloak @click.self="closeImportModal()">
+    <div class="modal" style="max-width:500px">
+      <h2>Import Configuration</h2>
+
+      <label>Select config file</label>
+      <input type="file" accept=".json" @change="handleConfigFile($event)"
+             style="margin-bottom:0.75rem;font-size:0.85rem">
+
+      <p class="validation-error" x-show="configImportError" x-text="configImportError"></p>
+
+      <template x-if="configImportPreview">
+        <div>
+          <div class="config-preview-summary">
+            <div class="config-preview-row">
+              <span class="config-preview-label">Source</span>
+              <span x-text="configImportPreview.serverName"></span>
+            </div>
+            <div class="config-preview-row">
+              <span class="config-preview-label">Fixtures</span>
+              <span x-text="configImportPreview.fixtureCount"></span>
+            </div>
+          </div>
+
+          <div class="batch-preview-list" style="margin-top:0.5rem">
+            <template x-for="(f, idx) in configImportPreview.fixtures" :key="idx">
+              <div class="batch-preview-item">
+                <span x-text="f.name"></span>
+                <span class="batch-preview-range" x-text="'DMX ' + f.dmxStartAddress + '-' + (f.dmxStartAddress + f.channelCount - 1)"></span>
+              </div>
+            </template>
+          </div>
+
+          <label style="margin-top:0.75rem">Import Mode</label>
+          <select x-model="configImportMode" style="margin-bottom:0.5rem">
+            <option value="replace">Replace (remove existing, load imported)</option>
+            <option value="merge">Merge (add non-conflicting fixtures)</option>
+          </select>
+          <p style="font-size:0.75rem;color:var(--text-dim)"
+             x-text="configImportMode === 'replace' ? 'All existing fixtures will be removed. Non-machine-specific settings (driver, server name, mDNS) will be applied.' : 'Imported fixtures with DMX address conflicts will be skipped. Settings will not be changed.'"></p>
+        </div>
+      </template>
+
+      <template x-if="configImportResult">
+        <div class="config-import-result">
+          <p class="msg-success" x-text="'Imported ' + configImportResult.fixturesAdded + ' fixture' + (configImportResult.fixturesAdded !== 1 ? 's' : '') + (configImportResult.fixturesSkipped > 0 ? ' (' + configImportResult.fixturesSkipped + ' skipped due to conflicts)' : '')"></p>
+          <p class="msg-success" x-show="configImportResult.settingsApplied">Settings applied.</p>
+        </div>
+      </template>
+
+      <div class="modal-actions">
+        <button class="btn" @click="closeImportModal()">Close</button>
+        <button class="btn btn-primary" @click="submitImport()"
+                x-show="configImportPreview && !configImportResult"
+                :disabled="!!configImportError">Import</button>
+      </div>
+
+      <button class="modal-close" @click="closeImportModal()">&times;</button>
     </div>
   </div>
 

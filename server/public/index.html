@@ -22,6 +22,7 @@
   <script src="/js/dmx-monitor.js"></script>
   <script src="/js/batch.js"></script>
   <script src="/js/config.js"></script>
+  <script src="/js/color-swatch.js"></script>
   <script src="/js/app.js"></script>
 </head>
 <body x-data="dmxrApp()" x-init="init()">
@@ -505,6 +506,14 @@
                @mouseenter="highlightedFixtureId = fixture.id"
                @mouseleave="highlightedFixtureId = null">
             <div class="fixture-card-top">
+              <div class="color-swatch"
+                   :style="getSwatchStyle(fixture.id)"
+                   :title="getSwatchTitle(fixture.id)"
+                   :class="{ 'color-swatch-inactive': !isFixtureActive(fixture.id) }">
+                <span class="color-swatch-white"
+                      x-show="getWhiteLevel(fixture.id) > 0"
+                      :style="'opacity:' + (getWhiteLevel(fixture.id) / 255)"></span>
+              </div>
               <div class="fixture-header">
                 <div style="display:flex;align-items:center;gap:0.3rem">
                   <span class="fixture-icon" x-html="fixtureIcon(fixture)"></span>

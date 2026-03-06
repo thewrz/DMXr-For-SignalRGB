@@ -311,6 +311,30 @@ header {
   gap: 0.5rem;
 }
 
+.color-swatch {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 6px;
+  border: 2px solid var(--border);
+  background: var(--surface2);
+  flex-shrink: 0;
+  transition: background 0.15s, border-color 0.15s;
+  position: relative;
+}
+.color-swatch-inactive {
+  opacity: 0.3;
+}
+.color-swatch-white {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 3px;
+  background: #fff;
+  border: 1px solid var(--border);
+}
+
 .fixture-header {
   flex: 1;
   min-width: 0;

@@ -2,6 +2,7 @@ import type { FixtureConfig, FixtureChannel } from "../types/protocol.js";
 import type { FixtureCapabilities } from "./fixture-capabilities.js";
 import { MOTOR_CHANNEL_TYPES, DEFAULT_MOTOR_GUARD_BUFFER, clampMotor } from "./motor-guard.js";
 import { DEFAULT_WHITE_GATE_THRESHOLD, isWhiteGateOpen } from "./channel-mapper.js";
+import { resolveAddress } from "./channel-remap.js";
 
 /**
  * Context passed through the color pipeline stages.
@@ -38,9 +39,8 @@ export function whiteGateStage(ctx: PipelineContext): PipelineContext {
   if (isWhiteGateOpen(ctx.r, ctx.g, ctx.b, threshold)) return ctx;
 
   const channels: Record<number, number> = {};
-  const base = ctx.fixture.dmxStartAddress;
   for (const channel of ctx.fixture.channels) {
-    const addr = base + channel.offset;
+    const addr = resolveAddress(ctx.fixture, channel.offset);
     const override = ctx.fixture.channelOverrides?.[channel.offset];
     channels[addr] = override?.enabled ? clamp(override.value) : 0;
   }
@@ -89,12 +89,11 @@ export function colorMappingStage(ctx: PipelineContext): PipelineContext {
   if (ctx.gateClosed) return ctx;
 
   const channels = { ...ctx.channels };
-  const base = ctx.fixture.dmxStartAddress;
   const motorGuardOn = ctx.fixture.motorGuardEnabled !== false;
   const motorBuffer = ctx.fixture.motorGuardBuffer ?? DEFAULT_MOTOR_GUARD_BUFFER;
 
   for (const channel of ctx.fixture.channels) {
-    const addr = base + channel.offset;
+    const addr = resolveAddress(ctx.fixture, channel.offset);
     const override = ctx.fixture.channelOverrides?.[channel.offset];
     const isMotor = motorGuardOn && MOTOR_CHANNEL_TYPES.has(channel.type);
 

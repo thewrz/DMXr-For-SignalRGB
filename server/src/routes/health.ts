@@ -6,6 +6,7 @@ import type { ConnectionStatus } from "../dmx/connection-state.js";
 import type { LatencyTracker } from "../metrics/latency-tracker.js";
 import type { UdpColorServer } from "../udp/udp-color-server.js";
 import type { MultiUniverseCoordinator } from "../dmx/multi-universe-coordinator.js";
+import { resolveAddress } from "../fixtures/channel-remap.js";
 
 interface UniverseStatusProvider {
   readonly getUniverseConfigs: () => readonly UniverseConfig[];
@@ -105,14 +106,17 @@ export function registerHealthRoute(
           id: f.id,
           name: f.name,
           dmxStart: f.dmxStartAddress,
-          channels: f.channels.map((ch) => ({
-            offset: ch.offset,
-            name: ch.name,
-            type: ch.type,
-            color: ch.color,
-            dmxAddr: f.dmxStartAddress + ch.offset,
-            value: snapshot[f.dmxStartAddress + ch.offset] ?? 0,
-          })),
+          channels: f.channels.map((ch) => {
+            const addr = resolveAddress(f, ch.offset);
+            return {
+              offset: ch.offset,
+              name: ch.name,
+              type: ch.type,
+              color: ch.color,
+              dmxAddr: addr,
+              value: snapshot[addr] ?? 0,
+            };
+          }),
         };
       }),
     };

@@ -1,4 +1,5 @@
 import type { FixtureConfig } from "../types/protocol.js";
+import { resolveAddress } from "./channel-remap.js";
 
 /**
  * Unified motor guard constants and helpers.
@@ -53,10 +54,9 @@ export function computeSafePositions(
   const positions: Record<number, number> = {};
 
   for (const fixture of fixtures) {
-    const base = fixture.dmxStartAddress;
     for (const ch of fixture.channels) {
       if (MOTOR_CHANNEL_TYPES.has(ch.type)) {
-        const addr = base + ch.offset;
+        const addr = resolveAddress(fixture, ch.offset);
         const override = fixture.channelOverrides?.[ch.offset];
         positions[addr] = override?.enabled
           ? override.value

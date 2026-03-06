@@ -4,6 +4,7 @@ import type { UniverseManager } from "../dmx/universe-manager.js";
 import type { AddFixtureRequest, UpdateFixtureRequest } from "../types/protocol.js";
 import { validateFixtureAddress, validateFixtureChannels, findNextAvailableAddress } from "../fixtures/fixture-validator.js";
 import { computeOverrideChannels } from "../fixtures/fixture-override-service.js";
+import { validateChannelRemap } from "../fixtures/channel-remap.js";
 import { pipeLog, resetSample } from "../logging/pipeline-logger.js";
 
 interface FixtureRouteDeps {
@@ -120,6 +121,10 @@ export function registerFixtureRoutes(
                 additionalProperties: false,
               },
             },
+            channelRemap: {
+              type: "object" as const,
+              additionalProperties: { type: "integer" as const, minimum: 0 },
+            },
             whiteGateThreshold: { type: "integer" as const, minimum: 0, maximum: 255 },
             motorGuardEnabled: { type: "boolean" as const },
             motorGuardBuffer: { type: "integer" as const, minimum: 0, maximum: 20 },
@@ -154,6 +159,16 @@ export function registerFixtureRoutes(
         );
         if (!validation.valid) {
           return reply.status(409).send({ success: false, error: validation.error });
+        }
+      }
+
+      if (request.body.channelRemap !== undefined) {
+        const remapValidation = validateChannelRemap(
+          request.body.channelRemap,
+          existing.channelCount,
+        );
+        if (!remapValidation.valid) {
+          return reply.status(400).send({ success: false, error: remapValidation.error });
         }
       }
 

@@ -3,6 +3,7 @@ import { analyzeFixture } from "./fixture-capabilities.js";
 import { pipeLog, shouldSample } from "../logging/pipeline-logger.js";
 import { MOTOR_CHANNEL_TYPES, DEFAULT_MOTOR_GUARD_BUFFER, clampMotor } from "./motor-guard.js";
 import { shortId } from "../utils/format.js";
+import { resolveAddress, resolveOffset } from "./channel-remap.js";
 import {
   whiteGateStage,
   brightnessScaleStage,
@@ -86,13 +87,15 @@ function logTraceResult(
   const summary = addrs.map((a) => `${a}:${result[a]}`).join(" ");
   const lines: string[] = [];
   for (const channel of fixture.channels) {
-    const addr = base + channel.offset;
+    const physOffset = resolveOffset(fixture, channel.offset);
+    const addr = base + physOffset;
     const override = fixture.channelOverrides?.[channel.offset];
     const ovState = override
       ? `ovr=${override.enabled ? "ON" : "off"}(${override.value})`
       : "ovr=none";
+    const remapTag = physOffset !== channel.offset ? ` remap→${physOffset}` : "";
     lines.push(
-      `  [${channel.offset}] DMX${addr} ${channel.name.padEnd(16)} ` +
+      `  [${channel.offset}${remapTag}] DMX${addr} ${channel.name.padEnd(16)} ` +
       `type=${channel.type.padEnd(15)} ${ovState.padEnd(16)} → ${String(result[addr] ?? 0).padStart(3)}`,
     );
   }
@@ -122,13 +125,16 @@ export function getFixtureDefaults(fixture: FixtureConfig): Record<number, numbe
     const value = override?.enabled
       ? doClamp(override.value)
       : doClamp(channel.defaultValue);
-    result[base + channel.offset] = value;
+    const addr = resolveAddress(fixture, channel.offset);
+    result[addr] = value;
 
+    const physOffset = resolveOffset(fixture, channel.offset);
+    const remapTag = physOffset !== channel.offset ? ` remap→${physOffset}` : "";
     const src = override?.enabled
       ? `OVERRIDE(${override.value}${isMotor ? ",motor-safe" : ""})`
       : `default(${channel.defaultValue}${isMotor ? ",motor-safe" : ""})`;
     lines.push(
-      `  [${channel.offset}] DMX${base + channel.offset} ${channel.name.padEnd(16)} ` +
+      `  [${channel.offset}${remapTag}] DMX${addr} ${channel.name.padEnd(16)} ` +
       `type=${channel.type.padEnd(15)} → ${String(value).padStart(3)} (${src})`,
     );
   }

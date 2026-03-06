@@ -3,6 +3,7 @@ import type { UniverseManager } from "../dmx/universe-manager.js";
 import type { FixtureStore } from "../fixtures/fixture-store.js";
 import type { FixtureConfig } from "../types/protocol.js";
 import { analyzeFixture } from "../fixtures/fixture-capabilities.js";
+import { resolveAddress } from "../fixtures/channel-remap.js";
 
 export interface FixtureTestDeps {
   readonly manager: UniverseManager;
@@ -32,19 +33,18 @@ const FLASH_HOLD_SAFETY_MS = 10_000;
 const FLASH_CLICK_SUSTAIN_MS = 2_000;
 
 function getFixtureAddresses(fixture: FixtureConfig): number[] {
-  return fixture.channels.map((ch) => fixture.dmxStartAddress + ch.offset);
+  return fixture.channels.map((ch) => resolveAddress(fixture, ch.offset));
 }
 
 export function buildFlashValues(
   fixture: FixtureConfig,
   snapshot: Record<number, number>,
 ): Record<number, number> {
-  const start = fixture.dmxStartAddress;
   const result: Record<number, number> = {};
   const caps = analyzeFixture(fixture.channels);
 
   for (const channel of fixture.channels) {
-    const addr = start + channel.offset;
+    const addr = resolveAddress(fixture, channel.offset);
 
     if (channel.type === "ColorIntensity" || channel.type === "Intensity") {
       result[addr] = 255;

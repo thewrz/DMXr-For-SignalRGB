@@ -178,6 +178,7 @@ export function registerConfigRoutes(
 
         const patch: Record<string, unknown> = {};
         if (src.channelOverrides) patch.channelOverrides = src.channelOverrides;
+        if (src.channelRemap) patch.channelRemap = src.channelRemap;
         if (src.whiteGateThreshold !== undefined) patch.whiteGateThreshold = src.whiteGateThreshold;
         if (src.motorGuardEnabled !== undefined) patch.motorGuardEnabled = src.motorGuardEnabled;
         if (src.motorGuardBuffer !== undefined) patch.motorGuardBuffer = src.motorGuardBuffer;
@@ -248,6 +249,7 @@ export function registerConfigRoutes(
       // Restore per-fixture settings
       const patch: Record<string, unknown> = {};
       if (f.channelOverrides) patch.channelOverrides = f.channelOverrides;
+      if (f.channelRemap) patch.channelRemap = f.channelRemap;
       if (f.whiteGateThreshold !== undefined) patch.whiteGateThreshold = f.whiteGateThreshold;
       if (f.motorGuardEnabled !== undefined) patch.motorGuardEnabled = f.motorGuardEnabled;
       if (f.motorGuardBuffer !== undefined) patch.motorGuardBuffer = f.motorGuardBuffer;

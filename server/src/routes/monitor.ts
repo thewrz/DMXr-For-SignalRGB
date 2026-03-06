@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import type { DmxMonitor } from "../dmx/dmx-monitor.js";
 import type { FixtureStore } from "../fixtures/fixture-store.js";
+import { resolveAddress } from "../fixtures/channel-remap.js";
 
 interface MonitorRouteDeps {
   readonly monitor: DmxMonitor;
@@ -29,14 +30,17 @@ export function registerMonitorRoutes(
           name: fixture.name,
           dmxStartAddress: fixture.dmxStartAddress,
           channelCount: fixture.channelCount,
-          channels: fixture.channels.map((ch) => ({
-            offset: ch.offset,
-            name: ch.name,
-            type: ch.type,
-            color: ch.color ?? null,
-            dmxAddress: fixture.dmxStartAddress + ch.offset,
-            value: snapshot.channels[fixture.dmxStartAddress + ch.offset] ?? 0,
-          })),
+          channels: fixture.channels.map((ch) => {
+            const addr = resolveAddress(fixture, ch.offset);
+            return {
+              offset: ch.offset,
+              name: ch.name,
+              type: ch.type,
+              color: ch.color ?? null,
+              dmxAddress: addr,
+              value: snapshot.channels[addr] ?? 0,
+            };
+          }),
         }));
 
         return { ...snapshot, fixtures };

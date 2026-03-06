@@ -4,6 +4,7 @@ import type { DmxDispatcher } from "../dmx/dmx-dispatcher.js";
 import { DEFAULT_UNIVERSE_ID } from "../types/protocol.js";
 import { pipeLog } from "../logging/pipeline-logger.js";
 import { errorResponse, successResponse } from "./response-helpers.js";
+import { resolveAddress } from "../fixtures/channel-remap.js";
 
 export interface DebugRouteDeps {
   readonly dispatcher: DmxDispatcher;
@@ -29,7 +30,7 @@ export function registerDebugRoutes(
       const snapshot = deps.dispatcher.getChannelSnapshot(universeId, base, count);
 
       const channels = fixture.channels.map((ch) => {
-        const addr = base + ch.offset;
+        const addr = resolveAddress(fixture, ch.offset);
         const override = fixture.channelOverrides?.[ch.offset];
         return {
           offset: ch.offset,

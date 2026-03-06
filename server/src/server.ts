@@ -26,6 +26,7 @@ import { registerMetricsRoute } from "./routes/metrics.js";
 import { registerUserFixtureRoutes } from "./routes/user-fixtures.js";
 import { registerUniverseRoutes } from "./routes/universes.js";
 import { registerMonitorRoutes } from "./routes/monitor.js";
+import { registerFixtureColorRoutes } from "./routes/fixture-colors.js";
 import { registerConfigRoutes } from "./routes/config.js";
 import { registerApiKeyAuth } from "./middleware/api-key-auth.js";
 import type { DmxMonitor } from "./dmx/dmx-monitor.js";
@@ -199,6 +200,10 @@ export async function buildServer(
 
   if (deps.dmxMonitor) {
     registerMonitorRoutes(app, {
+      monitor: deps.dmxMonitor,
+      fixtureStore: deps.fixtureStore,
+    });
+    registerFixtureColorRoutes(app, {
       monitor: deps.dmxMonitor,
       fixtureStore: deps.fixtureStore,
     });

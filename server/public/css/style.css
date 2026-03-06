@@ -304,19 +304,105 @@ header {
 }
 .fixture-card:hover { border-color: var(--card-color); background: var(--surface2); }
 
-.fixture-card-top {
+/* Row 1: Swatch + Icon + Name */
+.fixture-card-identity {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 0.5rem;
+  align-items: center;
+  gap: 0.4rem;
 }
-
-.fixture-header {
-  flex: 1;
+.fixture-name {
+  font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   min-width: 0;
 }
 
-.fixture-header strong { font-size: 0.95rem; }
+/* Row 2: Meta text + Controls */
+.fixture-card-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+.fixture-controls {
+  display: flex;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+/* Overflow Menu */
+.fixture-overflow {
+  position: relative;
+}
+.btn-overflow {
+  font-weight: bold;
+  letter-spacing: 1px;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.8rem;
+  line-height: 1;
+}
+.overflow-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 20;
+  min-width: 140px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  padding: 0.25rem 0;
+  margin-top: 0.25rem;
+}
+.overflow-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8rem;
+  background: none;
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+}
+.overflow-item:hover {
+  background: var(--surface2);
+}
+.overflow-item:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.overflow-item-danger {
+  color: var(--danger);
+}
+.overflow-item-danger:hover {
+  background: rgba(231, 76, 60, 0.1);
+}
+
+.color-swatch {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 6px;
+  border: 2px solid var(--border);
+  background: var(--surface2);
+  flex-shrink: 0;
+  transition: background 0.15s, border-color 0.15s;
+  position: relative;
+  overflow: hidden;
+}
+.color-swatch-inactive {
+  opacity: 0.3;
+}
+.color-swatch-white {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: #fff;
+}
 
 .fixture-meta {
   display: block;
@@ -356,12 +442,6 @@ header {
 .badge-white { background: #bdc3c7; color: #000; }
 .badge-amber { background: #e67e22; color: #fff; }
 .badge-intensity { background: #7f8c8d; color: #fff; }
-
-.fixture-actions {
-  display: flex;
-  gap: 0.25rem;
-  flex-shrink: 0;
-}
 
 .fixture-count {
   font-weight: normal;

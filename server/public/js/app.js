@@ -90,6 +90,7 @@ function dmxrApp() {
       this.loadServerName();
       this.pollFixtures();
       await this.checkWizardNeeded();
+      this.startColorStream();
     },
   };
 
@@ -107,5 +108,6 @@ function dmxrApp() {
     dmxrDmxMonitor(),
     dmxrBatch(),
     dmxrConfig(),
+    dmxrColorSwatch(),
   );
 }

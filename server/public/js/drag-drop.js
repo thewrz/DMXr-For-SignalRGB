@@ -11,7 +11,7 @@ function dmxrDragDrop() {
     dragPreviewValid: false,
 
     // Tooltip state
-    tooltip: { visible: false, x: 0, y: 0, content: "" },
+    tooltip: { visible: false, x: -9999, y: -9999, content: "" },
 
     // Fixture card hover → grid highlight
     highlightedFixtureId: null,
@@ -73,7 +73,7 @@ function dmxrDragDrop() {
     showTooltip: function(event, ch) {
       var info = this.getFixtureAtChannel(ch);
       if (!info) {
-        this.tooltip = { visible: false, x: 0, y: 0, content: "" };
+        this.tooltip = { visible: false, x: -9999, y: -9999, content: "" };
         return;
       }
 
@@ -98,7 +98,7 @@ function dmxrDragDrop() {
     },
 
     hideTooltip: function() {
-      this.tooltip = { visible: false, x: 0, y: 0, content: "" };
+      this.tooltip = { visible: false, x: -9999, y: -9999, content: "" };
     },
 
     escapeHtml: function(str) {

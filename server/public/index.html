@@ -22,6 +22,7 @@
   <script src="/js/dmx-monitor.js"></script>
   <script src="/js/batch.js"></script>
   <script src="/js/config.js"></script>
+  <script src="/js/color-swatch.js"></script>
   <script src="/js/app.js"></script>
 </head>
 <body x-data="dmxrApp()" x-init="init()">
@@ -504,39 +505,52 @@
           <div class="fixture-card" :class="'fixture-color-' + (fIndex % 8)"
                @mouseenter="highlightedFixtureId = fixture.id"
                @mouseleave="highlightedFixtureId = null">
-            <div class="fixture-card-top">
-              <div class="fixture-header">
-                <div style="display:flex;align-items:center;gap:0.3rem">
-                  <span class="fixture-icon" x-html="fixtureIcon(fixture)"></span>
-                  <strong x-text="fixture.name"></strong>
-                </div>
-                <span class="fixture-meta">
-                  <span x-text="fixture.oflFixtureName || fixture.source || ''"></span>
-                  <span x-show="fixture.oflFixtureName || fixture.source"> &middot; </span>
-                  <span x-text="fixture.mode"></span>
-                </span>
+            <!-- Row 1: Identity -->
+            <div class="fixture-card-identity">
+              <div class="color-swatch"
+                   :style="getSwatchStyle(fixture.id)"
+                   :title="getSwatchTitle(fixture.id)"
+                   :class="{ 'color-swatch-inactive': !isFixtureActive(fixture.id) }">
+                <span class="color-swatch-white"
+                      x-show="getWhiteLevel(fixture.id) > 0"
+                      :style="'opacity:' + (getWhiteLevel(fixture.id) / 255)"></span>
               </div>
-              <div class="fixture-actions">
+              <span class="fixture-icon" x-html="fixtureIcon(fixture)"></span>
+              <strong class="fixture-name" x-text="fixture.name"></strong>
+            </div>
+            <!-- Row 2: Meta + Controls -->
+            <div class="fixture-card-meta">
+              <span class="fixture-meta">
+                <span x-text="fixture.oflFixtureName || fixture.source || ''"></span>
+                <span x-show="fixture.oflFixtureName || fixture.source"> &middot; </span>
+                <span x-text="fixture.mode"></span>
+              </span>
+              <div class="fixture-controls">
                 <button class="btn btn-sm btn-expand" @click="toggleFixtureExpand(fixture.id)"
                         :title="expandedFixtureId === fixture.id ? 'Collapse channels' : 'Expand channels'">
                   <span x-text="expandedFixtureId === fixture.id ? '\u25B2' : '\u25BC'"></span>
                 </button>
-                <button class="btn btn-sm"
-                        @mousedown.prevent="flashStart(fixture.id)"
-                        @mouseup="flashEnd(fixture.id)"
-                        @mouseleave="flashEnd(fixture.id)"
-                        @touchstart.prevent="flashStart(fixture.id)"
-                        @touchend="flashEnd(fixture.id)"
-                        @touchcancel="flashEnd(fixture.id)">Flash</button>
-                <button class="btn btn-sm btn-reset"
-                        x-show="hasResetChannel(fixture)"
-                        @click="resetFixture(fixture.id)"
-                        :disabled="isResetting(fixture.id)"
-                        :title="'Send DMX reset command (' + getResetChannelName(fixture) + ')'">
-                  <span x-text="isResetting(fixture.id) ? 'Resetting...' : 'Reset'"></span>
-                </button>
-                <button class="btn btn-sm" @click="startDuplicate(fixture.id)">Dupe</button>
-                <button class="btn btn-sm btn-danger" @click="removeFixture(fixture.id)">Remove</button>
+                <div class="fixture-overflow" x-data="{ open: false }">
+                  <button class="btn btn-sm btn-overflow" @click="open = !open" title="More actions">&middot;&middot;&middot;</button>
+                  <div class="overflow-menu" x-show="open" @click.outside="open = false" x-cloak>
+                    <button @mousedown.prevent="flashStart(fixture.id)"
+                            @mouseup="flashEnd(fixture.id)"
+                            @mouseleave="flashEnd(fixture.id)"
+                            @touchstart.prevent="flashStart(fixture.id)"
+                            @touchend="flashEnd(fixture.id)"
+                            @touchcancel="flashEnd(fixture.id)"
+                            class="overflow-item">Flash (hold)</button>
+                    <button @click="startDuplicate(fixture.id); open = false"
+                            class="overflow-item">Duplicate</button>
+                    <button x-show="hasResetChannel(fixture)"
+                            @click="resetFixture(fixture.id); open = false"
+                            :disabled="isResetting(fixture.id)"
+                            class="overflow-item"
+                            x-text="isResetting(fixture.id) ? 'Resetting...' : 'Reset'"></button>
+                    <button @click="removeFixture(fixture.id); open = false"
+                            class="overflow-item overflow-item-danger">Remove</button>
+                  </div>
+                </div>
               </div>
             </div>
             <!-- Duplicate Popover -->

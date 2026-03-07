@@ -57,6 +57,10 @@ export async function createMultiUniverseStack(
 
   // Bootstrap connections for all persisted universes
   for (const uniConfig of registry.getAll()) {
+    if (uniConfig.devicePath === "auto") {
+      pipeLog("info", `Universe "${uniConfig.name}" (${shortId(uniConfig.id)}) skipped — device path not configured`);
+      continue;
+    }
     try {
       await pool.create(uniConfig);
       pipeLog("info", `Universe "${uniConfig.name}" (${shortId(uniConfig.id)}) connected`);

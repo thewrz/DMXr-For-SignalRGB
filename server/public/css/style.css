@@ -2201,12 +2201,13 @@ header {
   margin: 0.75rem 0;
 }
 
-.group-sel-option {
+.modal .group-sel-option {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   cursor: pointer;
   font-size: 0.85rem;
+  margin: 0;
 }
 
 .group-sel-option input[type="radio"] {

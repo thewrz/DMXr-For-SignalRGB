@@ -95,8 +95,7 @@ function dmxrApp() {
     },
   };
 
-  return Object.assign(
-    app,
+  var mixins = [
     dmxrFixtureManager(),
     dmxrLibraryBrowser(),
     dmxrSearch(),
@@ -114,5 +113,12 @@ function dmxrApp() {
     dmxrGroups(),
     dmxrConnectionLog(),
     dmxrSelection(),
-  );
+  ];
+
+  // Use defineProperties instead of Object.assign to preserve getters
+  mixins.forEach(function(mixin) {
+    Object.defineProperties(app, Object.getOwnPropertyDescriptors(mixin));
+  });
+
+  return app;
 }

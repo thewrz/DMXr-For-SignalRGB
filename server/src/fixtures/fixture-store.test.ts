@@ -143,6 +143,56 @@ describe("createFixtureStore", () => {
     });
   });
 
+  describe("removeBatch", () => {
+    it("removes multiple fixtures in one pass", () => {
+      const f1 = store.add(makeRequest({ name: "A", dmxStartAddress: 1 }));
+      const f2 = store.add(makeRequest({ name: "B", dmxStartAddress: 10 }));
+      store.add(makeRequest({ name: "C", dmxStartAddress: 20 }));
+
+      const removed = store.removeBatch([f1.id, f2.id]);
+
+      expect(removed).toEqual([f1.id, f2.id]);
+      expect(store.getAll()).toHaveLength(1);
+      expect(store.getAll()[0].name).toBe("C");
+    });
+
+    it("returns array of removed IDs", () => {
+      const f1 = store.add(makeRequest({ name: "X", dmxStartAddress: 1 }));
+      const removed = store.removeBatch([f1.id]);
+
+      expect(removed).toEqual([f1.id]);
+    });
+
+    it("rejects entirely if any ID is unknown (atomic)", () => {
+      const f1 = store.add(makeRequest({ name: "A", dmxStartAddress: 1 }));
+
+      expect(() => store.removeBatch([f1.id, "nonexistent"])).toThrow(
+        /Unknown fixture IDs.*nonexistent/,
+      );
+      // Original fixture should still exist — atomic rejection
+      expect(store.getAll()).toHaveLength(1);
+    });
+
+    it("empty array is a no-op", () => {
+      store.add(makeRequest({ name: "A", dmxStartAddress: 1 }));
+      const removed = store.removeBatch([]);
+
+      expect(removed).toEqual([]);
+      expect(store.getAll()).toHaveLength(1);
+    });
+
+    it("does not mutate original array reference", () => {
+      const f1 = store.add(makeRequest({ name: "A", dmxStartAddress: 1 }));
+      store.add(makeRequest({ name: "B", dmxStartAddress: 10 }));
+
+      const allBefore = store.getAll();
+      store.removeBatch([f1.id]);
+      const allAfter = store.getAll();
+
+      expect(allBefore).not.toBe(allAfter);
+    });
+  });
+
   describe("update", () => {
     it("updates fixture name", () => {
       const fixture = store.add(makeRequest({ name: "Old Name" }));

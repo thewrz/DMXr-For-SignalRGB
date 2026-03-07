@@ -63,6 +63,10 @@ function dmxrDragDrop() {
         classes.push("fixture-highlight");
       }
 
+      if (this.selectedFixtureIds && this.selectedFixtureIds.indexOf(info.fixture.id) !== -1) {
+        classes.push("fixture-selected");
+      }
+
       return classes.join(" ");
     },
 

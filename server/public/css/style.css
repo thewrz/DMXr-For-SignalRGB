@@ -2102,3 +2102,86 @@ header {
 .connlog-detail-suggestion {
   color: var(--warning);
 }
+
+/* --- Multi-Select --- */
+
+.fixture-card-selected {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  background: rgba(0, 184, 212, 0.08);
+}
+
+.fixture-selected {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+  z-index: 1;
+}
+
+/* Selection Action Bar */
+.selection-action-bar {
+  position: fixed;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: var(--surface2);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+  z-index: 100;
+}
+
+.selection-count {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--accent);
+  margin-right: 0.25rem;
+}
+
+.action-bar-enter { transition: opacity 0.15s, transform 0.15s; }
+.action-bar-enter-start { opacity: 0; transform: translateX(-50%) translateY(1rem); }
+.action-bar-enter-end { opacity: 1; transform: translateX(-50%) translateY(0); }
+.action-bar-leave { transition: opacity 0.15s, transform 0.15s; }
+.action-bar-leave-start { opacity: 1; transform: translateX(-50%) translateY(0); }
+.action-bar-leave-end { opacity: 0; transform: translateX(-50%) translateY(1rem); }
+
+/* Batch Delete Modal */
+.batch-delete-list {
+  list-style: none;
+  max-height: 200px;
+  overflow-y: auto;
+  margin: 0.75rem 0;
+  padding: 0;
+}
+
+.batch-delete-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.85rem;
+}
+
+/* Group from Selection Modal */
+.group-from-selection-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+}
+
+.group-sel-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.group-sel-option input[type="radio"] {
+  accent-color: var(--accent);
+}

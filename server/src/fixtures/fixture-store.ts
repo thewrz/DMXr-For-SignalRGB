@@ -12,6 +12,7 @@ export interface FixtureStore {
   readonly addBatch: (requests: readonly AddFixtureRequest[]) => readonly FixtureConfig[];
   readonly update: (id: string, changes: UpdateFixtureRequest) => FixtureConfig | undefined;
   readonly remove: (id: string) => boolean;
+  readonly removeBatch: (ids: readonly string[]) => readonly string[];
   readonly save: () => Promise<void>;
   readonly scheduleSave: () => void;
   readonly load: () => Promise<void>;
@@ -132,6 +133,19 @@ export function createFixtureStore(filePath: string): FixtureStore {
       const before = fixtures.length;
       fixtures = fixtures.filter((f) => f.id !== id);
       return fixtures.length < before;
+    },
+
+    removeBatch(ids: readonly string[]): readonly string[] {
+      if (ids.length === 0) return [];
+
+      const idSet = new Set(ids);
+      const missing = ids.filter((id) => !fixtures.some((f) => f.id === id));
+      if (missing.length > 0) {
+        throw new Error(`Unknown fixture IDs: ${missing.join(", ")}`);
+      }
+
+      fixtures = fixtures.filter((f) => !idSet.has(f.id));
+      return ids;
     },
 
     async save(): Promise<void> {

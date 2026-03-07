@@ -33,6 +33,7 @@ import { registerConfigRoutes } from "./routes/config.js";
 import { registerRemapPresetRoutes } from "./routes/remap-presets.js";
 import { registerGroupRoutes } from "./routes/groups.js";
 import { registerGroupControlRoutes } from "./routes/group-control.js";
+import { registerFixtureBatchRoutes } from "./routes/fixture-batch.js";
 import { registerOflCacheRoutes } from "./routes/ofl-cache.js";
 import type { OflDiskCache } from "./ofl/ofl-disk-cache.js";
 import { createDmxDispatcher } from "./dmx/dmx-dispatcher.js";
@@ -238,6 +239,11 @@ export async function buildServer(
     registerGroupRoutes(app, {
       groupStore: deps.groupStore,
       fixtureStore: deps.fixtureStore,
+    });
+
+    registerFixtureBatchRoutes(app, {
+      fixtureStore: deps.fixtureStore,
+      groupStore: deps.groupStore,
     });
 
     const groupDispatcher = createDmxDispatcher(deps.manager, deps.coordinator);

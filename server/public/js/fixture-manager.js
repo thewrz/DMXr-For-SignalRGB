@@ -41,6 +41,7 @@ function dmxrFixtureManager() {
         // Alpine tearing down and rebuilding DOM nodes on every poll.
         if (JSON.stringify(this.fixtures) !== JSON.stringify(incoming)) {
           this.fixtures = incoming;
+          if (this.pruneSelection) this.pruneSelection();
         }
       } catch {
         this.serverOnline = false;

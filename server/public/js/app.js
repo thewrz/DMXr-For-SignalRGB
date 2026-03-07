@@ -113,5 +113,6 @@ function dmxrApp() {
     dmxrChannelRemap(),
     dmxrGroups(),
     dmxrConnectionLog(),
+    dmxrSelection(),
   );
 }

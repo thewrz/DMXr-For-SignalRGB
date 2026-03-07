@@ -26,9 +26,10 @@
   <script src="/js/channel-remap.js"></script>
   <script src="/js/groups.js"></script>
   <script src="/js/connection-log.js"></script>
+  <script src="/js/selection.js"></script>
   <script src="/js/app.js"></script>
 </head>
-<body x-data="dmxrApp()" x-init="init()">
+<body x-data="dmxrApp()" x-init="init()" @keydown.window="onSelectionKeydown($event)">
 
   <header>
     <div class="header-left">
@@ -510,6 +511,7 @@
                  :draggable="isFixtureStart(ch) ? 'true' : 'false'"
                  @dragstart="onFixtureDragStart($event, ch)"
                  @dragend="onDragEnd()"
+                 @click="selectGridFixture(ch, $event)"
                  @mouseenter="showTooltip($event, ch)"
                  @mouseleave="hideTooltip()"
                  x-text="getChannelLabel(ch)"></div>
@@ -556,9 +558,10 @@
 
       <div class="fixture-list">
         <template x-for="(fixture, fIndex) in fixtures" :key="fixture.id">
-          <div class="fixture-card" :class="'fixture-color-' + (fIndex % 8)"
+          <div class="fixture-card" :class="'fixture-color-' + (fIndex % 8) + (isSelected(fixture.id) ? ' fixture-card-selected' : '')"
+               @click="toggleFixtureSelect(fixture.id, $event)"
                @mouseenter="highlightedFixtureId = fixture.id"
-               @mouseleave="highlightedFixtureId = null">
+               @mouseleave="highlightedFixtureId = null"
             <!-- Row 1: Identity -->
             <div class="fixture-card-identity">
               <div class="color-swatch"
@@ -587,12 +590,12 @@
                 <span x-text="fixture.mode"></span>
               </span>
               <div class="fixture-controls">
-                <button class="btn btn-sm btn-expand" @click="toggleFixtureExpand(fixture.id)"
+                <button class="btn btn-sm btn-expand" @click.stop="toggleFixtureExpand(fixture.id)"
                         :title="expandedFixtureId === fixture.id ? 'Collapse channels' : 'Expand channels'">
                   <span x-text="expandedFixtureId === fixture.id ? '\u25B2' : '\u25BC'"></span>
                 </button>
                 <div class="fixture-overflow" x-data="{ open: false }">
-                  <button class="btn btn-sm btn-overflow" @click="open = !open" title="More actions">&middot;&middot;&middot;</button>
+                  <button class="btn btn-sm btn-overflow" @click.stop="open = !open" title="More actions">&middot;&middot;&middot;</button>
                   <div class="overflow-menu" x-show="open" @click.outside="open = false" x-cloak>
                     <button @mousedown.prevent="flashStart(fixture.id)"
                             @mouseup="flashEnd(fixture.id)"
@@ -617,7 +620,7 @@
               </div>
             </div>
             <!-- Duplicate Popover -->
-            <div class="dupe-popover" x-show="dupeFixtureId === fixture.id" x-cloak>
+            <div class="dupe-popover" x-show="dupeFixtureId === fixture.id" x-cloak @click.stop
               <label>Name</label>
               <input type="text" x-model="dupeName">
               <label>DMX Start Address</label>
@@ -640,7 +643,7 @@
                 </template>
               </span>
             </div>
-            <div class="channel-overrides" x-show="expandedFixtureId === fixture.id" x-cloak>
+            <div class="channel-overrides" x-show="expandedFixtureId === fixture.id" x-cloak @click.stop
               <div class="motor-guard-row" x-show="hasMotorChannels(fixture)">
                 <span class="motor-guard-label">Motor Guard</span>
                 <label class="toggle-switch" title="Clamp motor channels to avoid mechanical extremes">
@@ -743,6 +746,74 @@
         </template>
       </div>
     </main>
+  </div>
+
+  <!-- Selection Action Bar -->
+  <div class="selection-action-bar"
+       x-show="hasSelection" x-cloak
+       x-transition:enter="action-bar-enter"
+       x-transition:enter-start="action-bar-enter-start"
+       x-transition:enter-end="action-bar-enter-end"
+       x-transition:leave="action-bar-leave"
+       x-transition:leave-start="action-bar-leave-start"
+       x-transition:leave-end="action-bar-leave-end">
+    <span class="selection-count" x-text="selectionCount + ' selected'"></span>
+    <button class="btn btn-sm" @click="batchDuplicate()">Duplicate</button>
+    <button class="btn btn-sm" @click="openGroupFromSelection()">Group</button>
+    <button class="btn btn-sm btn-danger" @click="openBatchDeleteModal()">Delete</button>
+    <button class="btn btn-sm" @click="clearSelection()">Cancel</button>
+  </div>
+
+  <!-- Batch Delete Confirmation Modal -->
+  <div class="modal-overlay" x-show="batchDeleteModalOpen" x-cloak @click.self="batchDeleteModalOpen = false">
+    <div class="modal" style="max-width:450px">
+      <h2>Delete Fixtures</h2>
+      <p>Remove <strong x-text="selectionCount"></strong> fixture(s)?</p>
+      <ul class="batch-delete-list">
+        <template x-for="f in getSelectedFixtures()" :key="f.id">
+          <li>
+            <span x-text="f.name"></span>
+            <span class="badge" x-text="'DMX ' + f.dmxStartAddress"></span>
+          </li>
+        </template>
+      </ul>
+      <p class="validation-error" x-show="selectionError" x-text="selectionError"></p>
+      <div class="modal-actions">
+        <button class="btn" @click="batchDeleteModalOpen = false">Cancel</button>
+        <button class="btn btn-danger" @click="confirmBatchDelete()">Delete All</button>
+      </div>
+      <button class="modal-close" @click="batchDeleteModalOpen = false">&times;</button>
+    </div>
+  </div>
+
+  <!-- Group from Selection Modal -->
+  <div class="modal-overlay" x-show="groupFromSelectionOpen" x-cloak @click.self="groupFromSelectionOpen = false">
+    <div class="modal" style="max-width:400px">
+      <h2>Group Selected Fixtures</h2>
+      <div class="group-from-selection-options">
+        <label class="group-sel-option">
+          <input type="radio" value="new" x-model="groupFromSelectionTarget">
+          <span>Create New Group</span>
+        </label>
+        <div x-show="groupFromSelectionTarget === 'new'" style="margin-left:1.5rem;margin-top:0.25rem">
+          <input type="text" x-model="groupFromSelectionName" placeholder="Group name"
+                 @input="selectionError = ''">
+        </div>
+        <template x-for="g in groups" :key="g.id">
+          <label class="group-sel-option">
+            <input type="radio" :value="g.id" x-model="groupFromSelectionTarget">
+            <span class="group-color-dot" :style="'background:' + (g.color || '#4fc3f7')"></span>
+            <span x-text="'Add to ' + g.name"></span>
+          </label>
+        </template>
+      </div>
+      <p class="validation-error" x-show="selectionError" x-text="selectionError"></p>
+      <div class="modal-actions">
+        <button class="btn" @click="groupFromSelectionOpen = false">Cancel</button>
+        <button class="btn btn-primary" @click="confirmGroupFromSelection()">Confirm</button>
+      </div>
+      <button class="modal-close" @click="groupFromSelectionOpen = false">&times;</button>
+    </div>
   </div>
 
   <!-- Settings Modal -->

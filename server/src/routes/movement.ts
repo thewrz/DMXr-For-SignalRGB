@@ -81,7 +81,19 @@ export function registerMovementRoutes(
         return reply.status(404).send({ success: false, error: "Fixture not found" });
       }
 
-      deps.movementEngine.setTarget(request.params.id, request.body);
+      const config = deps.movementEngine.getConfig(request.params.id);
+      const use16bit = config?.use16bit ?? false;
+      const target = {
+        pan: request.body.pan !== undefined
+          ? (use16bit ? request.body.pan * 256 : request.body.pan)
+          : undefined,
+        tilt: request.body.tilt !== undefined
+          ? (use16bit ? request.body.tilt * 256 : request.body.tilt)
+          : undefined,
+        speed: request.body.speed,
+      };
+
+      deps.movementEngine.setTarget(request.params.id, target);
       return { success: true };
     },
   );

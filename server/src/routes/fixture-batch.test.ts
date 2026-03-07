@@ -99,6 +99,163 @@ describe("fixture-batch routes", () => {
     });
   });
 
+  describe("PATCH /fixtures/batch-move", () => {
+    it("moves multiple fixtures to new addresses atomically", async () => {
+      const f1 = fixtureStore.add(makeRequest({ name: "A", dmxStartAddress: 1 }));
+      const f2 = fixtureStore.add(makeRequest({ name: "B", dmxStartAddress: 10 }));
+
+      const res = await app.inject({
+        method: "PATCH",
+        url: "/fixtures/batch-move",
+        payload: {
+          moves: [
+            { id: f1.id, dmxStartAddress: 100 },
+            { id: f2.id, dmxStartAddress: 200 },
+          ],
+        },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.success).toBe(true);
+      expect(body.moved).toHaveLength(2);
+      expect(fixtureStore.getById(f1.id)!.dmxStartAddress).toBe(100);
+      expect(fixtureStore.getById(f2.id)!.dmxStartAddress).toBe(200);
+    });
+
+    it("preserves relative spacing (delta applied uniformly)", async () => {
+      const f1 = fixtureStore.add(makeRequest({ name: "A", dmxStartAddress: 1 }));
+      const f2 = fixtureStore.add(makeRequest({ name: "B", dmxStartAddress: 10 }));
+
+      // Move both by +50
+      const res = await app.inject({
+        method: "PATCH",
+        url: "/fixtures/batch-move",
+        payload: {
+          moves: [
+            { id: f1.id, dmxStartAddress: 51 },
+            { id: f2.id, dmxStartAddress: 60 },
+          ],
+        },
+      });
+
+      expect(res.statusCode).toBe(200);
+      // Spacing preserved: 60 - 51 = 9 = 10 - 1
+      expect(fixtureStore.getById(f1.id)!.dmxStartAddress).toBe(51);
+      expect(fixtureStore.getById(f2.id)!.dmxStartAddress).toBe(60);
+    });
+
+    it("returns 400 if any ID is unknown", async () => {
+      const f1 = fixtureStore.add(makeRequest({ name: "A", dmxStartAddress: 1 }));
+
+      const res = await app.inject({
+        method: "PATCH",
+        url: "/fixtures/batch-move",
+        payload: {
+          moves: [
+            { id: f1.id, dmxStartAddress: 100 },
+            { id: "nonexistent", dmxStartAddress: 200 },
+          ],
+        },
+      });
+
+      expect(res.statusCode).toBe(400);
+      expect(res.json().error).toMatch(/Unknown fixture ID/);
+      // Original should be unchanged (atomic — no partial application)
+      expect(fixtureStore.getById(f1.id)!.dmxStartAddress).toBe(1);
+    });
+
+    it("returns 409 if any target overlaps a stationary fixture", async () => {
+      const f1 = fixtureStore.add(makeRequest({ name: "A", dmxStartAddress: 1 }));
+      fixtureStore.add(makeRequest({ name: "Stationary", dmxStartAddress: 50 }));
+
+      const res = await app.inject({
+        method: "PATCH",
+        url: "/fixtures/batch-move",
+        payload: {
+          moves: [{ id: f1.id, dmxStartAddress: 49 }],
+        },
+      });
+
+      expect(res.statusCode).toBe(409);
+      expect(res.json().error).toMatch(/Overlaps/);
+      // Unchanged
+      expect(fixtureStore.getById(f1.id)!.dmxStartAddress).toBe(1);
+    });
+
+    it("returns 409 if targets overlap each other (non-uniform delta)", async () => {
+      const f1 = fixtureStore.add(makeRequest({ name: "A", dmxStartAddress: 1 }));
+      const f2 = fixtureStore.add(makeRequest({ name: "B", dmxStartAddress: 10 }));
+
+      const res = await app.inject({
+        method: "PATCH",
+        url: "/fixtures/batch-move",
+        payload: {
+          moves: [
+            { id: f1.id, dmxStartAddress: 100 },
+            { id: f2.id, dmxStartAddress: 101 }, // overlaps A's 100-102
+          ],
+        },
+      });
+
+      expect(res.statusCode).toBe(409);
+      expect(res.json().error).toMatch(/Overlaps/);
+    });
+
+    it("returns 409 if any target exceeds channel 512 or below 1", async () => {
+      const f1 = fixtureStore.add(makeRequest({ name: "A", dmxStartAddress: 1 }));
+
+      const resOver = await app.inject({
+        method: "PATCH",
+        url: "/fixtures/batch-move",
+        payload: {
+          moves: [{ id: f1.id, dmxStartAddress: 511 }], // 511-513 exceeds 512
+        },
+      });
+      expect(resOver.statusCode).toBe(409);
+
+      const resUnder = await app.inject({
+        method: "PATCH",
+        url: "/fixtures/batch-move",
+        payload: {
+          moves: [{ id: f1.id, dmxStartAddress: 0 }],
+        },
+      });
+      // Schema rejects dmxStartAddress < 1 as 400
+      expect(resUnder.statusCode).toBe(400);
+    });
+
+    it("allows fixtures that swap positions (A→B old spot, B→A old spot)", async () => {
+      const f1 = fixtureStore.add(makeRequest({ name: "A", dmxStartAddress: 1 }));
+      const f2 = fixtureStore.add(makeRequest({ name: "B", dmxStartAddress: 10 }));
+
+      const res = await app.inject({
+        method: "PATCH",
+        url: "/fixtures/batch-move",
+        payload: {
+          moves: [
+            { id: f1.id, dmxStartAddress: 10 },
+            { id: f2.id, dmxStartAddress: 1 },
+          ],
+        },
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(fixtureStore.getById(f1.id)!.dmxStartAddress).toBe(10);
+      expect(fixtureStore.getById(f2.id)!.dmxStartAddress).toBe(1);
+    });
+
+    it("returns 400 for empty moves array", async () => {
+      const res = await app.inject({
+        method: "PATCH",
+        url: "/fixtures/batch-move",
+        payload: { moves: [] },
+      });
+
+      expect(res.statusCode).toBe(400);
+    });
+  });
+
   describe("POST /fixtures/batch-duplicate", () => {
     it("duplicates multiple fixtures at auto-found addresses", async () => {
       const f1 = fixtureStore.add(makeRequest({ name: "A", dmxStartAddress: 1 }));

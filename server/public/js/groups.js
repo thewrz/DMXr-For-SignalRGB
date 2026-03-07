@@ -35,6 +35,13 @@ function dmxrGroups() {
       this.groupColor = "#4fc3f7";
       this.groupError = "";
       this.groupFixtureSelection = {};
+      // Pre-populate from selection if active
+      if (this.selectedFixtureIds && this.selectedFixtureIds.length > 0) {
+        var self = this;
+        this.selectedFixtureIds.forEach(function(id) {
+          self.groupFixtureSelection[id] = true;
+        });
+      }
       this.groupModalOpen = true;
     },
 

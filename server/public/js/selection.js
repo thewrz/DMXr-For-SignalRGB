@@ -401,6 +401,27 @@ function dmxrSelection() {
       }
     },
 
+    // --- Batch Move ---
+
+    async batchMoveFixtures(moves) {
+      try {
+        var res = await fetch("/fixtures/batch-move", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ moves: moves }),
+        });
+        if (res.ok) {
+          this.clearSelection();
+          await this.loadFixtures();
+        } else {
+          var err = await res.json().catch(function() { return {}; });
+          this.showGridError(err.error || "Move failed");
+        }
+      } catch {
+        this.showGridError("Network error");
+      }
+    },
+
     // Helper: get selected fixture objects
     getSelectedFixtures: function() {
       var self = this;

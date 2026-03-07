@@ -43,10 +43,23 @@ function dmxrDragDrop() {
       var classes = [];
 
       if (this.dragTargetAddress !== null && this.dragPreview) {
-        var previewEnd = this.dragTargetAddress + this.dragPreview.channelCount - 1;
-        if (ch >= this.dragTargetAddress && ch <= previewEnd) {
-          classes.push(this.dragPreviewValid ? "drop-target-valid" : "drop-target-invalid");
-          return classes.join(" ");
+        if (this.dragPreview.type === "multi-move") {
+          var delta = this.dragTargetAddress - this.dragPreview.anchorAddress;
+          var moved = this.dragPreview.movedFixtures;
+          for (var pi = 0; pi < moved.length; pi++) {
+            var pStart = moved[pi].dmxStartAddress + delta;
+            var pEnd = pStart + moved[pi].channelCount - 1;
+            if (ch >= pStart && ch <= pEnd) {
+              classes.push(this.dragPreviewValid ? "drop-target-valid" : "drop-target-invalid");
+              return classes.join(" ");
+            }
+          }
+        } else {
+          var previewEnd = this.dragTargetAddress + this.dragPreview.channelCount - 1;
+          if (ch >= this.dragTargetAddress && ch <= previewEnd) {
+            classes.push(this.dragPreviewValid ? "drop-target-valid" : "drop-target-invalid");
+            return classes.join(" ");
+          }
         }
       }
 
@@ -137,6 +150,32 @@ function dmxrDragDrop() {
       }
 
       this.isDragging = true;
+
+      // Multi-fixture drag: if dragged fixture is in a multi-selection
+      if (
+        this.selectedFixtureIds &&
+        this.selectedFixtureIds.length > 1 &&
+        this.selectedFixtureIds.indexOf(info.fixture.id) !== -1
+      ) {
+        var self = this;
+        var movedFixtures = this.selectedFixtureIds
+          .map(function(id) { return self.fixtures.find(function(f) { return f.id === id; }); })
+          .filter(function(f) { return f !== undefined; });
+
+        this.dragPreview = {
+          type: "multi-move",
+          anchorAddress: info.fixture.dmxStartAddress,
+          movedFixtures: movedFixtures.map(function(f) {
+            return { id: f.id, dmxStartAddress: f.dmxStartAddress, channelCount: f.channelCount };
+          }),
+          channelCount: info.fixture.channelCount,
+          excludeId: null,
+        };
+        event.dataTransfer.setData("application/x-dmxr-fixture", "multi-move");
+        event.dataTransfer.effectAllowed = "move";
+        return;
+      }
+
       this.dragPreview = {
         channelCount: info.fixture.channelCount,
         excludeId: info.fixture.id,
@@ -191,6 +230,12 @@ function dmxrDragDrop() {
 
       if (fixtureId === "staged") {
         this.createFixtureAtAddress(address);
+      } else if (fixtureId === "multi-move" && this.dragPreview && this.dragPreview.type === "multi-move") {
+        var delta = address - this.dragPreview.anchorAddress;
+        var moves = this.dragPreview.movedFixtures.map(function(f) {
+          return { id: f.id, dmxStartAddress: f.dmxStartAddress + delta };
+        });
+        this.batchMoveFixtures(moves);
       } else {
         this.moveFixtureToAddress(fixtureId, address);
       }
@@ -200,6 +245,34 @@ function dmxrDragDrop() {
 
     isDropValid: function(address) {
       if (!this.dragPreview) return false;
+
+      // Multi-move validation
+      if (this.dragPreview.type === "multi-move") {
+        var delta = address - this.dragPreview.anchorAddress;
+        var moved = this.dragPreview.movedFixtures;
+
+        // Build set of selected IDs for quick lookup
+        var selectedIds = {};
+        for (var mi = 0; mi < moved.length; mi++) {
+          selectedIds[moved[mi].id] = true;
+        }
+
+        // Check each moved fixture's new position
+        for (var mj = 0; mj < moved.length; mj++) {
+          var newStart = moved[mj].dmxStartAddress + delta;
+          var newEnd = newStart + moved[mj].channelCount - 1;
+          if (newStart < 1 || newEnd > 512) return false;
+
+          // Check against non-selected fixtures
+          for (var k = 0; k < this.fixtures.length; k++) {
+            var f = this.fixtures[k];
+            if (selectedIds[f.id]) continue;
+            var fEnd = f.dmxStartAddress + f.channelCount - 1;
+            if (newStart <= fEnd && newEnd >= f.dmxStartAddress) return false;
+          }
+        }
+        return true;
+      }
 
       var count = this.dragPreview.channelCount;
       var end = address + count - 1;

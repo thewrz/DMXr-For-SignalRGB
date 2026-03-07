@@ -93,6 +93,12 @@ export interface ChannelOverride {
 /** Fixture data source */
 export type FixtureSource = "ofl" | "local-db" | "custom" | "builtin";
 
+/** Per-fixture RGB color calibration: gain multiplier + offset */
+export interface ColorCalibration {
+  readonly gain: { readonly r: number; readonly g: number; readonly b: number };
+  readonly offset: { readonly r: number; readonly g: number; readonly b: number };
+}
+
 /** Stored fixture configuration */
 export interface FixtureConfig {
   readonly id: string;
@@ -127,6 +133,7 @@ export interface FixtureConfig {
     readonly value: number;
     readonly holdMs: number;
   };
+  readonly colorCalibration?: ColorCalibration;
 }
 
 /** POST /fixtures request body */
@@ -159,6 +166,7 @@ export interface UpdateFixtureRequest {
     readonly value: number;
     readonly holdMs: number;
   };
+  readonly colorCalibration?: ColorCalibration;
 }
 
 /** Stored fixture group configuration */

@@ -11,6 +11,7 @@ import {
   colorMappingStage,
   type PipelineContext,
 } from "./pipeline-stages.js";
+import { calibrationStage } from "./calibration-stage.js";
 
 export const DEFAULT_WHITE_GATE_THRESHOLD = 240;
 
@@ -65,8 +66,10 @@ export function mapColor(
   // Run the pipeline stages in sequence
   const result = colorMappingStage(
     whiteExtractionStage(
-      brightnessScaleStage(
-        whiteGateStage(initial),
+      calibrationStage(
+        brightnessScaleStage(
+          whiteGateStage(initial),
+        ),
       ),
     ),
   );

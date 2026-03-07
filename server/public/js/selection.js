@@ -29,6 +29,36 @@ function dmxrSelection() {
       return this.selectedFixtureIds.length;
     },
 
+    get selectionGroupInfo() {
+      var grouped = [];
+      var ungrouped = [];
+      var detectedGroupMap = {};
+      var self = this;
+
+      this.selectedFixtureIds.forEach(function(id) {
+        var groups = self.getFixtureGroups(id);
+        if (groups.length > 0) {
+          grouped.push(id);
+          groups.forEach(function(g) { detectedGroupMap[g.id] = g; });
+        } else {
+          ungrouped.push(id);
+        }
+      });
+
+      var detectedGroups = Object.keys(detectedGroupMap).map(function(id) {
+        return detectedGroupMap[id];
+      });
+
+      return {
+        allGrouped: grouped.length > 0 && ungrouped.length === 0,
+        noneGrouped: grouped.length === 0,
+        someGrouped: grouped.length > 0 && ungrouped.length > 0,
+        detectedGroups: detectedGroups,
+        ungroupedIds: ungrouped,
+        groupedIds: grouped,
+      };
+    },
+
     isSelected: function(id) {
       return this.selectedFixtureIds.indexOf(id) !== -1;
     },
@@ -311,6 +341,11 @@ function dmxrSelection() {
       this.groupFromSelectionTarget = "new";
       this.groupFromSelectionName = "";
       this.selectionError = "";
+      // Smart default: if one group detected and there are ungrouped fixtures, pre-select it
+      var info = this.selectionGroupInfo;
+      if (info.detectedGroups.length === 1 && info.ungroupedIds.length > 0) {
+        this.groupFromSelectionTarget = info.detectedGroups[0].id;
+      }
       this.groupFromSelectionOpen = true;
     },
 

@@ -2143,10 +2143,8 @@ header {
 
 /* Selection Action Bar */
 .selection-action-bar {
-  position: fixed;
-  bottom: 1.5rem;
-  left: 50%;
-  transform: translateX(-50%);
+  margin: 0.75rem auto 0;
+  max-width: fit-content;
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -2155,7 +2153,6 @@ header {
   border: 1px solid var(--accent);
   border-radius: 8px;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
-  z-index: 100;
 }
 
 .selection-count {
@@ -2166,11 +2163,17 @@ header {
 }
 
 .action-bar-enter { transition: opacity 0.15s, transform 0.15s; }
-.action-bar-enter-start { opacity: 0; transform: translateX(-50%) translateY(1rem); }
-.action-bar-enter-end { opacity: 1; transform: translateX(-50%) translateY(0); }
+.action-bar-enter-start { opacity: 0; transform: translateY(0.5rem); }
+.action-bar-enter-end { opacity: 1; transform: translateY(0); }
 .action-bar-leave { transition: opacity 0.15s, transform 0.15s; }
-.action-bar-leave-start { opacity: 1; transform: translateX(-50%) translateY(0); }
-.action-bar-leave-end { opacity: 0; transform: translateX(-50%) translateY(1rem); }
+.action-bar-leave-start { opacity: 1; transform: translateY(0); }
+.action-bar-leave-end { opacity: 0; transform: translateY(0.5rem); }
+
+.selection-group-hint {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  font-style: italic;
+}
 
 /* Batch Delete Modal */
 .batch-delete-list {

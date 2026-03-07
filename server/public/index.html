@@ -525,6 +525,25 @@
              x-html="tooltip.content"></div>
       </div>
 
+      <!-- Selection Action Bar (below grid) -->
+      <div class="selection-action-bar"
+           x-show="hasSelection" x-cloak
+           x-transition:enter="action-bar-enter"
+           x-transition:enter-start="action-bar-enter-start"
+           x-transition:enter-end="action-bar-enter-end"
+           x-transition:leave="action-bar-leave"
+           x-transition:leave-start="action-bar-leave-start"
+           x-transition:leave-end="action-bar-leave-end">
+        <span class="selection-count" x-text="selectionCount + ' selected'"></span>
+        <button class="btn btn-sm" @click="batchDuplicate()">Duplicate</button>
+        <button class="btn btn-sm btn-danger" @click="openBatchDeleteModal()">Delete</button>
+        <button class="btn btn-sm" @click="openGroupFromSelection()"
+                x-text="selectionGroupInfo.allGrouped ? 'Regroup' : 'Add to Group'"></button>
+        <span class="selection-group-hint"
+              x-show="selectionGroupInfo.someGrouped" x-cloak
+              x-text="selectionGroupInfo.ungroupedIds.length + ' not yet grouped'"></span>
+      </div>
+
       <!-- Groups Section -->
       <div class="groups-section" x-show="groups.length > 0" x-cloak>
         <div class="groups-header">
@@ -755,21 +774,6 @@
     </main>
   </div>
 
-  <!-- Selection Action Bar -->
-  <div class="selection-action-bar"
-       x-show="hasSelection" x-cloak
-       x-transition:enter="action-bar-enter"
-       x-transition:enter-start="action-bar-enter-start"
-       x-transition:enter-end="action-bar-enter-end"
-       x-transition:leave="action-bar-leave"
-       x-transition:leave-start="action-bar-leave-start"
-       x-transition:leave-end="action-bar-leave-end">
-    <span class="selection-count" x-text="selectionCount + ' selected'"></span>
-    <button class="btn btn-sm" @click="batchDuplicate()">Duplicate</button>
-    <button class="btn btn-sm" @click="openGroupFromSelection()">Group</button>
-    <button class="btn btn-sm btn-danger" @click="openBatchDeleteModal()">Delete</button>
-    <button class="btn btn-sm" @click="clearSelection()">Cancel</button>
-  </div>
 
   <!-- Batch Delete Confirmation Modal -->
   <div class="modal-overlay" x-show="batchDeleteModalOpen" x-cloak @click.self="batchDeleteModalOpen = false">
@@ -797,6 +801,18 @@
   <div class="modal-overlay" x-show="groupFromSelectionOpen" x-cloak @click.self="groupFromSelectionOpen = false">
     <div class="modal" style="max-width:400px">
       <h2>Group Selected Fixtures</h2>
+      <!-- Group context hint -->
+      <p class="selection-group-hint"
+         x-show="selectionGroupInfo.detectedGroups.length > 0" x-cloak>
+        <template x-for="g in selectionGroupInfo.detectedGroups" :key="g.id">
+          <span class="badge" style="margin-right:0.25rem"
+                :style="'background:' + (g.color || '#4fc3f7')"
+                x-text="g.name"></span>
+        </template>
+        <span x-text="selectionGroupInfo.allGrouped
+          ? '— all selected are already grouped'
+          : '— ' + selectionGroupInfo.ungroupedIds.length + ' fixture(s) not yet grouped'"></span>
+      </p>
       <div class="group-from-selection-options">
         <label class="group-sel-option">
           <input type="radio" value="new" x-model="groupFromSelectionTarget">

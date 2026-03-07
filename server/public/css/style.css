@@ -1009,6 +1009,17 @@ header {
   margin-bottom: 0.35rem;
 }
 
+.calibration-toggle {
+  cursor: pointer;
+  user-select: none;
+  gap: 0.35rem;
+}
+
+.calibration-chevron {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+}
+
 .calibration-label {
   font-weight: 600;
   font-size: 0.75rem;

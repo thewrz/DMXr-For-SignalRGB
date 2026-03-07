@@ -620,7 +620,7 @@
               </div>
             </div>
             <!-- Duplicate Popover -->
-            <div class="dupe-popover" x-show="dupeFixtureId === fixture.id" x-cloak @click.stop
+            <div class="dupe-popover" x-show="dupeFixtureId === fixture.id" x-cloak @click.stop>
               <label>Name</label>
               <input type="text" x-model="dupeName">
               <label>DMX Start Address</label>
@@ -643,7 +643,7 @@
                 </template>
               </span>
             </div>
-            <div class="channel-overrides" x-show="expandedFixtureId === fixture.id" x-cloak @click.stop
+            <div class="channel-overrides" x-show="expandedFixtureId === fixture.id" x-cloak @click.stop>
               <div class="motor-guard-row" x-show="hasMotorChannels(fixture)">
                 <span class="motor-guard-label">Motor Guard</span>
                 <label class="toggle-switch" title="Clamp motor channels to avoid mechanical extremes">
@@ -680,64 +680,68 @@
                   <span class="override-value" x-text="getOverrideValue(fixture, ch.offset)"></span>
                 </div>
               </template>
-              <div class="color-calibration-section" x-show="hasColorChannels(fixture)">
-                <div class="calibration-header">
+              <div class="color-calibration-section" x-show="hasColorChannels(fixture)" x-data="{ calOpen: false }">
+                <div class="calibration-header calibration-toggle" @click="calOpen = !calOpen">
+                  <span class="calibration-chevron" x-text="calOpen ? '\u25B2' : '\u25BC'"></span>
                   <span class="calibration-label">Color Calibration</span>
-                  <button class="btn btn-sm calibration-reset" @click="resetCalibration(fixture.id)"
+                  <button class="btn btn-sm calibration-reset" x-show="calOpen"
+                          @click.stop="resetCalibration(fixture.id)"
                           title="Reset to defaults">Reset</button>
                 </div>
-                <div class="calibration-group">
-                  <span class="calibration-group-label">Gain</span>
-                  <div class="calibration-row">
-                    <span class="calibration-channel calibration-red">R</span>
-                    <input type="range" class="calibration-slider calibration-slider-red"
-                           min="0" max="2" step="0.01"
-                           :value="getCalGain(fixture, 'r')"
-                           @input="setCalGain(fixture.id, 'r', $event.target.value)">
-                    <span class="calibration-value" x-text="getCalGain(fixture, 'r').toFixed(2)"></span>
+                <div x-show="calOpen" x-cloak x-transition.opacity>
+                  <div class="calibration-group">
+                    <span class="calibration-group-label">Gain</span>
+                    <div class="calibration-row">
+                      <span class="calibration-channel calibration-red">R</span>
+                      <input type="range" class="calibration-slider calibration-slider-red"
+                             min="0" max="2" step="0.01"
+                             :value="getCalGain(fixture, 'r')"
+                             @input="setCalGain(fixture.id, 'r', $event.target.value)">
+                      <span class="calibration-value" x-text="getCalGain(fixture, 'r').toFixed(2)"></span>
+                    </div>
+                    <div class="calibration-row">
+                      <span class="calibration-channel calibration-green">G</span>
+                      <input type="range" class="calibration-slider calibration-slider-green"
+                             min="0" max="2" step="0.01"
+                             :value="getCalGain(fixture, 'g')"
+                             @input="setCalGain(fixture.id, 'g', $event.target.value)">
+                      <span class="calibration-value" x-text="getCalGain(fixture, 'g').toFixed(2)"></span>
+                    </div>
+                    <div class="calibration-row">
+                      <span class="calibration-channel calibration-blue">B</span>
+                      <input type="range" class="calibration-slider calibration-slider-blue"
+                             min="0" max="2" step="0.01"
+                             :value="getCalGain(fixture, 'b')"
+                             @input="setCalGain(fixture.id, 'b', $event.target.value)">
+                      <span class="calibration-value" x-text="getCalGain(fixture, 'b').toFixed(2)"></span>
+                    </div>
                   </div>
-                  <div class="calibration-row">
-                    <span class="calibration-channel calibration-green">G</span>
-                    <input type="range" class="calibration-slider calibration-slider-green"
-                           min="0" max="2" step="0.01"
-                           :value="getCalGain(fixture, 'g')"
-                           @input="setCalGain(fixture.id, 'g', $event.target.value)">
-                    <span class="calibration-value" x-text="getCalGain(fixture, 'g').toFixed(2)"></span>
-                  </div>
-                  <div class="calibration-row">
-                    <span class="calibration-channel calibration-blue">B</span>
-                    <input type="range" class="calibration-slider calibration-slider-blue"
-                           min="0" max="2" step="0.01"
-                           :value="getCalGain(fixture, 'b')"
-                           @input="setCalGain(fixture.id, 'b', $event.target.value)">
-                    <span class="calibration-value" x-text="getCalGain(fixture, 'b').toFixed(2)"></span>
-                  </div>
-                </div>
-                <div class="calibration-group">
-                  <span class="calibration-group-label">Offset</span>
-                  <div class="calibration-row">
-                    <span class="calibration-channel calibration-red">R</span>
-                    <input type="range" class="calibration-slider calibration-slider-red"
-                           min="-50" max="50" step="1"
-                           :value="getCalOffset(fixture, 'r')"
-                           @input="setCalOffset(fixture.id, 'r', $event.target.value)">
-                    <span class="calibration-value" x-text="getCalOffset(fixture, 'r')"></span>
-                  </div>
-                  <div class="calibration-row">
-                    <span class="calibration-channel calibration-green">G</span>
-                    <input type="range" class="calibration-slider calibration-slider-green"
-                           min="-50" max="50" step="1"
-                           :value="getCalOffset(fixture, 'g')"
-                           @input="setCalOffset(fixture.id, 'g', $event.target.value)">
-                    <span class="calibration-value" x-text="getCalOffset(fixture, 'g')"></span>
-                  </div>
-                  <div class="calibration-row">
-                    <span class="calibration-channel calibration-blue">B</span>
-                    <input type="range" class="calibration-slider calibration-slider-blue"
-                           min="-50" max="50" step="1"
-                           :value="getCalOffset(fixture, 'b')"
-                           @input="setCalOffset(fixture.id, 'b', $event.target.value)">
-                    <span class="calibration-value" x-text="getCalOffset(fixture, 'b')"></span>
+                  <div class="calibration-group">
+                    <span class="calibration-group-label">Offset</span>
+                    <div class="calibration-row">
+                      <span class="calibration-channel calibration-red">R</span>
+                      <input type="range" class="calibration-slider calibration-slider-red"
+                             min="-50" max="50" step="1"
+                             :value="getCalOffset(fixture, 'r')"
+                             @input="setCalOffset(fixture.id, 'r', $event.target.value)">
+                      <span class="calibration-value" x-text="getCalOffset(fixture, 'r')"></span>
+                    </div>
+                    <div class="calibration-row">
+                      <span class="calibration-channel calibration-green">G</span>
+                      <input type="range" class="calibration-slider calibration-slider-green"
+                             min="-50" max="50" step="1"
+                             :value="getCalOffset(fixture, 'g')"
+                             @input="setCalOffset(fixture.id, 'g', $event.target.value)">
+                      <span class="calibration-value" x-text="getCalOffset(fixture, 'g')"></span>
+                    </div>
+                    <div class="calibration-row">
+                      <span class="calibration-channel calibration-blue">B</span>
+                      <input type="range" class="calibration-slider calibration-slider-blue"
+                             min="-50" max="50" step="1"
+                             :value="getCalOffset(fixture, 'b')"
+                             @input="setCalOffset(fixture.id, 'b', $event.target.value)">
+                      <span class="calibration-value" x-text="getCalOffset(fixture, 'b')"></span>
+                    </div>
                   </div>
                 </div>
               </div>

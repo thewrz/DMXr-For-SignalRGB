@@ -54,6 +54,7 @@ function dmxrFixtureManager() {
           self.loadFixtures();
         }
         self.pollControlMode();
+        self.loadGroups();
       }, 3000);
     },
 

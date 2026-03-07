@@ -1821,3 +1821,101 @@ header {
   font-size: 0.7rem;
   border-radius: 3px;
 }
+
+/* --- Groups --- */
+.groups-section {
+  margin-bottom: 1.5rem;
+}
+.groups-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+.groups-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--text);
+}
+.groups-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 0.75rem;
+}
+.group-card {
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.group-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.group-color-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.group-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.group-count {
+  font-size: 0.7rem;
+  opacity: 0.7;
+}
+.group-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.group-actions .btn-xs {
+  font-size: 0.7rem;
+  padding: 0.15rem 0.4rem;
+}
+.group-fixture-list {
+  max-height: 250px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.group-fixture-list label.group-fixture-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0;
+  margin: 0;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.group-fixture-item input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+  flex-shrink: 0;
+}
+.fixture-group-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.25rem;
+}
+.group-badge {
+  font-size: 0.6rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 8px;
+  color: #000;
+  font-weight: 600;
+  opacity: 0.9;
+}

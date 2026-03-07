@@ -5,6 +5,7 @@ import { loadConfig } from "./config/server-config.js";
 import { createSettingsStore } from "./config/settings-store.js";
 import { createRemapPresetStore } from "./config/remap-preset-store.js";
 import { createFixtureStore } from "./fixtures/fixture-store.js";
+import { createGroupStore } from "./fixtures/group-store.js";
 import { createUserFixtureStore } from "./fixtures/user-fixture-store.js";
 import { autoDetectDmxPort } from "./dmx/serial-port-scanner.js";
 import { createMdnsAdvertiser, type MdnsAdvertiser } from "./mdns/advertiser.js";
@@ -87,6 +88,10 @@ async function main() {
   const userFixtureStore = createUserFixtureStore(finalConfig.userFixturesPath);
   await userFixtureStore.load();
 
+  // ── Group Store ──
+  const groupStore = createGroupStore("./config/groups.json");
+  await groupStore.load();
+
   // ── Fixture Defaults ──
   initializeFixtureDefaults(fixtureStore, manager);
 
@@ -131,6 +136,7 @@ async function main() {
     universeRegistry,
     connectionPool,
     remapPresetStore,
+    groupStore,
   });
 
   // ── Shutdown Handling ──

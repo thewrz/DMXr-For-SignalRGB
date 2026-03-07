@@ -24,6 +24,7 @@
   <script src="/js/config.js"></script>
   <script src="/js/color-swatch.js"></script>
   <script src="/js/channel-remap.js"></script>
+  <script src="/js/groups.js"></script>
   <script src="/js/app.js"></script>
 </head>
 <body x-data="dmxrApp()" x-init="init()">
@@ -458,6 +459,7 @@
         <span class="badge-control badge-whiteout" x-show="controlMode === 'whiteout'" x-cloak>WHITEOUT</span>
         <button class="btn" x-show="fixtures.length > 0" @click="syncComponents()"
                 title="Write component files for SignalRGB Layout tile names">Sync SignalRGB Components</button>
+        <button class="btn btn-sm" @click="openGroupModal()" title="Create a fixture group">+ New Group</button>
       </div>
       <div class="sync-result" x-show="syncResult" x-cloak>
         <template x-if="syncResult && syncResult.success">
@@ -510,6 +512,33 @@
              x-html="tooltip.content"></div>
       </div>
 
+      <!-- Groups Section -->
+      <div class="groups-section" x-show="groups.length > 0" x-cloak>
+        <div class="groups-header">
+          <h3>Groups</h3>
+          <button class="btn btn-sm" @click="openGroupModal()">+ New Group</button>
+        </div>
+        <div class="groups-grid">
+          <template x-for="group in groups" :key="group.id">
+            <div class="group-card" :style="'border-left: 3px solid ' + (group.color || '#4fc3f7')">
+              <div class="group-card-header">
+                <span class="group-color-dot" :style="'background:' + (group.color || '#4fc3f7')"></span>
+                <span class="group-name" x-text="group.name"></span>
+                <span class="group-count badge" x-text="group.fixtureIds.length + ' fixture' + (group.fixtureIds.length !== 1 ? 's' : '')"></span>
+              </div>
+              <div class="group-actions">
+                <button class="btn btn-xs" @click="groupFlash(group.id)" title="Flash">Flash</button>
+                <button class="btn btn-xs" @click="groupBlackout(group.id)" title="Blackout">Blackout</button>
+                <button class="btn btn-xs" @click="groupWhiteout(group.id)" title="Whiteout">White</button>
+                <button class="btn btn-xs" @click="groupResume(group.id)" title="Resume">Resume</button>
+                <button class="btn btn-xs" @click="editGroup(group)" title="Edit">Edit</button>
+                <button class="btn btn-xs btn-danger" @click="deleteGroup(group.id)" title="Delete">Del</button>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+
       <!-- Fixture Cards -->
       <template x-if="fixtures.length === 0 && !stagedFixture">
         <div class="empty-state">
@@ -535,6 +564,12 @@
               </div>
               <span class="fixture-icon" x-html="fixtureIcon(fixture)"></span>
               <strong class="fixture-name" x-text="fixture.name"></strong>
+            </div>
+            <!-- Group Badges -->
+            <div class="fixture-group-badges" x-show="getFixtureGroups(fixture.id).length > 0">
+              <template x-for="g in getFixtureGroups(fixture.id)" :key="g.id">
+                <span class="group-badge" :style="'background:' + (g.color || '#4fc3f7')" x-text="g.name"></span>
+              </template>
             </div>
             <!-- Row 2: Meta + Controls -->
             <div class="fixture-card-meta">
@@ -1095,6 +1130,42 @@
                 x-show="remapPresetKey">Save Preset</button>
         <button class="btn btn-sm" @click="closeRemapModal()">Cancel</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Group Modal -->
+  <div class="modal-overlay" x-show="groupModalOpen" x-cloak @click.self="closeGroupModal()">
+    <div class="modal" style="max-width:500px">
+      <h2 x-text="editingGroup ? 'Edit Group' : 'New Group'"></h2>
+
+      <label>Group Name</label>
+      <input type="text" x-model="groupName" placeholder="e.g. Stage Left, Wash Lights"
+             @input="groupError = ''">
+
+      <label>Color</label>
+      <input type="color" x-model="groupColor" style="width:60px;height:32px;padding:2px;cursor:pointer">
+
+      <label>Fixtures</label>
+      <div class="group-fixture-list">
+        <template x-for="fixture in fixtures" :key="fixture.id">
+          <label class="group-fixture-item">
+            <input type="checkbox" :checked="groupFixtureSelection[fixture.id]"
+                   @change="groupFixtureSelection[fixture.id] = $event.target.checked">
+            <span x-text="fixture.name"></span>
+            <span class="badge" x-text="'DMX ' + fixture.dmxStartAddress"></span>
+          </label>
+        </template>
+      </div>
+
+      <p class="validation-error" x-show="groupError" x-text="groupError"></p>
+
+      <div class="modal-actions">
+        <button class="btn" @click="closeGroupModal()">Cancel</button>
+        <button class="btn btn-primary" @click="saveGroup()"
+                x-text="editingGroup ? 'Update' : 'Create'"></button>
+      </div>
+
+      <button class="modal-close" @click="closeGroupModal()">&times;</button>
     </div>
   </div>
 

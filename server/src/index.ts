@@ -98,7 +98,7 @@ async function main() {
   initializeFixtureDefaults(fixtureStore, manager);
 
   // ── Multi-Universe Stack ──
-  const { registry: universeRegistry, pool: connectionPool, coordinator } =
+  const { registry: universeRegistry, pool: connectionPool, coordinator, connectionLog } =
     await createMultiUniverseStack(finalConfig, consoleLogger, latencyTracker);
 
   // ── Library Stack ──
@@ -144,6 +144,7 @@ async function main() {
     remapPresetStore,
     groupStore,
     diskCache,
+    connectionLog,
   });
 
   // ── Shutdown Handling ──

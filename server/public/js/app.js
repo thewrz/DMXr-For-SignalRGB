@@ -112,5 +112,6 @@ function dmxrApp() {
     dmxrColorSwatch(),
     dmxrChannelRemap(),
     dmxrGroups(),
+    dmxrConnectionLog(),
   );
 }

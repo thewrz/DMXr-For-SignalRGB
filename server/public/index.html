@@ -25,6 +25,7 @@
   <script src="/js/color-swatch.js"></script>
   <script src="/js/channel-remap.js"></script>
   <script src="/js/groups.js"></script>
+  <script src="/js/connection-log.js"></script>
   <script src="/js/app.js"></script>
 </head>
 <body x-data="dmxrApp()" x-init="init()">
@@ -57,6 +58,13 @@
           <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0z"/>
         </svg>
         Latency
+      </button>
+      <button class="btn btn-sm" @click="openConnectionLog()" title="Connection Log">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M5 8.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5zm0-2a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5zm0-2a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5zm0 6a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5z"/>
+          <path d="M3 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H3zm0 1h10a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1z"/>
+        </svg>
+        Log
       </button>
       <button class="btn btn-sm btn-settings" @click="openSettings()" title="Server Settings">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -1184,6 +1192,56 @@
       </div>
 
       <button class="modal-close" @click="closeGroupModal()">&times;</button>
+    </div>
+  </div>
+
+  <!-- Connection Log Modal -->
+  <div class="modal-overlay" x-show="showConnectionLog" x-cloak @click.self="closeConnectionLog()">
+    <div class="modal connlog-modal">
+      <h2>Connection Log</h2>
+
+      <div class="connlog-toolbar">
+        <button class="btn btn-sm" @click="clearConnectionLog()" :disabled="connectionLogEvents.length === 0">
+          Clear
+        </button>
+        <span class="connlog-count" x-show="connectionLogEvents.length > 0"
+              x-text="connectionLogEvents.length + ' event' + (connectionLogEvents.length !== 1 ? 's' : '')"></span>
+      </div>
+
+      <p class="validation-error" x-show="connectionLogError" x-text="connectionLogError"></p>
+
+      <div x-show="connectionLogLoading" class="settings-loading">Loading...</div>
+
+      <div class="connlog-empty" x-show="!connectionLogLoading && connectionLogEvents.length === 0 && !connectionLogError">
+        No connection events yet.
+      </div>
+
+      <div class="connlog-list" x-show="connectionLogEvents.length > 0">
+        <template x-for="(evt, idx) in connectionLogEvents" :key="idx">
+          <div class="connlog-event">
+            <span class="connlog-icon" :style="'color:' + connLogEventColor(evt.type)"
+                  x-text="connLogEventIcon(evt.type)"></span>
+            <div class="connlog-body">
+              <div class="connlog-header">
+                <span class="connlog-type" :style="'color:' + connLogEventColor(evt.type)"
+                      x-text="connLogEventLabel(evt.type)"></span>
+                <span class="connlog-universe badge" x-text="evt.universeId"></span>
+                <span class="connlog-time" x-text="connLogRelativeTime(evt.timestamp)"
+                      :title="evt.timestamp"></span>
+              </div>
+              <div class="connlog-details" x-show="evt.details && (evt.details.error || evt.details.attempt || evt.details.downtimeMs !== undefined)">
+                <span x-show="evt.details.error" x-text="evt.details.error" class="connlog-detail-error"></span>
+                <span x-show="evt.details.suggestion" x-text="evt.details.suggestion" class="connlog-detail-suggestion"></span>
+                <span x-show="evt.details.attempt" x-text="'Attempt #' + evt.details.attempt"></span>
+                <span x-show="evt.details.downtimeMs !== undefined"
+                      x-text="'Downtime: ' + (evt.details.downtimeMs >= 1000 ? (evt.details.downtimeMs / 1000).toFixed(1) + 's' : evt.details.downtimeMs + 'ms')"></span>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <button class="modal-close" @click="closeConnectionLog()">&times;</button>
     </div>
   </div>
 

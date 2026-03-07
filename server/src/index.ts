@@ -10,6 +10,8 @@ import { createUserFixtureStore } from "./fixtures/user-fixture-store.js";
 import { autoDetectDmxPort } from "./dmx/serial-port-scanner.js";
 import { createMdnsAdvertiser, type MdnsAdvertiser } from "./mdns/advertiser.js";
 import { createOflClient } from "./ofl/ofl-client.js";
+import { createOflDiskCache } from "./ofl/ofl-disk-cache.js";
+import { createCachedOflClient } from "./ofl/cached-ofl-client.js";
 import { buildServer } from "./server.js";
 import { createUdpColorServer } from "./udp/udp-color-server.js";
 import { createDmxMonitor } from "./dmx/dmx-monitor.js";
@@ -100,7 +102,11 @@ async function main() {
     await createMultiUniverseStack(finalConfig, consoleLogger, latencyTracker);
 
   // ── Library Stack ──
-  const oflClient = createOflClient();
+  const diskCache = createOflDiskCache();
+  const oflClient = createCachedOflClient({
+    inner: createOflClient(),
+    diskCache,
+  });
   const registry = createLibraryStack(finalConfig, oflClient, userFixtureStore);
 
   // ── UDP + Monitor ──
@@ -137,6 +143,7 @@ async function main() {
     connectionPool,
     remapPresetStore,
     groupStore,
+    diskCache,
   });
 
   // ── Shutdown Handling ──

@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // Mock bonjour-service before importing advertiser
-const publishMock = vi.fn();
+const stopMock = vi.fn();
+const publishMock = vi.fn().mockReturnValue({ stop: stopMock });
 const unpublishAllMock = vi.fn();
 const destroyMock = vi.fn();
 
@@ -14,13 +15,41 @@ vi.mock("bonjour-service", () => {
   return { Bonjour: BonjourMock, default: { Bonjour: BonjourMock } };
 });
 
+import { Bonjour } from "bonjour-service";
 import { createMdnsAdvertiser } from "./advertiser.js";
 
 describe("createMdnsAdvertiser", () => {
   beforeEach(() => {
-    publishMock.mockClear();
+    vi.useFakeTimers();
+    publishMock.mockClear().mockReturnValue({ stop: stopMock });
     unpublishAllMock.mockClear();
     destroyMock.mockClear();
+    stopMock.mockClear();
+    (Bonjour as unknown as ReturnType<typeof vi.fn>).mockClear();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("passes reuseAddr to Bonjour constructor", () => {
+    createMdnsAdvertiser({
+      port: 8080,
+      serverId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+    });
+
+    expect(Bonjour).toHaveBeenCalledWith({ reuseAddr: true });
+  });
+
+  it("publishes with probe: false", () => {
+    createMdnsAdvertiser({
+      port: 8080,
+      serverId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+    });
+
+    expect(publishMock).toHaveBeenCalledOnce();
+    const opts = publishMock.mock.calls[0][0];
+    expect(opts.probe).toBe(false);
   });
 
   it("uses serverName as mDNS name when provided", () => {
@@ -122,22 +151,43 @@ describe("createMdnsAdvertiser", () => {
     expect(destroyMock).toHaveBeenCalledOnce();
   });
 
-  it("republish updates mDNS with new serverName", () => {
+  it("republish reuses the same Bonjour instance", () => {
     const advertiser = createMdnsAdvertiser({
       port: 8080,
       serverId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
       serverName: "Old Name",
     });
 
-    expect(publishMock).toHaveBeenCalledOnce();
-    const firstOpts = publishMock.mock.calls[0][0];
-    expect(firstOpts.name).toBe("Old Name");
+    expect(Bonjour).toHaveBeenCalledTimes(1);
+
+    advertiser.republish({ serverName: "New Name" });
+    vi.advanceTimersByTime(2000);
+
+    // Should NOT have created a new Bonjour instance
+    expect(Bonjour).toHaveBeenCalledTimes(1);
+    // Should NOT have destroyed the instance
+    expect(destroyMock).not.toHaveBeenCalled();
+  });
+
+  it("republish stops old service and publishes new one after debounce", () => {
+    const advertiser = createMdnsAdvertiser({
+      port: 8080,
+      serverId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+      serverName: "Old Name",
+    });
+
+    expect(publishMock).toHaveBeenCalledTimes(1);
 
     advertiser.republish({ serverName: "New Name" });
 
-    // Should have destroyed old and re-published
-    expect(unpublishAllMock).toHaveBeenCalledOnce();
-    expect(destroyMock).toHaveBeenCalledOnce();
+    // Should not have republished yet (debounce pending)
+    expect(publishMock).toHaveBeenCalledTimes(1);
+    expect(stopMock).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(2000);
+
+    // Now it should have stopped old and published new
+    expect(stopMock).toHaveBeenCalledOnce();
     expect(publishMock).toHaveBeenCalledTimes(2);
 
     const secondOpts = publishMock.mock.calls[1][0];
@@ -145,6 +195,26 @@ describe("createMdnsAdvertiser", () => {
     expect(secondOpts.txt.serverName).toBe("New Name");
     expect(secondOpts.port).toBe(8080);
     expect(secondOpts.txt.serverId).toBe("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
+  });
+
+  it("republish debounces rapid calls into a single publish", () => {
+    const advertiser = createMdnsAdvertiser({
+      port: 8080,
+      serverId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+      serverName: "Name 1",
+    });
+
+    advertiser.republish({ serverName: "Name 2" });
+    vi.advanceTimersByTime(500);
+    advertiser.republish({ serverName: "Name 3" });
+    vi.advanceTimersByTime(500);
+    advertiser.republish({ serverName: "Final Name" });
+    vi.advanceTimersByTime(2000);
+
+    // Initial publish + one debounced publish = 2 total
+    expect(publishMock).toHaveBeenCalledTimes(2);
+    const finalOpts = publishMock.mock.calls[1][0];
+    expect(finalOpts.name).toBe("Final Name");
   });
 
   it("republish preserves existing options when partially updating", () => {
@@ -156,10 +226,25 @@ describe("createMdnsAdvertiser", () => {
     });
 
     advertiser.republish({ serverName: "Studio B" });
+    vi.advanceTimersByTime(2000);
 
     const opts = publishMock.mock.calls[1][0];
     expect(opts.name).toBe("Studio B");
     expect(opts.port).toBe(9090);
     expect(opts.txt.udpPort).toBe("9091");
+  });
+
+  it("unpublishAll cancels pending republish timer", () => {
+    const advertiser = createMdnsAdvertiser({
+      port: 8080,
+      serverId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+    });
+
+    advertiser.republish({ serverName: "Pending" });
+    advertiser.unpublishAll();
+
+    // Advance past debounce — should NOT publish again
+    vi.advanceTimersByTime(5000);
+    expect(publishMock).toHaveBeenCalledTimes(1); // only initial
   });
 });

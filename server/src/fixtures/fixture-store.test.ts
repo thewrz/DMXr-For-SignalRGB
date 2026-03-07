@@ -211,6 +211,35 @@ describe("createFixtureStore", () => {
       expect(updated!.name).toBe("New Name");
     });
 
+    it("updates colorCalibration → persisted", async () => {
+      const fixture = store.add(makeRequest());
+      const colorCalibration = {
+        gain: { r: 1.5, g: 0.8, b: 1.0 },
+        offset: { r: 10, g: -5, b: 0 },
+      };
+      const updated = store.update(fixture.id, { colorCalibration });
+
+      expect(updated!.colorCalibration).toEqual(colorCalibration);
+
+      await store.save();
+      const store2 = createFixtureStore(filePath);
+      await store2.load();
+      expect(store2.getById(fixture.id)!.colorCalibration).toEqual(colorCalibration);
+    });
+
+    it("colorCalibration preserved on partial update", () => {
+      const fixture = store.add(makeRequest());
+      const colorCalibration = {
+        gain: { r: 1.5, g: 0.8, b: 1.0 },
+        offset: { r: 10, g: -5, b: 0 },
+      };
+      store.update(fixture.id, { colorCalibration });
+      const updated = store.update(fixture.id, { name: "Renamed" });
+
+      expect(updated!.name).toBe("Renamed");
+      expect(updated!.colorCalibration).toEqual(colorCalibration);
+    });
+
     it("updates whiteGateThreshold → persisted", async () => {
       const fixture = store.add(makeRequest());
       const updated = store.update(fixture.id, { whiteGateThreshold: 200 });

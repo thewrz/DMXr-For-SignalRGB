@@ -149,6 +149,33 @@ export function registerFixtureRoutes(
               },
               additionalProperties: false,
             },
+            colorCalibration: {
+              type: "object" as const,
+              required: ["gain", "offset"],
+              properties: {
+                gain: {
+                  type: "object" as const,
+                  required: ["r", "g", "b"],
+                  properties: {
+                    r: { type: "number" as const, minimum: 0, maximum: 2 },
+                    g: { type: "number" as const, minimum: 0, maximum: 2 },
+                    b: { type: "number" as const, minimum: 0, maximum: 2 },
+                  },
+                  additionalProperties: false,
+                },
+                offset: {
+                  type: "object" as const,
+                  required: ["r", "g", "b"],
+                  properties: {
+                    r: { type: "number" as const, minimum: -50, maximum: 50 },
+                    g: { type: "number" as const, minimum: -50, maximum: 50 },
+                    b: { type: "number" as const, minimum: -50, maximum: 50 },
+                  },
+                  additionalProperties: false,
+                },
+              },
+              additionalProperties: false,
+            },
           },
         },
       },

@@ -573,6 +573,31 @@ describe("isWhiteGateOpen", () => {
   });
 });
 
+describe("mapColor with colorCalibration", () => {
+  it("calibration applied before white extraction produces correct RGBW", () => {
+    const fixture = makeFixture([
+      { offset: 0, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
+      { offset: 1, name: "Green", type: "ColorIntensity", color: "Green", defaultValue: 0 },
+      { offset: 2, name: "Blue", type: "ColorIntensity", color: "Blue", defaultValue: 0 },
+      { offset: 3, name: "White", type: "ColorIntensity", color: "White", defaultValue: 0 },
+    ]);
+    // Red LED runs hot → reduce gain to 0.5
+    // Input: (200, 100, 100) → after calibration: (100, 100, 100)
+    // White extraction: min(100,100,100) = 100 → R=0, G=0, B=0, W=100
+    (fixture as Record<string, unknown>).colorCalibration = {
+      gain: { r: 0.5, g: 1.0, b: 1.0 },
+      offset: { r: 0, g: 0, b: 0 },
+    };
+
+    const result = mapColor(fixture, 200, 100, 100, 1.0);
+
+    expect(result[4]).toBe(100); // white = min(100,100,100)
+    expect(result[1]).toBe(0);   // R after white extraction
+    expect(result[2]).toBe(0);   // G after white extraction
+    expect(result[3]).toBe(0);   // B after white extraction
+  });
+});
+
 describe("getFixtureDefaults", () => {
   it("returns defaultValue for all channels", () => {
     const fixture = makeFixture([

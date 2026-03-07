@@ -174,27 +174,43 @@ function dmxrOnboarding() {
       this.onboardingSplash = true;
     },
 
+    _helpMoveHandler: null,
+
     toggleHelpMode() {
       this.helpMode = !this.helpMode;
-      if (!this.helpMode) {
+      if (this.helpMode) {
+        this._bindHelpHover();
+      } else {
+        this._unbindHelpHover();
         this.helpTooltip = { visible: false, x: 0, y: 0, title: "", description: "" };
       }
     },
 
-    onHelpHover(event) {
-      if (!this.helpMode) return;
-      var target = event.target.closest("[data-help-title]");
-      if (target) {
-        var rect = target.getBoundingClientRect();
-        this.helpTooltip = {
-          visible: true,
-          x: Math.max(8, Math.min(rect.left, window.innerWidth - 260)),
-          y: rect.bottom + 8,
-          title: target.getAttribute("data-help-title"),
-          description: target.getAttribute("data-help-desc") || ""
-        };
-      } else {
-        this.helpTooltip = { visible: false, x: 0, y: 0, title: "", description: "" };
+    _bindHelpHover() {
+      var self = this;
+      if (self._helpMoveHandler) return;
+      self._helpMoveHandler = function (event) {
+        var target = event.target.closest("[data-help-title]");
+        if (target) {
+          var rect = target.getBoundingClientRect();
+          self.helpTooltip = {
+            visible: true,
+            x: Math.max(8, Math.min(rect.left, window.innerWidth - 260)),
+            y: rect.bottom + 8,
+            title: target.getAttribute("data-help-title"),
+            description: target.getAttribute("data-help-desc") || ""
+          };
+        } else if (self.helpTooltip.visible) {
+          self.helpTooltip = { visible: false, x: 0, y: 0, title: "", description: "" };
+        }
+      };
+      document.addEventListener("mousemove", self._helpMoveHandler);
+    },
+
+    _unbindHelpHover() {
+      if (this._helpMoveHandler) {
+        document.removeEventListener("mousemove", this._helpMoveHandler);
+        this._helpMoveHandler = null;
       }
     },
 

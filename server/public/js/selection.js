@@ -1,7 +1,8 @@
 /**
  * Multi-select fixture management for DMXr.
  * Provides Ctrl+click / Shift+click selection on fixture cards and grid cells,
- * with a floating action bar for batch delete, duplicate, and group operations.
+ * marquee drag-select on the DMX grid, and a floating action bar for batch
+ * delete, duplicate, and group operations.
  * Mixed into the main Alpine component via Object.assign.
  */
 function dmxrSelection() {
@@ -14,6 +15,10 @@ function dmxrSelection() {
     groupFromSelectionTarget: "new",
     groupFromSelectionName: "",
     selectionError: "",
+
+    // Marquee state
+    marquee: null,       // { startX, startY, x, y, w, h } or null
+    marqueeGridEl: null,  // cached ref to .channel-grid
 
     // Computed-like helpers
     get hasSelection() {
@@ -66,15 +71,15 @@ function dmxrSelection() {
     },
 
     selectGridFixture: function(ch, event) {
-      // Don't trigger selection at the end of a drag operation
+      // Don't trigger selection at the end of a drag or marquee operation
       if (this.isDragging) return;
+      if (this.marquee) return;
       var info = this.getFixtureAtChannel(ch);
       if (!info) return;
       this.toggleFixtureSelect(info.fixture.id, event);
     },
 
     selectAll: function() {
-      var self = this;
       this.selectedFixtureIds = this.fixtures.map(function(f) { return f.id; });
       if (this.fixtures.length > 0) {
         this.lastSelectedFixtureId = this.fixtures[0].id;
@@ -99,6 +104,148 @@ function dmxrSelection() {
       this.selectedFixtureIds = this.selectedFixtureIds.filter(function(id) {
         return fixtureIds[id];
       });
+    },
+
+    // --- Marquee Drag Select on Grid ---
+
+    onGridMousedown: function(event) {
+      // Only start marquee on left-click, not during fixture drag
+      if (event.button !== 0) return;
+      if (this.isDragging) return;
+
+      // Don't start marquee on a draggable fixture-start cell (let drag-drop handle it)
+      var cell = event.target.closest(".channel-cell");
+      if (cell && cell.draggable) return;
+
+      var grid = event.currentTarget;
+      this.marqueeGridEl = grid;
+
+      var rect = grid.getBoundingClientRect();
+      var x = event.clientX - rect.left;
+      var y = event.clientY - rect.top;
+
+      this.marquee = {
+        startX: x,
+        startY: y,
+        x: x,
+        y: y,
+        w: 0,
+        h: 0,
+      };
+
+      // Bind mousemove/mouseup to window so we track even outside the grid
+      var self = this;
+      this._marqueeMove = function(e) { self.onGridMarqueeMove(e); };
+      this._marqueeUp = function(e) { self.onGridMarqueeUp(e); };
+      window.addEventListener("mousemove", this._marqueeMove);
+      window.addEventListener("mouseup", this._marqueeUp);
+
+      event.preventDefault(); // prevent text selection
+    },
+
+    onGridMarqueeMove: function(event) {
+      if (!this.marquee || !this.marqueeGridEl) return;
+
+      var rect = this.marqueeGridEl.getBoundingClientRect();
+      var curX = event.clientX - rect.left;
+      var curY = event.clientY - rect.top;
+
+      // Clamp to grid bounds
+      curX = Math.max(0, Math.min(curX, rect.width));
+      curY = Math.max(0, Math.min(curY, rect.height));
+
+      var x = Math.min(this.marquee.startX, curX);
+      var y = Math.min(this.marquee.startY, curY);
+      var w = Math.abs(curX - this.marquee.startX);
+      var h = Math.abs(curY - this.marquee.startY);
+
+      this.marquee = {
+        startX: this.marquee.startX,
+        startY: this.marquee.startY,
+        x: x,
+        y: y,
+        w: w,
+        h: h,
+      };
+    },
+
+    onGridMarqueeUp: function(event) {
+      window.removeEventListener("mousemove", this._marqueeMove);
+      window.removeEventListener("mouseup", this._marqueeUp);
+
+      if (!this.marquee || !this.marqueeGridEl) {
+        this.marquee = null;
+        return;
+      }
+
+      var m = this.marquee;
+      // Only process if dragged more than a few pixels (not just a click)
+      if (m.w > 5 || m.h > 5) {
+        this.resolveMarqueeSelection(event);
+      }
+
+      this.marquee = null;
+      this.marqueeGridEl = null;
+    },
+
+    resolveMarqueeSelection: function(event) {
+      if (!this.marqueeGridEl) return;
+
+      var gridRect = this.marqueeGridEl.getBoundingClientRect();
+      var m = this.marquee;
+
+      // Marquee rect in viewport coords
+      var mLeft = gridRect.left + m.x;
+      var mTop = gridRect.top + m.y;
+      var mRight = mLeft + m.w;
+      var mBottom = mTop + m.h;
+
+      // Find all cells that intersect the marquee
+      var cells = this.marqueeGridEl.querySelectorAll(".channel-cell");
+      var hitFixtureIds = {};
+
+      for (var i = 0; i < cells.length; i++) {
+        var cellRect = cells[i].getBoundingClientRect();
+        // Check overlap
+        if (cellRect.right > mLeft && cellRect.left < mRight &&
+            cellRect.bottom > mTop && cellRect.top < mBottom) {
+          var ch = parseInt(cells[i].dataset.address, 10);
+          if (!isNaN(ch)) {
+            var info = this.getFixtureAtChannel(ch);
+            if (info) {
+              hitFixtureIds[info.fixture.id] = true;
+            }
+          }
+        }
+      }
+
+      var ids = Object.keys(hitFixtureIds);
+      if (ids.length === 0) return;
+
+      // Ctrl/Cmd: add to existing selection; otherwise replace
+      if (event.ctrlKey || event.metaKey) {
+        var merged = this.selectedFixtureIds.slice();
+        for (var j = 0; j < ids.length; j++) {
+          if (merged.indexOf(ids[j]) === -1) {
+            merged.push(ids[j]);
+          }
+        }
+        this.selectedFixtureIds = merged;
+      } else {
+        this.selectedFixtureIds = ids;
+      }
+
+      if (ids.length > 0) {
+        this.lastSelectedFixtureId = ids[ids.length - 1];
+      }
+    },
+
+    getMarqueeStyle: function() {
+      if (!this.marquee) return "display:none";
+      return "left:" + this.marquee.x + "px;" +
+             "top:" + this.marquee.y + "px;" +
+             "width:" + this.marquee.w + "px;" +
+             "height:" + this.marquee.h + "px;";
     },
 
     // --- Batch Delete ---

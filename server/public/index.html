@@ -503,7 +503,8 @@
         <div class="channel-grid"
              @dragover.prevent="onGridDragOver($event)"
              @drop.prevent="onGridDrop($event)"
-             @dragleave="onGridDragLeave($event)">
+             @dragleave="onGridDragLeave($event)"
+             @mousedown="onGridMousedown($event)">
           <template x-for="ch in 512" :key="ch">
             <div class="channel-cell"
                  :class="getEnhancedChannelClass(ch)"
@@ -516,6 +517,8 @@
                  @mouseleave="hideTooltip()"
                  x-text="getChannelLabel(ch)"></div>
           </template>
+          <div class="grid-marquee" x-show="marquee" x-cloak
+               :style="getMarqueeStyle()"></div>
         </div>
         <div class="grid-tooltip" x-show="tooltip.visible" x-cloak
              :style="'left:' + tooltip.x + 'px;top:' + tooltip.y + 'px'"

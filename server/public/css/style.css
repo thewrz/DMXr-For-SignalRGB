@@ -493,6 +493,9 @@ header {
   gap: 1px;
   font-size: 0.55rem;
   font-family: monospace;
+  position: relative;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .channel-cell {
@@ -2115,6 +2118,16 @@ header {
 }
 
 /* --- Multi-Select --- */
+
+/* Marquee drag-select rectangle */
+.grid-marquee {
+  position: absolute;
+  border: 1.5px solid var(--accent);
+  background: rgba(0, 184, 212, 0.12);
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 10;
+}
 
 .fixture-card-selected {
   outline: 2px solid var(--accent);

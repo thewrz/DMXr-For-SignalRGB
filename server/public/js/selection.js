@@ -66,6 +66,8 @@ function dmxrSelection() {
     },
 
     selectGridFixture: function(ch, event) {
+      // Don't trigger selection at the end of a drag operation
+      if (this.isDragging) return;
       var info = this.getFixtureAtChannel(ch);
       if (!info) return;
       this.toggleFixtureSelect(info.fixture.id, event);

@@ -561,7 +561,7 @@
           <div class="fixture-card" :class="'fixture-color-' + (fIndex % 8) + (isSelected(fixture.id) ? ' fixture-card-selected' : '')"
                @click="toggleFixtureSelect(fixture.id, $event)"
                @mouseenter="highlightedFixtureId = fixture.id"
-               @mouseleave="highlightedFixtureId = null"
+               @mouseleave="highlightedFixtureId = null">
             <!-- Row 1: Identity -->
             <div class="fixture-card-identity">
               <div class="color-swatch"

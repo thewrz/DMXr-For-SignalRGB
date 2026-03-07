@@ -91,6 +91,7 @@ function dmxrApp() {
       this.loadServerName();
       this.pollFixtures();
       await this.checkWizardNeeded();
+      await this.checkOnboardingNeeded();
       this.startColorStream();
     },
   };
@@ -114,6 +115,7 @@ function dmxrApp() {
     dmxrConnectionLog(),
     dmxrSelection(),
     dmxrMovement(),
+    dmxrOnboarding(),
   ];
 
   // Use defineProperties instead of Object.assign to preserve getters

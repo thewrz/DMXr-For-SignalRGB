@@ -12,6 +12,7 @@ export interface PersistedSettings {
   readonly setupCompleted: boolean;
   readonly serverId: string;
   readonly serverName: string;
+  readonly onboardingCompleted: boolean;
 }
 
 const DEFAULTS: PersistedSettings = {
@@ -24,6 +25,7 @@ const DEFAULTS: PersistedSettings = {
   setupCompleted: false,
   serverId: "",
   serverName: "",
+  onboardingCompleted: false,
 };
 
 export interface SettingsStore {
@@ -47,6 +49,7 @@ function isValidSettings(data: unknown): data is Partial<PersistedSettings> {
   if ("setupCompleted" in record && typeof record["setupCompleted"] !== "boolean") return false;
   if ("serverId" in record && typeof record["serverId"] !== "string") return false;
   if ("serverName" in record && typeof record["serverName"] !== "string") return false;
+  if ("onboardingCompleted" in record && typeof record["onboardingCompleted"] !== "boolean") return false;
 
   return true;
 }

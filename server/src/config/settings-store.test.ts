@@ -97,7 +97,7 @@ describe("createSettingsStore", () => {
 
       const settings = await store.load();
 
-      expect(settings).toEqual({ ...full, udpPort: 0 });
+      expect(settings).toEqual({ ...full, udpPort: 0, onboardingCompleted: false });
     });
 
     it("auto-generates serverId on first load and persists it", async () => {
@@ -206,5 +206,47 @@ describe("getDefaults", () => {
     expect(defaults.setupCompleted).toBe(false);
     expect(defaults.serverId).toBe("");
     expect(defaults.serverName).toBe("");
+    expect(defaults.onboardingCompleted).toBe(false);
+  });
+});
+
+describe("onboardingCompleted", () => {
+  let store: SettingsStore;
+  let filePath: string;
+
+  beforeEach(() => {
+    filePath = join(tmpdir(), `dmxr-settings-test-${Date.now()}.json`);
+    store = createSettingsStore(filePath);
+  });
+
+  afterEach(async () => {
+    try {
+      await rm(filePath);
+      await rm(filePath + ".tmp");
+    } catch {
+      // may not exist
+    }
+  });
+
+  it("defaults onboardingCompleted to false", async () => {
+    const settings = await store.load();
+    expect(settings.onboardingCompleted).toBe(false);
+  });
+
+  it("persists onboardingCompleted through update", async () => {
+    await store.load();
+    await store.update({ onboardingCompleted: true });
+
+    const store2 = createSettingsStore(filePath);
+    const reloaded = await store2.load();
+    expect(reloaded.onboardingCompleted).toBe(true);
+  });
+
+  it("rejects non-boolean onboardingCompleted", async () => {
+    await mkdir(dirname(filePath), { recursive: true });
+    await writeFile(filePath, JSON.stringify({ onboardingCompleted: "yes" }), "utf-8");
+
+    const settings = await store.load();
+    expect(settings.onboardingCompleted).toBe(false);
   });
 });

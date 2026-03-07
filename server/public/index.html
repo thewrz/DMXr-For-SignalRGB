@@ -28,9 +28,10 @@
   <script src="/js/connection-log.js"></script>
   <script src="/js/selection.js"></script>
   <script src="/js/movement.js"></script>
+  <script src="/js/onboarding.js"></script>
   <script src="/js/app.js"></script>
 </head>
-<body x-data="dmxrApp()" x-init="init()" @keydown.window="onSelectionKeydown($event)">
+<body x-data="dmxrApp()" x-init="init()" @keydown.window="onSelectionKeydown($event)" @mousemove="onHelpHover($event)">
 
   <header>
     <div class="header-left">
@@ -46,7 +47,9 @@
       <span class="header-title">Fixture Manager</span>
       <span class="header-server-name" x-show="settingsServerName" x-text="settingsServerName" x-cloak></span>
     </div>
-    <div class="header-right">
+    <div class="header-right"
+         data-help-title="Header Controls"
+         data-help-desc="DMX Monitor, Latency Dashboard, Connection Log, and Settings.">
       <button class="btn btn-sm" @click="openMonitor()" title="DMX Channel Monitor">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
           <path d="M0 2a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H2z"/>
@@ -68,6 +71,9 @@
         </svg>
         Log
       </button>
+      <button class="btn btn-sm btn-icon btn-help" @click="toggleHelpMode()"
+              :class="{ 'btn-help-active': helpMode }" title="Help"
+              style="z-index:180">?</button>
       <button class="btn btn-sm btn-settings" @click="openSettings()" title="Server Settings">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
           <path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z"/>
@@ -82,7 +88,9 @@
 
   <div class="app-layout" :class="{ 'sidebar-collapsed': !sidebarOpen }">
     <!-- Sidebar: Search / Browse / Stage -->
-    <aside class="sidebar">
+    <aside class="sidebar"
+           data-help-title="Fixture Library"
+           data-help-desc="Search or browse thousands of fixtures. Drag onto the grid to add.">
       <div class="sidebar-tabs">
         <button class="tab" :class="{ active: sidebarTab === 'search' }"
                 @click="sidebarTab = 'search'">Search</button>
@@ -461,7 +469,9 @@
 
     <!-- Main Content -->
     <main class="main-content">
-      <div class="toolbar">
+      <div class="toolbar"
+           data-help-title="Toolbar"
+           data-help-desc="Blackout/Whiteout all fixtures, sync with SignalRGB, or manage groups.">
         <button class="btn btn-danger" @click="blackout()">Blackout All</button>
         <button class="btn btn-warning" @click="whiteout()">Whiteout All</button>
         <button class="btn btn-success" x-show="overrideActive" @click="resume()">Resume</button>
@@ -502,6 +512,8 @@
           </select>
         </div>
         <div class="channel-grid"
+             data-help-title="Universe Grid"
+             data-help-desc="Your 512-channel DMX universe. Drag fixtures to reposition. Hover for channel details."
              @dragover.prevent="onGridDragOver($event)"
              @drop.prevent="onGridDrop($event)"
              @dragleave="onGridDragLeave($event)"
@@ -579,7 +591,9 @@
         </div>
       </template>
 
-      <div class="fixture-list">
+      <div class="fixture-list"
+           data-help-title="Your Fixtures"
+           data-help-desc="Each card shows DMX range, color preview, and channels. Expand for overrides and movement.">
         <template x-for="(fixture, fIndex) in fixtures" :key="fixture.id">
           <div class="fixture-card" :class="'fixture-color-' + (fIndex % 8) + (isSelected(fixture.id) ? ' fixture-card-selected' : '')"
                @click="toggleFixtureSelect(fixture.id, $event)"
@@ -1471,6 +1485,55 @@
 
       <button class="modal-close" @click="closeConnectionLog()">&times;</button>
     </div>
+  </div>
+
+  <!-- Onboarding: Welcome Splash -->
+  <div class="modal-overlay onboarding-splash-overlay" x-show="onboardingSplash" x-cloak
+       @keydown.escape.window="onboardingSplash && skipOnboarding()">
+    <div class="modal onboarding-splash">
+      <img src="/images/DMXr-logo.svg" alt="DMXr" width="160">
+      <h2>Welcome to DMXr!</h2>
+      <p>DMX lighting control for SignalRGB</p>
+      <ul>
+        <li>Control any DMX fixture from your browser</li>
+        <li>Browse 1000s of fixtures from Open Fixture Library</li>
+        <li>Real-time SignalRGB canvas integration via UDP</li>
+        <li>Pan/tilt movement control for moving heads</li>
+      </ul>
+      <div class="wizard-actions">
+        <button class="btn" @click="skipOnboarding()">Skip</button>
+        <button class="btn btn-primary" @click="startTour()">Take a Tour</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Onboarding: Spotlight + Step Card -->
+  <template x-if="onboardingActive">
+    <div @keydown.escape.window="onboardingActive && skipOnboarding()">
+      <div class="onboarding-spotlight" :style="spotlightStyle"></div>
+      <div class="onboarding-card" :style="cardStyle">
+        <div class="onboarding-card-header">
+          <span class="onboarding-step-count" x-text="(onboardingStep+1)+' / '+tourSteps.length"></span>
+        </div>
+        <h4 x-text="tourSteps[onboardingStep].title"></h4>
+        <p x-text="tourSteps[onboardingStep].description"></p>
+        <div class="onboarding-card-actions">
+          <button class="btn btn-sm" @click="skipOnboarding()">Skip</button>
+          <div>
+            <button class="btn btn-sm" @click="onboardingBack()" x-show="onboardingStep > 0">Back</button>
+            <button class="btn btn-sm btn-primary" @click="onboardingNext()"
+                    x-text="onboardingStep === tourSteps.length - 1 ? 'Finish' : 'Next'"></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <!-- Help Mode: Floating Tooltip -->
+  <div class="help-tooltip" x-show="helpTooltip.visible" x-cloak
+       :style="'left:'+helpTooltip.x+'px;top:'+helpTooltip.y+'px'">
+    <strong x-text="helpTooltip.title"></strong>
+    <p x-text="helpTooltip.description"></p>
   </div>
 
 </body>

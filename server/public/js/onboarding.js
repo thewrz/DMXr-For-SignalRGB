@@ -105,6 +105,15 @@ function dmxrOnboarding() {
       var vw = window.innerWidth;
       var vh = window.innerHeight;
 
+      // If the spotlight is taller than half the viewport (e.g. sidebar),
+      // place the card to the right of the spotlight instead of above/below
+      if (spotRect.height > vh * 0.5) {
+        var x = Math.min(spotRect.right + gap, vw - cardWidth - 16);
+        var y = Math.max(16, Math.min(spotRect.top + 40, vh - cardHeight - 16));
+        this.cardStyle = "left:" + x + "px;top:" + y + "px";
+        return;
+      }
+
       var x = Math.max(16, Math.min(spotRect.left, vw - cardWidth - 16));
       var y = spotRect.bottom + gap;
 

@@ -44,6 +44,8 @@ import type { UdpColorServer } from "./udp/udp-color-server.js";
 import type { MultiUniverseCoordinator } from "./dmx/multi-universe-coordinator.js";
 import type { UniverseRegistry } from "./dmx/universe-registry.js";
 import type { ConnectionPool } from "./dmx/connection-pool.js";
+import type { ConnectionLog } from "./dmx/connection-log.js";
+import { registerDiagnosticsRoutes } from "./routes/diagnostics.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -71,6 +73,7 @@ interface BuildServerDeps {
   readonly remapPresetStore?: RemapPresetStore;
   readonly groupStore?: GroupStore;
   readonly diskCache?: OflDiskCache;
+  readonly connectionLog?: ConnectionLog;
 }
 
 export async function buildServer(
@@ -247,6 +250,10 @@ export async function buildServer(
 
   if (deps.diskCache) {
     registerOflCacheRoutes(app, { diskCache: deps.diskCache });
+  }
+
+  if (deps.connectionLog) {
+    registerDiagnosticsRoutes(app, { connectionLog: deps.connectionLog });
   }
 
   app.setErrorHandler((error: FastifyError, request, reply) => {

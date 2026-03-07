@@ -8,11 +8,13 @@ import { createConnectionPool, type ConnectionPool } from "../dmx/connection-poo
 import { createMultiUniverseCoordinator, type MultiUniverseCoordinator } from "../dmx/multi-universe-coordinator.js";
 import { shortId } from "../utils/format.js";
 import { pipeLog } from "../logging/pipeline-logger.js";
+import { createConnectionLog, mapStatusToEvent, type ConnectionLog } from "../dmx/connection-log.js";
 
 export interface MultiUniverseStack {
   readonly registry: UniverseRegistry;
   readonly pool: ConnectionPool;
   readonly coordinator: MultiUniverseCoordinator;
+  readonly connectionLog: ConnectionLog;
 }
 
 export async function createMultiUniverseStack(
@@ -22,6 +24,8 @@ export async function createMultiUniverseStack(
 ): Promise<MultiUniverseStack> {
   const registry = createUniverseRegistry("./config/universes.json");
   await registry.load();
+
+  const connectionLog = createConnectionLog();
 
   const pool = createConnectionPool({
     createConnection: async (uniConfig) => {
@@ -35,6 +39,9 @@ export async function createMultiUniverseStack(
         logger,
         getChannelSnapshot: () =>
           pool.getManager(uniConfig.id)?.getFullSnapshot() ?? {},
+        onStateChange: (status) => {
+          connectionLog.push(mapStatusToEvent(status, uniConfig.id));
+        },
       });
     },
     createManager: (universe) =>
@@ -58,5 +65,5 @@ export async function createMultiUniverseStack(
     }
   }
 
-  return { registry, pool, coordinator };
+  return { registry, pool, coordinator, connectionLog };
 }

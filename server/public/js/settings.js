@@ -154,6 +154,7 @@ function dmxrSettings() {
     openSettings() {
       this.showSettings = true;
       this.loadSettings();
+      this.loadOflCacheStats();
     },
 
     closeSettings() {
@@ -165,6 +166,46 @@ function dmxrSettings() {
       if (port.manufacturer) label += " (" + port.manufacturer + ")";
       if (port.isEnttec) label += " — ENTTEC";
       return label;
+    },
+
+    // OFL Cache
+    oflCacheStats: null,
+    oflCacheLoading: false,
+    oflCacheClearing: false,
+
+    async loadOflCacheStats() {
+      this.oflCacheLoading = true;
+      try {
+        var res = await fetch("/api/settings/ofl-cache");
+        if (res.ok) {
+          this.oflCacheStats = await res.json();
+        }
+      } catch {
+        // ignore
+      } finally {
+        this.oflCacheLoading = false;
+      }
+    },
+
+    async clearOflCache() {
+      this.oflCacheClearing = true;
+      try {
+        var res = await fetch("/api/settings/ofl-cache/clear", { method: "POST" });
+        if (res.ok) {
+          await this.loadOflCacheStats();
+        }
+      } catch {
+        // ignore
+      } finally {
+        this.oflCacheClearing = false;
+      }
+    },
+
+    formatCacheSize(bytes) {
+      if (!bytes || bytes === 0) return "0 B";
+      if (bytes < 1024) return bytes + " B";
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+      return (bytes / (1024 * 1024)).toFixed(1) + " MB";
     },
   };
 }

@@ -744,6 +744,24 @@
             <button class="btn btn-sm" @click="openImportModal()">Import Config</button>
           </div>
         </div>
+
+        <div class="config-backup-section" style="margin-top:1rem">
+          <label style="font-size:0.85rem;color:var(--text);font-weight:600">OFL Fixture Cache</label>
+          <div style="display:flex;align-items:center;gap:0.5rem;margin-top:0.5rem">
+            <span style="width:8px;height:8px;border-radius:50%;display:inline-block"
+                  :style="'background:' + (oflCacheStats && oflCacheStats.entryCount > 0 ? 'var(--success, #4caf50)' : 'var(--text-muted, #888)')"></span>
+            <span x-show="oflCacheLoading" style="font-size:0.8rem;color:var(--text-muted)">Loading...</span>
+            <span x-show="!oflCacheLoading && oflCacheStats" style="font-size:0.8rem;color:var(--text-muted)"
+                  x-text="oflCacheStats.entryCount + ' entries (' + formatCacheSize(oflCacheStats.totalSize) + ')'"></span>
+            <span x-show="!oflCacheLoading && !oflCacheStats" style="font-size:0.8rem;color:var(--text-muted)">No cache data</span>
+          </div>
+          <div style="display:flex;gap:0.5rem;margin-top:0.5rem">
+            <button class="btn btn-sm" @click="clearOflCache()"
+                    :disabled="oflCacheClearing || !oflCacheStats || oflCacheStats.entryCount === 0">
+              <span x-text="oflCacheClearing ? 'Clearing...' : 'Clear Cache'"></span>
+            </button>
+          </div>
+        </div>
       </div>
 
       <button class="modal-close" @click="closeSettings()">&times;</button>

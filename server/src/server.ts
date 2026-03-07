@@ -33,6 +33,8 @@ import { registerConfigRoutes } from "./routes/config.js";
 import { registerRemapPresetRoutes } from "./routes/remap-presets.js";
 import { registerGroupRoutes } from "./routes/groups.js";
 import { registerGroupControlRoutes } from "./routes/group-control.js";
+import { registerOflCacheRoutes } from "./routes/ofl-cache.js";
+import type { OflDiskCache } from "./ofl/ofl-disk-cache.js";
 import { createDmxDispatcher } from "./dmx/dmx-dispatcher.js";
 import { registerApiKeyAuth } from "./middleware/api-key-auth.js";
 import type { DmxMonitor } from "./dmx/dmx-monitor.js";
@@ -68,6 +70,7 @@ interface BuildServerDeps {
   readonly connectionPool?: ConnectionPool;
   readonly remapPresetStore?: RemapPresetStore;
   readonly groupStore?: GroupStore;
+  readonly diskCache?: OflDiskCache;
 }
 
 export async function buildServer(
@@ -240,6 +243,10 @@ export async function buildServer(
       fixtureStore: deps.fixtureStore,
       dispatcher: groupDispatcher,
     });
+  }
+
+  if (deps.diskCache) {
+    registerOflCacheRoutes(app, { diskCache: deps.diskCache });
   }
 
   app.setErrorHandler((error: FastifyError, request, reply) => {

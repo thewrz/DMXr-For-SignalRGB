@@ -814,11 +814,11 @@
           : '— ' + selectionGroupInfo.ungroupedIds.length + ' fixture(s) not yet grouped'"></span>
       </p>
       <div class="group-from-selection-options">
-        <label class="group-sel-option">
+        <label class="group-sel-option" x-show="groups.length > 0" x-cloak>
           <input type="radio" value="new" x-model="groupFromSelectionTarget">
           <span>Create New Group</span>
         </label>
-        <div x-show="groupFromSelectionTarget === 'new'" style="margin-left:1.5rem;margin-top:0.25rem">
+        <div x-show="groupFromSelectionTarget === 'new'" :style="groups.length > 0 ? 'margin-left:1.5rem;margin-top:0.25rem' : ''">
           <input type="text" x-model="groupFromSelectionName" placeholder="Group name"
                  @input="selectionError = ''">
         </div>

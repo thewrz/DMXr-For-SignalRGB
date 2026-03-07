@@ -130,7 +130,7 @@ async function main() {
 
   // ── Multi-Universe Stack ──
   const { registry: universeRegistry, pool: connectionPool, coordinator, connectionLog } =
-    await createMultiUniverseStack(finalConfig, consoleLogger, latencyTracker);
+    await createMultiUniverseStack(finalConfig, consoleLogger, latencyTracker, manager);
 
   // ── Library Stack ──
   const diskCache = createOflDiskCache();

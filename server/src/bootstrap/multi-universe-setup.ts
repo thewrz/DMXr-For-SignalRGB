@@ -1,11 +1,12 @@
 import type { ServerConfig } from "../config/server-config.js";
-import type { DmxLogger } from "../dmx/universe-manager.js";
+import type { DmxLogger, UniverseManager } from "../dmx/universe-manager.js";
 import type { LatencyTracker } from "../metrics/latency-tracker.js";
 import { createUniverseManager } from "../dmx/universe-manager.js";
 import { createResilientConnection } from "../dmx/resilient-connection.js";
 import { createUniverseRegistry, type UniverseRegistry } from "../dmx/universe-registry.js";
 import { createConnectionPool, type ConnectionPool } from "../dmx/connection-pool.js";
 import { createMultiUniverseCoordinator, type MultiUniverseCoordinator } from "../dmx/multi-universe-coordinator.js";
+import { DEFAULT_UNIVERSE_ID } from "../types/protocol.js";
 import { shortId } from "../utils/format.js";
 import { pipeLog } from "../logging/pipeline-logger.js";
 import { createConnectionLog, mapStatusToEvent, type ConnectionLog } from "../dmx/connection-log.js";
@@ -21,6 +22,7 @@ export async function createMultiUniverseStack(
   config: ServerConfig,
   logger: DmxLogger,
   latencyTracker: LatencyTracker,
+  fallbackManager?: UniverseManager,
 ): Promise<MultiUniverseStack> {
   const registry = createUniverseRegistry("./config/universes.json");
   await registry.load();
@@ -52,7 +54,15 @@ export async function createMultiUniverseStack(
       }),
   });
 
-  const coordinator = createMultiUniverseCoordinator(() => pool.getAllManagers());
+  const coordinator = createMultiUniverseCoordinator(() => {
+    const managers = pool.getAllManagers();
+    if (fallbackManager && !managers.has(DEFAULT_UNIVERSE_ID)) {
+      const merged = new Map(managers);
+      merged.set(DEFAULT_UNIVERSE_ID, fallbackManager);
+      return merged;
+    }
+    return managers;
+  });
   pipeLog("info", `Universe registry loaded: ${registry.getAll().length} universe(s)`);
 
   // Bootstrap connections for all persisted universes

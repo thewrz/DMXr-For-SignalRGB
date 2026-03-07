@@ -2213,3 +2213,159 @@ header {
 .group-sel-option input[type="radio"] {
   accent-color: var(--accent);
 }
+
+/* ── Movement Control Panel ────────────────────────────── */
+
+.movement-section {
+  margin-top: 0.75rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.5rem;
+}
+
+.movement-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  padding: 0.25rem 0;
+  user-select: none;
+}
+
+.movement-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+}
+
+.movement-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.movement-label {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  min-width: 55px;
+  flex-shrink: 0;
+}
+
+.movement-select {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  padding: 0.25rem 0.5rem;
+  font-size: 0.8rem;
+}
+
+.movement-xy-pad {
+  position: relative;
+  width: 180px;
+  height: 180px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  cursor: crosshair;
+  margin: 0.25rem auto;
+  overflow: hidden;
+  touch-action: none;
+}
+
+.xy-pad-crosshair-h,
+.xy-pad-crosshair-v {
+  position: absolute;
+  background: var(--border);
+}
+
+.xy-pad-crosshair-h {
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+}
+
+.xy-pad-crosshair-v {
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+}
+
+.xy-pad-current-dot {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid #fff;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  pointer-events: none;
+  transition: left 0.15s ease, top 0.15s ease;
+}
+
+.xy-pad-target-dot {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: transparent;
+  border: 2px solid var(--warning);
+  transform: translate(-50%, -50%);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.xy-pad-label-l {
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  pointer-events: none;
+}
+
+.xy-pad-label-t {
+  position: absolute;
+  left: 2px;
+  top: 50%;
+  transform: translateY(-50%) rotate(-90deg);
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  pointer-events: none;
+}
+
+.movement-position {
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.movement-moving-badge {
+  font-size: 0.7rem;
+  background: var(--accent2);
+  color: #fff;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  animation: pulse-badge 1s infinite alternate;
+}
+
+@keyframes pulse-badge {
+  from { opacity: 0.6; }
+  to { opacity: 1; }
+}
+
+.movement-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-top: 0.25rem;
+}

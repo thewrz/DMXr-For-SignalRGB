@@ -1,10 +1,11 @@
 import { createSocket, type Socket } from "node:dgram";
-import { parseColorPacket, isParseError, FLAG_BLACKOUT, FLAG_PING, encodeColorPacket } from "./packet-parser.js";
+import { parseColorPacket, isParseError, isMovementPacket, FLAG_BLACKOUT, FLAG_PING, encodeColorPacket } from "./packet-parser.js";
 import { processColorBatch, processColorBatchMulti, type ColorEntry } from "../fixtures/color-pipeline.js";
 import type { FixtureStore } from "../fixtures/fixture-store.js";
 import type { UniverseManager } from "../dmx/universe-manager.js";
 import type { MultiUniverseCoordinator } from "../dmx/multi-universe-coordinator.js";
 import type { LatencyTracker } from "../metrics/latency-tracker.js";
+import type { MovementEngine } from "../fixtures/movement-interpolator.js";
 import { pipeLog, shouldSample } from "../logging/pipeline-logger.js";
 
 export interface UdpColorServerDeps {
@@ -12,6 +13,7 @@ export interface UdpColorServerDeps {
   readonly manager: UniverseManager;
   readonly coordinator?: MultiUniverseCoordinator;
   readonly latencyTracker?: LatencyTracker;
+  readonly movementEngine?: MovementEngine;
   readonly logger?: {
     readonly info: (msg: string) => void;
     readonly warn: (msg: string) => void;
@@ -149,6 +151,23 @@ export function createUdpColorServer(deps: UdpColorServerDeps): UdpColorServer {
 
           if (deps.latencyTracker) {
             deps.latencyTracker.recordColorMap(mapDuration);
+          }
+
+          // Forward movement data to engine if present
+          if (isMovementPacket(packet) && deps.movementEngine) {
+            const allFixtures = deps.fixtureStore.getAll();
+            for (const entry of packet.movements) {
+              if (entry.panTarget === 0xffff && entry.tiltTarget === 0xffff) {
+                continue;
+              }
+              const fixture = allFixtures[entry.index];
+              if (fixture) {
+                deps.movementEngine.setTarget(fixture.id, {
+                  pan: entry.panTarget,
+                  tilt: entry.tiltTarget,
+                });
+              }
+            }
           }
 
           deps.latencyTracker?.recordProcessed(receiveTime);

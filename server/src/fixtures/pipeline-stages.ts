@@ -19,6 +19,8 @@ export interface PipelineContext {
   readonly channels: Record<number, number>;
   /** Set to true by whiteGateStage when gate is closed → short-circuit. */
   readonly gateClosed: boolean;
+  /** DMX addresses managed by MovementEngine — skip these in colorMappingStage. */
+  readonly movementManagedAddresses?: ReadonlySet<number>;
 }
 
 export type PipelineStage = (ctx: PipelineContext) => PipelineContext;
@@ -94,6 +96,15 @@ export function colorMappingStage(ctx: PipelineContext): PipelineContext {
 
   for (const channel of ctx.fixture.channels) {
     const addr = resolveAddress(ctx.fixture, channel.offset);
+
+    // Skip Pan/Tilt channels managed by MovementEngine
+    if (
+      ctx.movementManagedAddresses?.has(addr) &&
+      (channel.type === "Pan" || channel.type === "Tilt")
+    ) {
+      continue;
+    }
+
     const override = ctx.fixture.channelOverrides?.[channel.offset];
     const isMotor = motorGuardOn && MOTOR_CHANNEL_TYPES.has(channel.type);
 

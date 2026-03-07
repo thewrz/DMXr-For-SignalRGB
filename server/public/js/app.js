@@ -113,6 +113,7 @@ function dmxrApp() {
     dmxrGroups(),
     dmxrConnectionLog(),
     dmxrSelection(),
+    dmxrMovement(),
   ];
 
   // Use defineProperties instead of Object.assign to preserve getters

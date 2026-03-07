@@ -27,6 +27,7 @@
   <script src="/js/groups.js"></script>
   <script src="/js/connection-log.js"></script>
   <script src="/js/selection.js"></script>
+  <script src="/js/movement.js"></script>
   <script src="/js/app.js"></script>
 </head>
 <body x-data="dmxrApp()" x-init="init()" @keydown.window="onSelectionKeydown($event)">
@@ -702,6 +703,78 @@
                   <span class="override-value" x-text="getOverrideValue(fixture, ch.offset)"></span>
                 </div>
               </template>
+              <!-- Movement Control Panel -->
+              <div class="movement-section" x-show="hasPanTilt(fixture)" x-data="{ mvOpen: false }">
+                <div class="movement-header" @click="mvOpen = !mvOpen; if (mvOpen) openMovement(fixture.id); else closeMovement()">
+                  <span class="calibration-chevron" x-text="mvOpen ? '\u25B2' : '\u25BC'"></span>
+                  <span class="calibration-label">Movement Control</span>
+                </div>
+                <div x-show="mvOpen" x-cloak x-transition.opacity>
+                  <div class="movement-panel" @click.stop>
+                    <!-- Enable toggle -->
+                    <div class="movement-row">
+                      <span class="movement-label">Enabled</span>
+                      <label class="toggle-switch">
+                        <input type="checkbox" :checked="movementEnabled()"
+                               @change="toggleMovementEnabled()">
+                        <span class="toggle-track"></span>
+                      </label>
+                    </div>
+                    <!-- XY Pad -->
+                    <div class="movement-xy-pad"
+                         @mousedown="handleXYPadMouseDown($event)"
+                         @mousemove="handleXYPadMouseMove($event)"
+                         @mouseup="handleXYPadMouseUp()"
+                         @mouseleave="handleXYPadMouseUp()">
+                      <div class="xy-pad-crosshair-h"></div>
+                      <div class="xy-pad-crosshair-v"></div>
+                      <div class="xy-pad-target-dot" :style="targetDotStyle()"></div>
+                      <div class="xy-pad-current-dot" :style="currentDotStyle()"></div>
+                      <span class="xy-pad-label-l">Pan</span>
+                      <span class="xy-pad-label-t">Tilt</span>
+                    </div>
+                    <!-- Position readout -->
+                    <div class="movement-position">
+                      <span x-text="'Pan: ' + movementCurrentPan() + ' / Tilt: ' + movementCurrentTilt()"></span>
+                      <span class="movement-moving-badge" x-show="movementIsMoving()" x-cloak>Moving</span>
+                    </div>
+                    <!-- Speed slider -->
+                    <div class="movement-row">
+                      <span class="movement-label">Speed</span>
+                      <input type="range" class="override-slider" min="1" max="255"
+                             :value="movementVelocity()"
+                             @input="setMovementVelocity($event.target.value)">
+                      <span class="override-value" x-text="movementVelocity()"></span>
+                    </div>
+                    <!-- Smoothing curve -->
+                    <div class="movement-row">
+                      <span class="movement-label">Curve</span>
+                      <select class="movement-select" :value="movementCurve()"
+                              @change="setMovementCurve($event.target.value)">
+                        <option value="linear">Linear</option>
+                        <option value="ease-in-out">Ease In/Out</option>
+                        <option value="s-curve">S-Curve</option>
+                      </select>
+                    </div>
+                    <!-- Preset -->
+                    <div class="movement-row">
+                      <span class="movement-label">Preset</span>
+                      <select class="movement-select" :value="movementPreset()"
+                              @change="setMovementPreset($event.target.value)">
+                        <option value="moving-head">Moving Head</option>
+                        <option value="scanner">Scanner</option>
+                        <option value="laser">Laser</option>
+                        <option value="custom">Custom</option>
+                      </select>
+                    </div>
+                    <!-- Home / Stop buttons -->
+                    <div class="movement-actions">
+                      <button class="btn btn-sm btn-primary" @click="homeMovement(fixture.id)">Home</button>
+                      <button class="btn btn-sm btn-danger" @click="stopMovement(fixture.id)">Stop</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
               <div class="color-calibration-section" x-show="hasColorChannels(fixture)" x-data="{ calOpen: false }">
                 <div class="calibration-header calibration-toggle" @click="calOpen = !calOpen">
                   <span class="calibration-chevron" x-text="calOpen ? '\u25B2' : '\u25BC'"></span>

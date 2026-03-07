@@ -21,6 +21,8 @@ export interface FixtureCapabilities {
   readonly isBasicStrobe: boolean;
   readonly hasPan: boolean;
   readonly hasTilt: boolean;
+  readonly hasPanFine: boolean;
+  readonly hasTiltFine: boolean;
   readonly channelsByType: ReadonlyMap<string, readonly FixtureChannel[]>;
 }
 
@@ -35,6 +37,8 @@ export function analyzeFixture(
   let hasStrobe = false;
   let hasPan = false;
   let hasTilt = false;
+  let hasPanFine = false;
+  let hasTiltFine = false;
 
   const colorFlags: Record<string, boolean> = {};
   const byType = new Map<string, readonly FixtureChannel[]>();
@@ -54,9 +58,15 @@ export function analyzeFixture(
         break;
       case "Pan":
         hasPan = true;
+        if (/fine/i.test(ch.name)) {
+          hasPanFine = true;
+        }
         break;
       case "Tilt":
         hasTilt = true;
+        if (/fine/i.test(ch.name)) {
+          hasTiltFine = true;
+        }
         break;
       case "ColorIntensity":
         if (ch.color) {
@@ -93,6 +103,8 @@ export function analyzeFixture(
     isBasicStrobe: hasStrobe && !hasRGB,
     hasPan,
     hasTilt,
+    hasPanFine,
+    hasTiltFine,
     channelsByType: byType,
   };
 }

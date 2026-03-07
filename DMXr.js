@@ -128,6 +128,36 @@ function buildBlackoutPacket() {
 	];
 }
 
+function buildDmxrcMovementPacket(fixtureIndex, r, g, b, brightnessUint8, panTarget, tiltTarget) {
+	var seq = udpSequence;
+	udpSequence = (udpSequence + 1) & 0xFFFF;
+
+	var ts = Date.now();
+	var tsBytes = timestampToBytes(ts);
+
+	var packet = [
+		0x44, 0x58,                 // magic "DX"
+		0x01,                       // version
+		0x04,                       // flags: FLAG_HAS_MOVEMENT
+		(seq >> 8) & 0xFF,          // sequence high
+		seq & 0xFF,                 // sequence low
+		tsBytes[0], tsBytes[1], tsBytes[2], tsBytes[3],
+		tsBytes[4], tsBytes[5], tsBytes[6], tsBytes[7],
+		1,                          // fixture_count (color)
+		fixtureIndex,               // fixture index
+		r, g, b,                    // RGB
+		brightnessUint8,            // brightness
+		1,                          // movement_count
+		fixtureIndex,               // movement fixture index
+		(panTarget >> 8) & 0xFF,    // pan high
+		panTarget & 0xFF,           // pan low
+		(tiltTarget >> 8) & 0xFF,   // tilt high
+		tiltTarget & 0xFF           // tilt low
+	];
+
+	return packet;
+}
+
 // Encode a JS timestamp (Date.now()) as uint64 big-endian (8 bytes)
 // Uses only basic integer math — no typed arrays (SignalRGB sandbox lacks them)
 function timestampToBytes(ms) {
@@ -179,8 +209,13 @@ export function Initialize() {
 	var iconBase64 = FIXTURE_ICONS_BASE64[iconKey] || FIXTURE_ICONS_BASE64["other"];
 	device.setImageFromBase64(iconBase64);
 
-	device.setSize([1, 1]);
-	device.setControllableLeds([controller.name], [[0, 0]]);
+	if (controller._isMover) {
+		device.setSize([3, 3]);
+		device.setControllableLeds(controller.ledNames, controller.ledPositions);
+	} else {
+		device.setSize([1, 1]);
+		device.setControllableLeds([controller.name], [[0, 0]]);
+	}
 
 	// Enable UDP transport
 	try {
@@ -197,6 +232,8 @@ export function Initialize() {
 	controller._lastG = -1;
 	controller._lastB = -1;
 	controller._lastSendTime = 0;
+	controller._lastPan = 0xFFFF;
+	controller._lastTilt = 0xFFFF;
 
 	if (enableDebugLog === "true") {
 		device.log("DMXr: Initialized " + controller.name +
@@ -210,8 +247,13 @@ export function Render() {
 	var ctrl = controller;
 	var srv = ctrl._server;
 
-	// Single pixel color sample from the canvas tile
-	var color = device.color(0, 0);
+	// Color sample: movers use center pixel (1,1), non-movers use (0,0)
+	var color;
+	if (ctrl._isMover) {
+		color = device.color(1, 1);
+	} else {
+		color = device.color(0, 0);
+	}
 	var r = color[0];
 	var g = color[1];
 	var b = color[2];
@@ -223,15 +265,55 @@ export function Render() {
 		return;
 	}
 
-	// Skip if unchanged
+	// For movers, compute centroid from 3x3 grid
+	var panTarget = 0xFFFF;
+	var tiltTarget = 0xFFFF;
+
+	if (ctrl._isMover) {
+		var totalBrightness = 0;
+		var weightedX = 0;
+		var weightedY = 0;
+		var minBr = 999;
+		var maxBr = -1;
+
+		for (var gy = 0; gy < 3; gy++) {
+			for (var gx = 0; gx < 3; gx++) {
+				var px = device.color(gx, gy);
+				var br = (px[0] + px[1] + px[2]) / 3;
+				weightedX = weightedX + br * gx;
+				weightedY = weightedY + br * gy;
+				totalBrightness = totalBrightness + br;
+				if (br < minBr) minBr = br;
+				if (br > maxBr) maxBr = br;
+			}
+		}
+
+		// Only compute movement if brightness is non-uniform (threshold of 5)
+		if (totalBrightness > 0 && (maxBr - minBr) > 5) {
+			var cx = weightedX / totalBrightness;
+			var cy = weightedY / totalBrightness;
+			var panNorm = cx / 2.0;
+			var tiltNorm = cy / 2.0;
+			panTarget = Math.round(panNorm * 65535);
+			tiltTarget = Math.round(tiltNorm * 65535);
+		}
+	}
+
+	// Skip if unchanged (for movers, also check pan/tilt)
 	if (r === ctrl._lastR && g === ctrl._lastG && b === ctrl._lastB) {
-		return;
+		if (!ctrl._isMover || (panTarget === ctrl._lastPan && tiltTarget === ctrl._lastTilt)) {
+			return;
+		}
 	}
 
 	ctrl._lastR = r;
 	ctrl._lastG = g;
 	ctrl._lastB = b;
 	ctrl._lastSendTime = now;
+	if (ctrl._isMover) {
+		ctrl._lastPan = panTarget;
+		ctrl._lastTilt = tiltTarget;
+	}
 
 	var brightness = device.getBrightness() / 100;
 
@@ -240,7 +322,13 @@ export function Render() {
 		var udpPort = srv.udpPort || (srv.port + 1);
 		var ip = srv.host;
 		var brightnessUint8 = Math.round(brightness * 255);
-		var packet = buildDmxrcPacket(ctrl._udpIndex, r, g, b, brightnessUint8);
+		var packet;
+
+		if (ctrl._isMover && (panTarget !== 0xFFFF || tiltTarget !== 0xFFFF)) {
+			packet = buildDmxrcMovementPacket(ctrl._udpIndex, r, g, b, brightnessUint8, panTarget, tiltTarget);
+		} else {
+			packet = buildDmxrcPacket(ctrl._udpIndex, r, g, b, brightnessUint8);
+		}
 
 		try {
 			udp.send(ip, udpPort, packet, 1); // BIG_ENDIAN = 1
@@ -767,11 +855,36 @@ function deriveCategoryFromChannels(channels, name) {
 function DMXrBridge(fixture, udpIndex, server, displayName) {
 	this.id = server.serverId + "/" + fixture.id;
 	this.name = displayName || fixture.name;
-	this.width = 1;
-	this.height = 1;
 
-	this.ledNames = [this.name];
-	this.ledPositions = [[0, 0]];
+	// Detect movers: fixtures with Pan or Tilt channels get a 3x3 grid
+	var channels = fixture.channels || [];
+	var isMover = false;
+	for (var c = 0; c < channels.length; c++) {
+		var chType = channels[c].type;
+		if (chType === "Pan" || chType === "Tilt") {
+			isMover = true;
+			break;
+		}
+	}
+	this._isMover = isMover;
+
+	if (isMover) {
+		this.width = 3;
+		this.height = 3;
+		this.ledNames = [];
+		this.ledPositions = [];
+		for (var y = 0; y < 3; y++) {
+			for (var x = 0; x < 3; x++) {
+				this.ledNames.push(this.name + " [" + x + "," + y + "]");
+				this.ledPositions.push([x, y]);
+			}
+		}
+	} else {
+		this.width = 1;
+		this.height = 1;
+		this.ledNames = [this.name];
+		this.ledPositions = [[0, 0]];
+	}
 
 	this.fixtureConfig = fixture;
 
@@ -792,4 +905,6 @@ function DMXrBridge(fixture, udpIndex, server, displayName) {
 	this._lastG = -1;
 	this._lastB = -1;
 	this._lastSendTime = 0;
+	this._lastPan = 0xFFFF;
+	this._lastTilt = 0xFFFF;
 }

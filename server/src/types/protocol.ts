@@ -1,3 +1,5 @@
+import type { MovementConfig } from "../fixtures/movement-types.js";
+
 /** Default universe ID for backward compatibility */
 export const DEFAULT_UNIVERSE_ID = "default";
 
@@ -134,6 +136,7 @@ export interface FixtureConfig {
     readonly holdMs: number;
   };
   readonly colorCalibration?: ColorCalibration;
+  readonly movementConfig?: MovementConfig;
 }
 
 /** POST /fixtures request body */
@@ -167,6 +170,7 @@ export interface UpdateFixtureRequest {
     readonly holdMs: number;
   };
   readonly colorCalibration?: ColorCalibration;
+  readonly movementConfig?: Partial<MovementConfig>;
 }
 
 /** Stored fixture group configuration */

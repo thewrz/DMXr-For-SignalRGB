@@ -2,10 +2,14 @@ import { describe, it, expect } from "vitest";
 import {
   parseColorPacket,
   encodeColorPacket,
+  encodeMovementPacket,
   isParseError,
+  isMovementPacket,
   FLAG_PING,
   FLAG_BLACKOUT,
+  FLAG_HAS_MOVEMENT,
   type ColorPacket,
+  type MovementPacket,
 } from "./packet-parser.js";
 
 function makePacket(overrides: Partial<ColorPacket> = {}): ColorPacket {
@@ -199,5 +203,135 @@ describe("isParseError", () => {
 
   it("returns false for valid packets", () => {
     expect(isParseError(makePacket())).toBe(false);
+  });
+});
+
+function makeMovementPacket(overrides: Partial<MovementPacket> = {}): MovementPacket {
+  return {
+    version: 1,
+    flags: FLAG_HAS_MOVEMENT,
+    sequence: 100,
+    timestamp: 1709400000000,
+    fixtures: [
+      { index: 0, r: 255, g: 128, b: 64, brightness: 200 },
+    ],
+    movements: [
+      { index: 0, panTarget: 32768, tiltTarget: 16384 },
+    ],
+    ...overrides,
+  };
+}
+
+describe("encodeMovementPacket / parseColorPacket with movement", () => {
+  it("round-trips a movement packet", () => {
+    const original = makeMovementPacket();
+    const buf = encodeMovementPacket(original);
+    const parsed = parseColorPacket(buf);
+
+    expect(isParseError(parsed)).toBe(false);
+    expect(isMovementPacket(parsed)).toBe(true);
+    if (isMovementPacket(parsed)) {
+      expect(parsed.version).toBe(original.version);
+      expect(parsed.flags).toBe(original.flags);
+      expect(parsed.sequence).toBe(original.sequence);
+      expect(parsed.timestamp).toBe(original.timestamp);
+      expect(parsed.fixtures).toEqual(original.fixtures);
+      expect(parsed.movements).toEqual(original.movements);
+    }
+  });
+
+  it("backward compatibility: old packet without FLAG_HAS_MOVEMENT parses as ColorPacket", () => {
+    const original = makePacket(); // no FLAG_HAS_MOVEMENT
+    const buf = encodeColorPacket(original);
+    const parsed = parseColorPacket(buf);
+
+    expect(isParseError(parsed)).toBe(false);
+    expect(isMovementPacket(parsed)).toBe(false);
+    if (!isParseError(parsed)) {
+      expect(parsed.fixtures).toEqual(original.fixtures);
+    }
+  });
+
+  it("encodes correct size with movement entries", () => {
+    const pkt = makeMovementPacket({
+      movements: [
+        { index: 0, panTarget: 1000, tiltTarget: 2000 },
+        { index: 1, panTarget: 3000, tiltTarget: 4000 },
+      ],
+    });
+    const buf = encodeMovementPacket(pkt);
+    // 15 header + 1*5 color + 1 movement count + 2*5 movement = 31
+    expect(buf.length).toBe(31);
+  });
+
+  it("preserves 0xFFFF sentinel values", () => {
+    const pkt = makeMovementPacket({
+      movements: [
+        { index: 0, panTarget: 0xFFFF, tiltTarget: 0xFFFF },
+      ],
+    });
+    const buf = encodeMovementPacket(pkt);
+    const parsed = parseColorPacket(buf);
+
+    expect(isMovementPacket(parsed)).toBe(true);
+    if (isMovementPacket(parsed)) {
+      expect(parsed.movements[0].panTarget).toBe(0xFFFF);
+      expect(parsed.movements[0].tiltTarget).toBe(0xFFFF);
+    }
+  });
+
+  it("handles mixed color and movement data", () => {
+    const pkt = makeMovementPacket({
+      fixtures: [
+        { index: 0, r: 255, g: 0, b: 0, brightness: 255 },
+        { index: 1, r: 0, g: 255, b: 0, brightness: 128 },
+        { index: 2, r: 0, g: 0, b: 255, brightness: 64 },
+      ],
+      movements: [
+        { index: 0, panTarget: 100, tiltTarget: 200 },
+        { index: 2, panTarget: 0xFFFF, tiltTarget: 500 },
+      ],
+    });
+    const buf = encodeMovementPacket(pkt);
+    const parsed = parseColorPacket(buf);
+
+    expect(isMovementPacket(parsed)).toBe(true);
+    if (isMovementPacket(parsed)) {
+      expect(parsed.fixtures).toHaveLength(3);
+      expect(parsed.movements).toHaveLength(2);
+      expect(parsed.movements[0]).toEqual({ index: 0, panTarget: 100, tiltTarget: 200 });
+      expect(parsed.movements[1]).toEqual({ index: 2, panTarget: 0xFFFF, tiltTarget: 500 });
+    }
+  });
+
+  it("handles empty movement list with flag set", () => {
+    const pkt = makeMovementPacket({ movements: [] });
+    const buf = encodeMovementPacket(pkt);
+    const parsed = parseColorPacket(buf);
+
+    expect(isMovementPacket(parsed)).toBe(true);
+    if (isMovementPacket(parsed)) {
+      expect(parsed.movements).toHaveLength(0);
+    }
+  });
+});
+
+describe("isMovementPacket", () => {
+  it("returns true for movement packets", () => {
+    const pkt = makeMovementPacket();
+    const buf = encodeMovementPacket(pkt);
+    const parsed = parseColorPacket(buf);
+    expect(isMovementPacket(parsed)).toBe(true);
+  });
+
+  it("returns false for plain color packets", () => {
+    const pkt = makePacket();
+    const buf = encodeColorPacket(pkt);
+    const parsed = parseColorPacket(buf);
+    expect(isMovementPacket(parsed)).toBe(false);
+  });
+
+  it("returns false for parse errors", () => {
+    expect(isMovementPacket({ error: "bad" })).toBe(false);
   });
 });

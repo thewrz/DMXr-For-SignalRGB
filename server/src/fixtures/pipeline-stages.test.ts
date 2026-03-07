@@ -234,4 +234,34 @@ describe("colorMappingStage", () => {
 
     expect(result.channels[1]).toBe(128);
   });
+
+  it("skips Pan/Tilt when address is in movementManagedAddresses", () => {
+    const channels: FixtureChannel[] = [
+      { offset: 0, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
+      { offset: 1, name: "Pan", type: "Pan", defaultValue: 128 },
+      { offset: 2, name: "Tilt", type: "Tilt", defaultValue: 128 },
+    ];
+    const managedAddresses = new Set([2, 3]); // dmxStartAddress=1, so Pan=2, Tilt=3
+    const ctx: PipelineContext = {
+      ...makeCtx(channels, 255, 0, 0, 1.0),
+      movementManagedAddresses: managedAddresses,
+    };
+    const result = colorMappingStage(ctx);
+
+    expect(result.channels[1]).toBe(255); // Red still mapped
+    expect(result.channels[2]).toBeUndefined(); // Pan skipped
+    expect(result.channels[3]).toBeUndefined(); // Tilt skipped
+  });
+
+  it("writes Pan/Tilt normally when no movementManagedAddresses", () => {
+    const channels: FixtureChannel[] = [
+      { offset: 0, name: "Pan", type: "Pan", defaultValue: 128 },
+      { offset: 1, name: "Tilt", type: "Tilt", defaultValue: 128 },
+    ];
+    const ctx = makeCtx(channels, 0, 0, 0, 1.0);
+    const result = colorMappingStage(ctx);
+
+    expect(result.channels[1]).toBeDefined();
+    expect(result.channels[2]).toBeDefined();
+  });
 });

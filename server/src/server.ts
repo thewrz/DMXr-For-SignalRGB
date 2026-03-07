@@ -47,6 +47,7 @@ import type { UniverseRegistry } from "./dmx/universe-registry.js";
 import type { ConnectionPool } from "./dmx/connection-pool.js";
 import type { ConnectionLog } from "./dmx/connection-log.js";
 import { registerDiagnosticsRoutes } from "./routes/diagnostics.js";
+import { registerMovementRoutes } from "./routes/movement.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -75,6 +76,7 @@ interface BuildServerDeps {
   readonly groupStore?: GroupStore;
   readonly diskCache?: OflDiskCache;
   readonly connectionLog?: ConnectionLog;
+  readonly movementEngine?: import("./fixtures/movement-interpolator.js").MovementEngine;
 }
 
 export async function buildServer(
@@ -260,6 +262,13 @@ export async function buildServer(
 
   if (deps.connectionLog) {
     registerDiagnosticsRoutes(app, { connectionLog: deps.connectionLog });
+  }
+
+  if (deps.movementEngine) {
+    registerMovementRoutes(app, {
+      movementEngine: deps.movementEngine,
+      fixtureStore: deps.fixtureStore,
+    });
   }
 
   app.setErrorHandler((error: FastifyError, request, reply) => {

@@ -97,6 +97,9 @@ function dmxrApp() {
   };
 
   var mixins = [
+    dmxrMotorGuard(),
+    dmxrFixtureReset(),
+    dmxrColorCalibration(),
     dmxrFixtureManager(),
     dmxrLibraryBrowser(),
     dmxrSearch(),

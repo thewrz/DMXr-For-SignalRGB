@@ -117,8 +117,8 @@ function dmxrGroups() {
       try {
         await fetch("/groups/" + groupId, { method: "DELETE" });
         await this.loadGroups();
-      } catch {
-        // ignore
+      } catch (err) {
+        console.warn("DMXr: deleteGroup failed:", err);
       }
     },
 
@@ -130,8 +130,8 @@ function dmxrGroups() {
           headers: { "Content-Type": "application/json" },
           body: "{}",
         });
-      } catch {
-        // ignore
+      } catch (err) {
+        console.warn("DMXr: groupBlackout failed:", err);
       }
     },
 
@@ -142,8 +142,8 @@ function dmxrGroups() {
           headers: { "Content-Type": "application/json" },
           body: "{}",
         });
-      } catch {
-        // ignore
+      } catch (err) {
+        console.warn("DMXr: groupWhiteout failed:", err);
       }
     },
 
@@ -154,8 +154,8 @@ function dmxrGroups() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ durationMs: 500 }),
         });
-      } catch {
-        // ignore
+      } catch (err) {
+        console.warn("DMXr: groupFlash failed:", err);
       }
     },
 
@@ -166,8 +166,8 @@ function dmxrGroups() {
           headers: { "Content-Type": "application/json" },
           body: "{}",
         });
-      } catch {
-        // ignore
+      } catch (err) {
+        console.warn("DMXr: groupResume failed:", err);
       }
     },
 

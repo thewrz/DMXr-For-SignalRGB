@@ -337,3 +337,94 @@ describe("laserPresetConfig", () => {
     expect(config.preset).toBe("laser");
   });
 });
+
+describe("applyCurve default case", () => {
+  it("does not produce NaN for unknown smoothing curve", () => {
+    const config = {
+      ...defaultMovementConfig(),
+      smoothingCurve: "bogus" as MovementConfig["smoothingCurve"],
+    };
+    const state = makeState({
+      currentPan: 0,
+      targetPan: 200 * SCALE_16,
+    });
+
+    const result = interpolateStep(state, config, 100);
+
+    expect(Number.isNaN(result.currentPan)).toBe(false);
+    expect(result.currentPan).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe("speed multiplier", () => {
+  it("speed=0.25 causes slower movement than speed=1", () => {
+    const config = { ...defaultMovementConfig(), smoothingCurve: "linear" as const };
+    const engine = new MovementEngine();
+
+    engine.setConfig("fast", config);
+    engine.setConfig("slow", config);
+
+    engine.setTarget("fast", { pan: 255 });
+    engine.setTarget("slow", { pan: 255, speed: 0.25 });
+
+    engine.tick(200);
+
+    const fastState = engine.getState("fast")!;
+    const slowState = engine.getState("slow")!;
+
+    expect(slowState.currentPan).toBeLessThan(fastState.currentPan);
+  });
+
+  it("speed is clamped to [0.01, 1]", () => {
+    const config = { ...defaultMovementConfig(), smoothingCurve: "linear" as const };
+    const engine = new MovementEngine();
+
+    engine.setConfig("f1", config);
+    engine.setTarget("f1", { pan: 200, speed: 0 });
+
+    const state = engine.getState("f1")!;
+    expect(state.speedMultiplier).toBe(0.01); // clamped, not 0
+  });
+
+  it("speed persists across setTarget calls without speed", () => {
+    const config = { ...defaultMovementConfig(), smoothingCurve: "linear" as const };
+    const engine = new MovementEngine();
+
+    engine.setConfig("f1", config);
+    engine.setTarget("f1", { pan: 100, speed: 0.5 });
+    engine.setTarget("f1", { pan: 200 }); // no speed → keeps 0.5
+
+    const state = engine.getState("f1")!;
+    expect(state.speedMultiplier).toBe(0.5);
+  });
+});
+
+describe("is16bit target flag", () => {
+  it("does not double-scale 16-bit UDP values on 8-bit fixture", () => {
+    const engine = new MovementEngine();
+    engine.setConfig("mover", {
+      ...defaultMovementConfig(),
+      use16bit: false,
+    });
+
+    // Simulate UDP: value is already 16-bit (32768 = center position)
+    engine.setTarget("mover", { pan: 32768, is16bit: true });
+
+    const state = engine.getState("mover");
+    expect(state!.targetPan).toBeLessThanOrEqual(65535);
+    expect(state!.targetPan).toBe(32768);
+  });
+
+  it("still scales 8-bit values when is16bit is not set", () => {
+    const engine = new MovementEngine();
+    engine.setConfig("mover", {
+      ...defaultMovementConfig(),
+      use16bit: false,
+    });
+
+    engine.setTarget("mover", { pan: 128 });
+
+    const state = engine.getState("mover");
+    expect(state!.targetPan).toBe(128 * SCALE_16);
+  });
+});

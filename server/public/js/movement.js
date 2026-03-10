@@ -10,6 +10,10 @@ function dmxrMovement() {
     movementPollTimer: null,
     movementDragging: false,
 
+    destroy() {
+      this.stopMovementPoll();
+    },
+
     hasPanTilt(fixture) {
       if (!fixture || !fixture.channels) return false;
       return fixture.channels.some(function(ch) {

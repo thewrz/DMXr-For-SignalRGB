@@ -170,7 +170,7 @@ export interface UpdateFixtureRequest {
     readonly holdMs: number;
   };
   readonly colorCalibration?: ColorCalibration;
-  readonly movementConfig?: Partial<MovementConfig>;
+  readonly movementConfig?: MovementConfig;
 }
 
 /** Stored fixture group configuration */

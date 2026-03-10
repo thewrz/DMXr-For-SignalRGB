@@ -9,6 +9,58 @@ interface MovementRouteDeps {
   readonly fixtureStore: FixtureStore;
 }
 
+const rangeSchema = {
+  type: "object" as const,
+  properties: {
+    min: { type: "integer" as const, minimum: 0, maximum: 255 },
+    max: { type: "integer" as const, minimum: 0, maximum: 255 },
+  },
+  required: ["min" as const, "max" as const],
+  additionalProperties: false,
+};
+
+const movementConfigSchema = {
+  schema: {
+    body: {
+      type: "object" as const,
+      additionalProperties: false,
+      properties: {
+        enabled: { type: "boolean" as const },
+        maxVelocity: { type: "number" as const, minimum: 0, maximum: 1000 },
+        maxAcceleration: { type: "number" as const, minimum: 0, maximum: 10000 },
+        smoothingCurve: { type: "string" as const, enum: ["linear", "ease-in-out", "s-curve"] },
+        panRange: rangeSchema,
+        tiltRange: rangeSchema,
+        use16bit: { type: "boolean" as const },
+        homePosition: {
+          type: "object" as const,
+          properties: {
+            pan: { type: "integer" as const, minimum: 0, maximum: 255 },
+            tilt: { type: "integer" as const, minimum: 0, maximum: 255 },
+          },
+          required: ["pan" as const, "tilt" as const],
+          additionalProperties: false,
+        },
+        preset: { type: "string" as const, enum: ["moving-head", "scanner", "laser", "custom"] },
+      },
+    },
+  },
+};
+
+const movementTargetSchema = {
+  schema: {
+    body: {
+      type: "object" as const,
+      additionalProperties: false,
+      properties: {
+        pan: { type: "number" as const, minimum: 0, maximum: 255 },
+        tilt: { type: "number" as const, minimum: 0, maximum: 255 },
+        speed: { type: "number" as const, minimum: 0, maximum: 1 },
+      },
+    },
+  },
+};
+
 export function registerMovementRoutes(
   app: FastifyInstance,
   deps: MovementRouteDeps,
@@ -36,6 +88,7 @@ export function registerMovementRoutes(
 
   app.patch<{ Params: { id: string }; Body: Partial<MovementConfig> }>(
     "/fixtures/:id/movement",
+    movementConfigSchema,
     async (request, reply) => {
       const fixture = deps.fixtureStore.getById(request.params.id);
       if (!fixture) {
@@ -75,6 +128,7 @@ export function registerMovementRoutes(
 
   app.post<{ Params: { id: string }; Body: { pan?: number; tilt?: number; speed?: number } }>(
     "/fixtures/:id/movement/target",
+    movementTargetSchema,
     async (request, reply) => {
       const fixture = deps.fixtureStore.getById(request.params.id);
       if (!fixture) {

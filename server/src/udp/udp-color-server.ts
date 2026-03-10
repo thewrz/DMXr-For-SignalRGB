@@ -165,6 +165,7 @@ export function createUdpColorServer(deps: UdpColorServerDeps): UdpColorServer {
                 deps.movementEngine.setTarget(fixture.id, {
                   pan: entry.panTarget,
                   tilt: entry.tiltTarget,
+                  is16bit: true,
                 });
               }
             }

@@ -277,6 +277,49 @@ describe("createFixtureStore", () => {
       expect(store2.getById(fixture.id)!.colorCalibration).toEqual(colorCalibration);
     });
 
+    it("updates movementConfig → persisted", async () => {
+      const fixture = store.add(makeRequest());
+      const movementConfig = {
+        enabled: true,
+        maxVelocity: 75,
+        maxAcceleration: 150,
+        smoothingCurve: "s-curve" as const,
+        panRange: { min: 0, max: 255 },
+        tiltRange: { min: 0, max: 255 },
+        use16bit: false,
+        homePosition: { pan: 128, tilt: 128 },
+        preset: "moving-head" as const,
+      };
+      const updated = store.update(fixture.id, { movementConfig });
+
+      expect(updated!.movementConfig).toEqual(movementConfig);
+
+      await store.save();
+      const store2 = createFixtureStore(filePath);
+      await store2.load();
+      expect(store2.getById(fixture.id)!.movementConfig).toEqual(movementConfig);
+    });
+
+    it("movementConfig preserved on partial update", () => {
+      const fixture = store.add(makeRequest());
+      const movementConfig = {
+        enabled: true,
+        maxVelocity: 75,
+        maxAcceleration: 150,
+        smoothingCurve: "s-curve" as const,
+        panRange: { min: 0, max: 255 },
+        tiltRange: { min: 0, max: 255 },
+        use16bit: false,
+        homePosition: { pan: 128, tilt: 128 },
+        preset: "moving-head" as const,
+      };
+      store.update(fixture.id, { movementConfig });
+      const updated = store.update(fixture.id, { name: "Renamed" });
+
+      expect(updated!.name).toBe("Renamed");
+      expect(updated!.movementConfig).toEqual(movementConfig);
+    });
+
     it("colorCalibration preserved on partial update", () => {
       const fixture = store.add(makeRequest());
       const colorCalibration = {

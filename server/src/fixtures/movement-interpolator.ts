@@ -30,6 +30,8 @@ function applyCurve(
     case "s-curve":
       // Sigmoid-like: 6t^5 - 15t^4 + 10t^3 (smoothstep)
       return progress * progress * progress * (progress * (progress * 6 - 15) + 10);
+    default:
+      return progress;
   }
 }
 
@@ -56,11 +58,6 @@ function interpolateAxis(
 
   const direction = Math.sign(delta);
   const effectiveMaxVel = maxVelocity16 * speedMultiplier;
-
-  // Compute progress toward target (0 = far, 1 = arrived)
-  // Use distance-based progress for curve shaping
-  const totalDistance = absDelta + Math.abs(velocity) * deltaSec;
-  const progress = totalDistance > 0 ? 1 - (absDelta / Math.max(totalDistance, absDelta)) : 1;
 
   // Apply curve to get velocity scaling factor
   const curveScale = curve === "linear" ? 1 : applyCurve(Math.min(1, absDelta / (effectiveMaxVel * 0.5 + 1)), curve);
@@ -120,7 +117,7 @@ export function interpolateStep(
   // Scale 8-bit config values to 16-bit for internal math
   const maxVelocity16 = config.maxVelocity * SCALE_16;
   const maxAccel16 = config.maxAcceleration * SCALE_16;
-  const speedMultiplier = 1; // target-level speed is applied in setTarget
+  const speedMultiplier = state.speedMultiplier ?? 1;
 
   const [newPan, newVelPan] = interpolateAxis(
     state.currentPan,
@@ -210,13 +207,18 @@ export class MovementEngine {
     const currentPan = existing?.currentPan ?? to16bit(config.homePosition.pan);
     const currentTilt = existing?.currentTilt ?? to16bit(config.homePosition.tilt);
 
+    const alreadyScaled = target.is16bit || config.use16bit;
     const targetPan = target.pan !== undefined
-      ? (config.use16bit ? target.pan : to16bit(target.pan))
+      ? (alreadyScaled ? target.pan : to16bit(target.pan))
       : (existing?.targetPan ?? currentPan);
 
     const targetTilt = target.tilt !== undefined
-      ? (config.use16bit ? target.tilt : to16bit(target.tilt))
+      ? (alreadyScaled ? target.tilt : to16bit(target.tilt))
       : (existing?.targetTilt ?? currentTilt);
+
+    const speed = target.speed !== undefined
+      ? Math.max(0.01, Math.min(1, target.speed))
+      : (existing?.speedMultiplier ?? 1);
 
     this.states.set(fixtureId, {
       currentPan,
@@ -227,6 +229,7 @@ export class MovementEngine {
       velocityTilt: existing?.velocityTilt ?? 0,
       lastUpdateTime: existing?.lastUpdateTime ?? Date.now(),
       isMoving: true,
+      speedMultiplier: speed,
     });
   }
 

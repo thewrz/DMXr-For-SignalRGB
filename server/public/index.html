@@ -39,6 +39,7 @@
   <script src="/js/selection.js"></script>
   <script src="/js/movement.js"></script>
   <script src="/js/onboarding.js"></script>
+  <script src="/js/action-feedback.js"></script>
   <script src="/js/app.js"></script>
 </head>
 <body x-data="dmxrApp()" x-init="init()" @keydown.window="onSelectionKeydown($event)">
@@ -1544,6 +1545,13 @@
        :style="'left:'+helpTooltip.x+'px;top:'+helpTooltip.y+'px'">
     <strong x-text="helpTooltip.title"></strong>
     <p x-text="helpTooltip.description"></p>
+  </div>
+
+  <!-- Action feedback toasts -->
+  <div class="toast-container">
+    <template x-for="toast in actionToasts" :key="toast.id">
+      <div class="toast" :class="'toast-' + toast.type" x-text="toast.message"></div>
+    </template>
   </div>
 
 </body>

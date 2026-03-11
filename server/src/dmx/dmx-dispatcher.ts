@@ -1,5 +1,5 @@
 import type { FixtureUpdatePayload } from "../types/protocol.js";
-import type { UniverseManager, ControlMode } from "./universe-manager.js";
+import type { UniverseManager, ControlMode, DmxWriteResult } from "./universe-manager.js";
 import type { MultiUniverseCoordinator } from "./multi-universe-coordinator.js";
 
 /**
@@ -10,10 +10,10 @@ import type { MultiUniverseCoordinator } from "./multi-universe-coordinator.js";
  */
 export interface DmxDispatcher {
   readonly applyFixtureUpdate: (universeId: string | undefined, payload: FixtureUpdatePayload) => number;
-  readonly applyRawUpdate: (universeId: string | undefined, channels: Record<number, number>) => void;
-  readonly blackout: (universeId?: string) => void;
-  readonly whiteout: (universeId?: string) => void;
-  readonly resumeNormal: (universeId?: string) => void;
+  readonly applyRawUpdate: (universeId: string | undefined, channels: Record<number, number>) => DmxWriteResult;
+  readonly blackout: (universeId?: string) => DmxWriteResult;
+  readonly whiteout: (universeId?: string) => DmxWriteResult;
+  readonly resumeNormal: (universeId?: string) => DmxWriteResult;
   readonly getChannelSnapshot: (universeId: string | undefined, start: number, count: number) => Record<number, number>;
   readonly isBlackoutActive: (universeId?: string) => boolean;
   readonly getControlMode: (universeId?: string) => ControlMode;
@@ -36,10 +36,9 @@ export function createDmxDispatcher(
 
     applyRawUpdate(universeId, channels) {
       if (coordinator && universeId) {
-        coordinator.applyRawUpdate(universeId, channels);
-      } else {
-        manager.applyRawUpdate(channels);
+        return coordinator.applyRawUpdate(universeId, channels);
       }
+      return manager.applyRawUpdate(channels);
     },
 
     blackout(universeId?) {
@@ -49,7 +48,7 @@ export function createDmxDispatcher(
         coordinator.blackoutAll();
       }
       // Primary manager is not in the connection pool — always update it
-      manager.blackout();
+      return manager.blackout();
     },
 
     whiteout(universeId?) {
@@ -58,7 +57,7 @@ export function createDmxDispatcher(
       } else if (coordinator) {
         coordinator.whiteoutAll();
       }
-      manager.whiteout();
+      return manager.whiteout();
     },
 
     resumeNormal(universeId?) {
@@ -67,7 +66,7 @@ export function createDmxDispatcher(
       } else if (coordinator) {
         coordinator.resumeNormalAll();
       }
-      manager.resumeNormal();
+      return manager.resumeNormal();
     },
 
     getChannelSnapshot(universeId, start, count) {

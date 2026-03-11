@@ -209,3 +209,10 @@ export interface ColorUpdatePayload {
     readonly brightness: number;
   }[];
 }
+
+/** Future: RDM/Art-Net response confirmation */
+export interface DmxConfirmation {
+  readonly sent: true;
+  readonly confirmed?: boolean;
+  readonly roundTripMs?: number;
+}

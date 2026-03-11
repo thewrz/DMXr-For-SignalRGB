@@ -119,6 +119,7 @@ function dmxrApp() {
     dmxrSelection(),
     dmxrMovement(),
     dmxrOnboarding(),
+    dmxrActionFeedback(),
   ];
 
   // Use defineProperties instead of Object.assign to preserve getters

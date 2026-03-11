@@ -4,6 +4,11 @@ import { pipeLog, shouldSample } from "../logging/pipeline-logger.js";
 
 export type ControlMode = "normal" | "blackout" | "whiteout";
 
+export interface DmxWriteResult {
+  readonly ok: boolean;
+  readonly error?: string;
+}
+
 const MIN_CHANNEL = 1;
 const MAX_CHANNEL = 512;
 const MIN_VALUE = 0;
@@ -28,15 +33,15 @@ export interface UniverseManagerOptions {
 
 export interface UniverseManager {
   readonly applyFixtureUpdate: (payload: FixtureUpdatePayload) => number;
-  readonly blackout: () => void;
-  readonly whiteout: () => void;
-  readonly resumeNormal: () => void;
+  readonly blackout: () => DmxWriteResult;
+  readonly whiteout: () => DmxWriteResult;
+  readonly resumeNormal: () => DmxWriteResult;
   readonly isBlackoutActive: () => boolean;
   readonly getControlMode: () => ControlMode;
   readonly getActiveChannelCount: () => number;
   readonly getChannelSnapshot: (start: number, count: number) => Record<number, number>;
   readonly getFullSnapshot: () => Record<number, number>;
-  readonly applyRawUpdate: (channels: Record<number, number>) => void;
+  readonly applyRawUpdate: (channels: Record<number, number>) => DmxWriteResult;
   readonly getDmxSendStatus: () => DmxSendStatus;
   /** Register safe center positions for motor channels (Pan/Tilt/etc).
    *  These are restored immediately after blackout/whiteout to prevent
@@ -91,7 +96,7 @@ export function createUniverseManager(
   let blackoutActive = false;
   let controlMode: ControlMode = "normal";
 
-  function safeSend(label: string, fn: () => void): void {
+  function safeSend(label: string, fn: () => void): DmxWriteResult {
     try {
       const start = performance.now();
       fn();
@@ -99,10 +104,12 @@ export function createUniverseManager(
       lastSendTime = Date.now();
       lastSendError = null;
       options.onDmxSendTiming?.(duration);
+      return { ok: true };
     } catch (error: unknown) {
       lastSendError = error instanceof Error ? error.message : String(error);
       log?.error(`DMX send failed (${label}): ${lastSendError}`);
       options.onDmxError?.(error);
+      return { ok: false, error: lastSendError };
     }
   }
 
@@ -156,7 +163,7 @@ export function createUniverseManager(
       return channelCount;
     },
 
-    blackout(): void {
+    blackout(): DmxWriteResult {
       blackoutActive = true;
       controlMode = "blackout";
       const prevCount = activeChannels.size;
@@ -168,6 +175,8 @@ export function createUniverseManager(
       }
 
       activeChannels.clear();
+
+      let result: DmxWriteResult;
 
       // Always use selective update when we have safe positions or locked channels
       if (safePositions.size > 0 || lockedChannels.size > 0) {
@@ -185,20 +194,21 @@ export function createUniverseManager(
             selective[ch] = 0;
           }
         }
-        safeSend(`blackout-selective ${MAX_CHANNEL}ch`, () => universe.update(selective));
+        result = safeSend(`blackout-selective ${MAX_CHANNEL}ch`, () => universe.update(selective));
         const preserved = safePositions.size + lockedChannels.size;
         pipeLog("info",
           `BLACKOUT: zeroed ${MAX_CHANNEL - preserved} channels, ` +
           `preserved ${safePositions.size} motor + ${lockedChannels.size} locked`,
         );
       } else {
-        safeSend("blackout", () => universe.updateAll(0));
+        result = safeSend("blackout", () => universe.updateAll(0));
         pipeLog("info", `BLACKOUT: cleared ${prevCount} active channels → all 512 zeroed`);
       }
       log?.info("DMX blackout active");
+      return result;
     },
 
-    whiteout(): void {
+    whiteout(): DmxWriteResult {
       blackoutActive = true;
       controlMode = "whiteout";
 
@@ -209,6 +219,8 @@ export function createUniverseManager(
       }
 
       activeChannels.clear();
+
+      let result: DmxWriteResult;
 
       // Always use selective update when we have safe positions or locked channels
       if (safePositions.size > 0 || lockedChannels.size > 0) {
@@ -226,23 +238,24 @@ export function createUniverseManager(
             activeChannels.set(ch, MAX_VALUE);
           }
         }
-        safeSend(`whiteout-selective ${MAX_CHANNEL}ch`, () => universe.update(selective));
+        result = safeSend(`whiteout-selective ${MAX_CHANNEL}ch`, () => universe.update(selective));
         const preserved = safePositions.size + lockedChannels.size;
         pipeLog("info",
           `WHITEOUT: set ${MAX_CHANNEL - preserved} channels to 255, ` +
           `preserved ${safePositions.size} motor + ${lockedChannels.size} locked`,
         );
       } else {
-        safeSend("whiteout", () => universe.updateAll(MAX_VALUE));
+        result = safeSend("whiteout", () => universe.updateAll(MAX_VALUE));
         for (let ch = MIN_CHANNEL; ch <= MAX_CHANNEL; ch++) {
           activeChannels.set(ch, MAX_VALUE);
         }
         pipeLog("info", "WHITEOUT: all 512 channels → 255");
       }
       log?.info("DMX whiteout active");
+      return result;
     },
 
-    resumeNormal(): void {
+    resumeNormal(): DmxWriteResult {
       const prevMode = controlMode;
       blackoutActive = false;
       controlMode = "normal";
@@ -251,6 +264,8 @@ export function createUniverseManager(
       // doesn't keep showing override values for unoccupied channels.
       const prevCount = activeChannels.size;
       activeChannels.clear();
+
+      let result: DmxWriteResult;
 
       // Reset DMX hardware to zero so unoccupied channels don't stay at
       // the override level (e.g. 255 after whiteout).  Safe positions are
@@ -265,9 +280,9 @@ export function createUniverseManager(
             selective[ch] = 0;
           }
         }
-        safeSend(`resume-selective ${MAX_CHANNEL}ch`, () => universe.update(selective));
+        result = safeSend(`resume-selective ${MAX_CHANNEL}ch`, () => universe.update(selective));
       } else {
-        safeSend("resume", () => universe.updateAll(0));
+        result = safeSend("resume", () => universe.updateAll(0));
       }
 
       pipeLog("info",
@@ -275,6 +290,7 @@ export function createUniverseManager(
         `hardware reset to 0${safePositions.size > 0 ? ` (${safePositions.size} motor positions preserved)` : ""}`,
       );
       log?.info("DMX override cleared: resuming normal updates");
+      return result;
     },
 
     isBlackoutActive(): boolean {
@@ -305,7 +321,7 @@ export function createUniverseManager(
       return snapshot;
     },
 
-    applyRawUpdate(channels: Record<number, number>): void {
+    applyRawUpdate(channels: Record<number, number>): DmxWriteResult {
       for (const [ch, val] of Object.entries(channels)) {
         const chNum = Number(ch);
         if (val > 0) {
@@ -315,12 +331,13 @@ export function createUniverseManager(
         }
       }
       const count = Object.keys(channels).length;
-      safeSend(`raw-update ${count}ch`, () => universe.update(channels));
+      const result = safeSend(`raw-update ${count}ch`, () => universe.update(channels));
       if (shouldSample("rawUpdate")) {
         const addrs = Object.keys(channels).map(Number).sort((a, b) => a - b);
         const snapshot = addrs.map((a) => `${a}:${channels[Number(a)]}`).join(" ");
         pipeLog("verbose", `RAW UPDATE: ${count}ch → ${snapshot}`);
       }
+      return result;
     },
 
     getDmxSendStatus(): DmxSendStatus {

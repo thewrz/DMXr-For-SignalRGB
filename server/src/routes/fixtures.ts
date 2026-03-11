@@ -78,6 +78,15 @@ export function registerFixtureRoutes(
         return reply.status(404).send({ success: false, error: "Fixture not found" });
       }
 
+      if (request.body.version !== undefined && request.body.version !== existing.version) {
+        return reply.status(409).send({
+          success: false,
+          error: "Conflict: fixture was modified by another request",
+          currentVersion: existing.version,
+          fixture: existing,
+        });
+      }
+
       if (request.body.dmxStartAddress !== undefined) {
         const targetUniverse = request.body.universeId ?? existing.universeId;
         const validation = validateFixtureAddress(
@@ -230,6 +239,7 @@ export function registerFixtureRoutes(
   }>(
     "/fixtures/batch",
     {
+      bodyLimit: 256 * 1024,
       schema: {
         body: {
           type: "object" as const,
@@ -240,7 +250,7 @@ export function registerFixtureRoutes(
             channels: addFixtureSchema.body.properties.channels,
             channelCount: { type: "integer" as const, minimum: 1 },
             startAddress: { type: "integer" as const, minimum: 1, maximum: 512 },
-            count: { type: "integer" as const, minimum: 1, maximum: 32 },
+            count: { type: "integer" as const, minimum: 1, maximum: 50 },
             spacing: { type: "integer" as const, minimum: 1 },
             universeId: { type: "string" as const },
             oflKey: { type: "string" as const },

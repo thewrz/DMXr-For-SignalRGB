@@ -67,6 +67,7 @@ export interface HealthResponse {
   readonly controlMode?: "normal" | "blackout" | "whiteout";
   readonly serverId?: string;
   readonly serverName?: string;
+  readonly sseSubscribers?: number;
   readonly universes?: readonly {
     readonly id: string;
     readonly name: string;
@@ -137,6 +138,7 @@ export interface FixtureConfig {
   };
   readonly colorCalibration?: ColorCalibration;
   readonly movementConfig?: MovementConfig;
+  readonly version?: number;
 }
 
 /** POST /fixtures request body */
@@ -171,6 +173,7 @@ export interface UpdateFixtureRequest {
   };
   readonly colorCalibration?: ColorCalibration;
   readonly movementConfig?: MovementConfig;
+  readonly version?: number;
 }
 
 /** Stored fixture group configuration */

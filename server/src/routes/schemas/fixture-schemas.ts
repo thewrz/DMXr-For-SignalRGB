@@ -46,6 +46,7 @@ export const updateFixtureSchema = {
     properties: {
       name: { type: "string" as const, minLength: 1 },
       universeId: { type: "string" as const },
+      version: { type: "integer" as const, minimum: 1 },
       dmxStartAddress: { type: "integer" as const, minimum: 1, maximum: 512 },
       channelOverrides: {
         type: "object" as const,

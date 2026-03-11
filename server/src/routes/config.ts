@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import type { FixtureStore } from "../fixtures/fixture-store.js";
 import type { SettingsStore, PersistedSettings } from "../config/settings-store.js";
 import type { FixtureConfig, AddFixtureRequest } from "../types/protocol.js";
+import { DEFAULT_UNIVERSE_ID } from "../types/protocol.js";
 import { validateFixtureAddress } from "../fixtures/fixture-validator.js";
 
 const CONFIG_VERSION = 1;
@@ -91,7 +92,7 @@ export function registerConfigRoutes(
   });
 
   // POST /config/preview — validate import file without applying
-  app.post("/config/preview", async (request, reply) => {
+  app.post("/config/preview", { bodyLimit: 5 * 1024 * 1024 }, async (request, reply) => {
     const body = request.body as { config?: unknown } | null;
     if (!body?.config) {
       return reply.status(400).send({ valid: false, error: "No config provided" });
@@ -125,7 +126,7 @@ export function registerConfigRoutes(
   });
 
   // POST /config/import — apply configuration
-  app.post("/config/import", async (request, reply) => {
+  app.post("/config/import", { bodyLimit: 5 * 1024 * 1024 }, async (request, reply) => {
     const body = request.body as ImportBody | null;
     if (!body?.config || !body.mode) {
       return reply.status(400).send({ success: false, error: "config and mode required" });
@@ -147,46 +148,101 @@ export function registerConfigRoutes(
       });
     }
 
+    if (config.fixtures.length > 500) {
+      return reply.status(400).send({
+        success: false,
+        error: `Import contains ${config.fixtures.length} fixtures, maximum is 500`,
+      });
+    }
+
     if (body.mode === "replace") {
-      // Remove all existing fixtures
+      // Pre-validate all fixtures before any destructive changes
+      const importFixtures = config.fixtures;
+
+      // Validate each fixture has required fields
+      for (let i = 0; i < importFixtures.length; i++) {
+        const f = importFixtures[i];
+        if (!f.name || typeof f.dmxStartAddress !== "number" || !f.channelCount || !Array.isArray(f.channels)) {
+          return reply.status(400).send({
+            success: false,
+            error: `Invalid fixture at index ${i}: missing required fields`,
+          });
+        }
+      }
+
+      // Check for intra-import DMX address conflicts
+      for (let i = 0; i < importFixtures.length; i++) {
+        const a = importFixtures[i];
+        const aEnd = a.dmxStartAddress + a.channelCount - 1;
+        const aUniverse = a.universeId ?? DEFAULT_UNIVERSE_ID;
+        for (let j = i + 1; j < importFixtures.length; j++) {
+          const b = importFixtures[j];
+          const bEnd = b.dmxStartAddress + b.channelCount - 1;
+          const bUniverse = b.universeId ?? DEFAULT_UNIVERSE_ID;
+          if (aUniverse === bUniverse) {
+            if (a.dmxStartAddress <= bEnd && b.dmxStartAddress <= aEnd) {
+              return reply.status(400).send({
+                success: false,
+                error: `Import conflict: fixture "${a.name}" (DMX ${a.dmxStartAddress}-${aEnd}) overlaps "${b.name}" (DMX ${b.dmxStartAddress}-${bEnd}) on universe ${aUniverse}`,
+              });
+            }
+          }
+        }
+      }
+
+      // All validation passed — now safe to delete and replace
       const existing = deps.fixtureStore.getAll();
       for (const f of existing) {
         deps.fixtureStore.remove(f.id);
       }
 
-      // Add all imported fixtures
-      const requests: AddFixtureRequest[] = config.fixtures.map((f) => ({
-        name: f.name,
-        universeId: f.universeId,
-        oflKey: f.oflKey,
-        oflFixtureName: f.oflFixtureName,
-        source: f.source,
-        category: f.category,
-        mode: f.mode,
-        dmxStartAddress: f.dmxStartAddress,
-        channelCount: f.channelCount,
-        channels: [...f.channels],
-      }));
+      let created: readonly FixtureConfig[];
+      try {
+        // Add all imported fixtures
+        const requests: AddFixtureRequest[] = config.fixtures.map((f) => ({
+          name: f.name,
+          universeId: f.universeId,
+          oflKey: f.oflKey,
+          oflFixtureName: f.oflFixtureName,
+          source: f.source,
+          category: f.category,
+          mode: f.mode,
+          dmxStartAddress: f.dmxStartAddress,
+          channelCount: f.channelCount,
+          channels: [...f.channels],
+        }));
 
-      const created = deps.fixtureStore.addBatch(requests);
+        created = deps.fixtureStore.addBatch(requests);
 
-      // Restore per-fixture settings (overrides, motor guard, etc.) by patching
-      for (let i = 0; i < config.fixtures.length; i++) {
-        const src = config.fixtures[i];
-        const target = created[i];
-        if (!target) continue;
+        // Restore per-fixture settings (overrides, motor guard, etc.) by patching
+        for (let i = 0; i < config.fixtures.length; i++) {
+          const src = config.fixtures[i];
+          const target = created[i];
+          if (!target) continue;
 
-        const patch: Record<string, unknown> = {};
-        if (src.channelOverrides) patch.channelOverrides = src.channelOverrides;
-        if (src.channelRemap) patch.channelRemap = src.channelRemap;
-        if (src.whiteGateThreshold !== undefined) patch.whiteGateThreshold = src.whiteGateThreshold;
-        if (src.motorGuardEnabled !== undefined) patch.motorGuardEnabled = src.motorGuardEnabled;
-        if (src.motorGuardBuffer !== undefined) patch.motorGuardBuffer = src.motorGuardBuffer;
-        if (src.resetConfig) patch.resetConfig = src.resetConfig;
+          const patch: Record<string, unknown> = {};
+          if (src.channelOverrides) patch.channelOverrides = src.channelOverrides;
+          if (src.channelRemap) patch.channelRemap = src.channelRemap;
+          if (src.whiteGateThreshold !== undefined) patch.whiteGateThreshold = src.whiteGateThreshold;
+          if (src.motorGuardEnabled !== undefined) patch.motorGuardEnabled = src.motorGuardEnabled;
+          if (src.motorGuardBuffer !== undefined) patch.motorGuardBuffer = src.motorGuardBuffer;
+          if (src.resetConfig) patch.resetConfig = src.resetConfig;
 
-        if (Object.keys(patch).length > 0) {
-          deps.fixtureStore.update(target.id, patch);
+          if (Object.keys(patch).length > 0) {
+            deps.fixtureStore.update(target.id, patch);
+          }
         }
+      } catch (err) {
+        request.log.error(
+          { error: err instanceof Error ? err.message : String(err) },
+          "CRITICAL: Config import failed after deleting existing fixtures — data loss may have occurred",
+        );
+        // Still try to save whatever state we have
+        await deps.fixtureStore.save();
+        return reply.status(500).send({
+          success: false,
+          error: "Import failed after deletion — partial data may have been saved",
+        });
       }
 
       await deps.fixtureStore.save();

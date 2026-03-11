@@ -2,8 +2,11 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import Fastify, { type FastifyInstance } from "fastify";
 import { registerMovementRoutes } from "./movement.js";
 import { MovementEngine } from "../fixtures/movement-interpolator.js";
+import { defaultMovementConfig } from "../fixtures/movement-types.js";
 import { createTestFixtureStore, makeTestMovingHead, makeTestPar } from "../test-helpers.js";
 import type { FixtureStore } from "../fixtures/fixture-store.js";
+
+const defaultConfig = defaultMovementConfig();
 
 describe("Movement routes", () => {
   let app: FastifyInstance;
@@ -198,6 +201,139 @@ describe("Movement routes", () => {
       });
 
       expect(res.statusCode).toBe(404);
+    });
+  });
+
+  describe("PATCH /fixtures/:id/movement input validation", () => {
+    it("rejects maxVelocity of type string", async () => {
+      const fixture = store.add(makeTestMovingHead({ dmxStartAddress: 1 }));
+      const res = await app.inject({
+        method: "PATCH",
+        url: `/fixtures/${fixture.id}/movement`,
+        payload: { maxVelocity: "fast" },
+      });
+      expect(res.statusCode).toBe(400);
+    });
+
+    it("rejects negative maxVelocity", async () => {
+      const fixture = store.add(makeTestMovingHead({ dmxStartAddress: 1 }));
+      const res = await app.inject({
+        method: "PATCH",
+        url: `/fixtures/${fixture.id}/movement`,
+        payload: { maxVelocity: -10 },
+      });
+      expect(res.statusCode).toBe(400);
+    });
+
+    it("rejects invalid smoothingCurve", async () => {
+      const fixture = store.add(makeTestMovingHead({ dmxStartAddress: 1 }));
+      const res = await app.inject({
+        method: "PATCH",
+        url: `/fixtures/${fixture.id}/movement`,
+        payload: { smoothingCurve: "cubic-bezier" },
+      });
+      expect(res.statusCode).toBe(400);
+    });
+
+    it("rejects invalid preset", async () => {
+      const fixture = store.add(makeTestMovingHead({ dmxStartAddress: 1 }));
+      const res = await app.inject({
+        method: "PATCH",
+        url: `/fixtures/${fixture.id}/movement`,
+        payload: { preset: "disco-ball" },
+      });
+      expect(res.statusCode).toBe(400);
+    });
+
+    it("strips unknown properties silently", async () => {
+      const fixture = store.add(makeTestMovingHead({ dmxStartAddress: 1 }));
+      const res = await app.inject({
+        method: "PATCH",
+        url: `/fixtures/${fixture.id}/movement`,
+        payload: { hackField: true, maxVelocity: 80 },
+      });
+      // Fastify strips unknown props rather than rejecting — verify valid fields still work
+      expect(res.statusCode).toBe(200);
+      expect(res.json().maxVelocity).toBe(80);
+    });
+
+    it("rejects maxVelocity above 1000", async () => {
+      const fixture = store.add(makeTestMovingHead({ dmxStartAddress: 1 }));
+      const res = await app.inject({
+        method: "PATCH",
+        url: `/fixtures/${fixture.id}/movement`,
+        payload: { maxVelocity: 9999 },
+      });
+      expect(res.statusCode).toBe(400);
+    });
+  });
+
+  describe("POST /fixtures/:id/movement/target input validation", () => {
+    it("rejects non-numeric pan", async () => {
+      const fixture = store.add(makeTestMovingHead({ dmxStartAddress: 1 }));
+      engine.setConfig(fixture.id, {
+        ...defaultConfig,
+      });
+      const res = await app.inject({
+        method: "POST",
+        url: `/fixtures/${fixture.id}/movement/target`,
+        payload: { pan: "left" },
+      });
+      expect(res.statusCode).toBe(400);
+    });
+
+    it("rejects pan above 255", async () => {
+      const fixture = store.add(makeTestMovingHead({ dmxStartAddress: 1 }));
+      engine.setConfig(fixture.id, {
+        ...defaultConfig,
+      });
+      const res = await app.inject({
+        method: "POST",
+        url: `/fixtures/${fixture.id}/movement/target`,
+        payload: { pan: 999 },
+      });
+      expect(res.statusCode).toBe(400);
+    });
+
+    it("rejects speed above 1", async () => {
+      const fixture = store.add(makeTestMovingHead({ dmxStartAddress: 1 }));
+      engine.setConfig(fixture.id, {
+        ...defaultConfig,
+      });
+      const res = await app.inject({
+        method: "POST",
+        url: `/fixtures/${fixture.id}/movement/target`,
+        payload: { pan: 128, speed: 5 },
+      });
+      expect(res.statusCode).toBe(400);
+    });
+
+    it("rejects negative pan", async () => {
+      const fixture = store.add(makeTestMovingHead({ dmxStartAddress: 1 }));
+      engine.setConfig(fixture.id, {
+        ...defaultConfig,
+      });
+      const res = await app.inject({
+        method: "POST",
+        url: `/fixtures/${fixture.id}/movement/target`,
+        payload: { pan: -1 },
+      });
+      expect(res.statusCode).toBe(400);
+    });
+
+    it("strips unknown properties silently", async () => {
+      const fixture = store.add(makeTestMovingHead({ dmxStartAddress: 1 }));
+      engine.setConfig(fixture.id, {
+        ...defaultConfig,
+      });
+      const res = await app.inject({
+        method: "POST",
+        url: `/fixtures/${fixture.id}/movement/target`,
+        payload: { pan: 128, inject: true },
+      });
+      // Fastify strips unknown props — valid fields still processed
+      expect(res.statusCode).toBe(200);
+      expect(res.json().success).toBe(true);
     });
   });
 

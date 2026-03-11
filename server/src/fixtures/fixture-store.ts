@@ -123,6 +123,7 @@ export function createFixtureStore(filePath: string): FixtureStore {
         ...(changes.motorGuardBuffer !== undefined ? { motorGuardBuffer: changes.motorGuardBuffer } : {}),
         ...(changes.resetConfig !== undefined ? { resetConfig: changes.resetConfig } : {}),
         ...(changes.colorCalibration !== undefined ? { colorCalibration: changes.colorCalibration } : {}),
+        ...(changes.movementConfig !== undefined ? { movementConfig: changes.movementConfig } : {}),
       };
 
       fixtures = fixtures.map((f, i) => (i === index ? updated : f));

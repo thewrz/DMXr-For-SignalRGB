@@ -18,6 +18,7 @@ export interface ShutdownDeps {
   readonly connectionPool: ConnectionPool;
   readonly connection: ResilientConnection;
   readonly getMdnsAdvertiser: () => MdnsAdvertiser | undefined;
+  readonly movementInterval?: ReturnType<typeof setInterval>;
 }
 
 /**
@@ -43,6 +44,9 @@ export function installShutdownHandlers(deps: ShutdownDeps): (signal: string) =>
 
     deps.app.log.info(`Received ${signal}, shutting down...`);
     exitBlackoutDone = true;
+    if (deps.movementInterval) {
+      clearInterval(deps.movementInterval);
+    }
     deps.getMdnsAdvertiser()?.unpublishAll();
     for (const provider of deps.registry.getAll()) {
       provider.close?.();

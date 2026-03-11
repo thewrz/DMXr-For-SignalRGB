@@ -18,6 +18,8 @@ import { createDmxMonitor } from "./dmx/dmx-monitor.js";
 import { shortId } from "./utils/format.js";
 import { setPipelineLogLevel, parsePipelineLogLevel, pipeLog } from "./logging/pipeline-logger.js";
 import { MovementEngine } from "./fixtures/movement-interpolator.js";
+import { createMovementTickHandler } from "./fixtures/movement-tick.js";
+import { createDmxDispatcher } from "./dmx/dmx-dispatcher.js";
 import { createDmxStack } from "./bootstrap/dmx-setup.js";
 import { createMultiUniverseStack } from "./bootstrap/multi-universe-setup.js";
 import { createLibraryStack } from "./bootstrap/library-setup.js";
@@ -100,37 +102,21 @@ async function main() {
 
   // ── Movement Engine ──
   const movementEngine = new MovementEngine();
-  const MOVEMENT_TICK_MS = 25;
-  const movementInterval = setInterval(() => {
-    const outputs = movementEngine.tick(MOVEMENT_TICK_MS);
-    for (const [fixtureId, output] of outputs) {
-      const fixture = fixtureStore.getById(fixtureId);
-      if (!fixture) continue;
-
-      const channels: Record<number, number> = {};
-      for (const ch of fixture.channels) {
-        const addr = fixture.dmxStartAddress + ch.offset;
-        if (ch.type === "Pan" && !/fine/i.test(ch.name)) {
-          channels[addr] = output.panCoarse;
-        } else if (ch.type === "Pan" && /fine/i.test(ch.name)) {
-          channels[addr] = output.panFine;
-        } else if (ch.type === "Tilt" && !/fine/i.test(ch.name)) {
-          channels[addr] = output.tiltCoarse;
-        } else if (ch.type === "Tilt" && /fine/i.test(ch.name)) {
-          channels[addr] = output.tiltFine;
-        }
-      }
-
-      if (Object.keys(channels).length > 0) {
-        manager.applyRawUpdate(channels);
-      }
-    }
-  }, MOVEMENT_TICK_MS);
-  movementInterval.unref();
 
   // ── Multi-Universe Stack ──
   const { registry: universeRegistry, pool: connectionPool, coordinator, connectionLog } =
     await createMultiUniverseStack(finalConfig, consoleLogger, latencyTracker, manager);
+
+  // ── Movement Tick (after coordinator so dispatcher can route by universe) ──
+  const MOVEMENT_TICK_MS = 25;
+  const dispatcher = createDmxDispatcher(manager, coordinator);
+  const movementTick = createMovementTickHandler({
+    engine: movementEngine,
+    fixtureStore,
+    dispatcher,
+  });
+  const movementInterval = setInterval(() => movementTick(MOVEMENT_TICK_MS), MOVEMENT_TICK_MS);
+  movementInterval.unref();
 
   // ── Library Stack ──
   const diskCache = createOflDiskCache();
@@ -193,6 +179,7 @@ async function main() {
     connectionPool,
     connection,
     getMdnsAdvertiser: () => mdnsAdvertiser,
+    movementInterval,
   });
 
   // ── Start Listeners ──

@@ -16,6 +16,9 @@ export interface MovementTarget {
   readonly pan?: number;    // 0-65535 (16-bit) or 0-255 (8-bit)
   readonly tilt?: number;
   readonly speed?: number;  // 0-1 multiplier override
+  /** When true, pan/tilt values are already in 16-bit resolution (e.g. from UDP protocol).
+   *  Prevents double-scaling when config.use16bit is false. */
+  readonly is16bit?: boolean;
 }
 
 /** Internal state of a fixture's movement interpolation. */
@@ -28,6 +31,7 @@ export interface MovementState {
   readonly velocityTilt: number;
   readonly lastUpdateTime: number;
   readonly isMoving: boolean;
+  readonly speedMultiplier?: number;  // 0-1, applied to maxVelocity
 }
 
 /** DMX output values for pan/tilt channels. */

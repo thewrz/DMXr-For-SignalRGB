@@ -17,13 +17,7 @@ export interface RemapPresetStore {
 
 export function createRemapPresetStore(filePath: string): RemapPresetStore {
   let presets: Record<string, RemapPreset> = {};
-
-  async function saveToDisk(): Promise<void> {
-    await mkdir(dirname(filePath), { recursive: true });
-    const tmpPath = filePath + ".tmp";
-    await writeFile(tmpPath, JSON.stringify(presets, null, 2), "utf-8");
-    await rename(tmpPath, filePath);
-  }
+  let saveChain: Promise<void> = Promise.resolve();
 
   return {
     async load(): Promise<void> {
@@ -60,6 +54,14 @@ export function createRemapPresetStore(filePath: string): RemapPresetStore {
       return true;
     },
 
-    save: saveToDisk,
+    async save(): Promise<void> {
+      saveChain = saveChain.then(async () => {
+        await mkdir(dirname(filePath), { recursive: true });
+        const tmpPath = filePath + ".tmp";
+        await writeFile(tmpPath, JSON.stringify(presets, null, 2), "utf-8");
+        await rename(tmpPath, filePath);
+      });
+      return saveChain;
+    },
   };
 }

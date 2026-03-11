@@ -72,11 +72,24 @@ export function registerFixtureColorRoutes(
       reply.raw.write(initialPayload);
 
       const unsubscribe = deps.monitor.subscribe(() => {
-        const payload = buildColorSnapshot(deps, universeId);
-        reply.raw.write(`data:${JSON.stringify(payload)}\n\n`);
+        if (!reply.raw.destroyed) {
+          const payload = buildColorSnapshot(deps, universeId);
+          reply.raw.write(`data:${JSON.stringify(payload)}\n\n`);
+        }
       }, universeId);
 
+      const heartbeat = setInterval(() => {
+        if (reply.raw.destroyed) {
+          clearInterval(heartbeat);
+          unsubscribe();
+          return;
+        }
+        reply.raw.write(":heartbeat\n\n");
+      }, 30_000);
+      heartbeat.unref();
+
       request.raw.on("close", () => {
+        clearInterval(heartbeat);
         unsubscribe();
       });
 

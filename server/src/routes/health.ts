@@ -6,6 +6,7 @@ import type { ConnectionStatus } from "../dmx/connection-state.js";
 import type { LatencyTracker } from "../metrics/latency-tracker.js";
 import type { UdpColorServer } from "../udp/udp-color-server.js";
 import type { MultiUniverseCoordinator } from "../dmx/multi-universe-coordinator.js";
+import type { DmxMonitor } from "../dmx/dmx-monitor.js";
 import { resolveAddress } from "../fixtures/channel-remap.js";
 
 interface UniverseStatusProvider {
@@ -27,6 +28,7 @@ interface HealthDeps {
   readonly serverId?: string;
   readonly serverName?: string;
   readonly universeStatus?: UniverseStatusProvider;
+  readonly dmxMonitor?: DmxMonitor;
 }
 
 export function registerHealthRoute(
@@ -85,6 +87,7 @@ export function registerHealthRoute(
         : undefined,
       serverId: deps.serverId,
       serverName: deps.serverName,
+      ...(deps.dmxMonitor ? { sseSubscribers: deps.dmxMonitor.subscriberCount() } : {}),
       universes: universeStatuses,
     };
   });

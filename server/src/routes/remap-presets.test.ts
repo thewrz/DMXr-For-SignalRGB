@@ -28,7 +28,7 @@ describe("Remap preset routes", () => {
     const manager = createUniverseManager(universe);
     manager.resumeNormal();
 
-    app = await buildServer({
+    ({ app } = await buildServer({
       config: createTestConfig(),
       manager,
       driver: "null",
@@ -37,7 +37,7 @@ describe("Remap preset routes", () => {
       oflClient: createMockOflClient(),
       registry: createMockRegistry(),
       remapPresetStore: store,
-    });
+    }));
   });
 
   afterEach(async () => {

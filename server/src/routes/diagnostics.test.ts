@@ -32,7 +32,7 @@ describe("Diagnostics routes", () => {
     const manager = createUniverseManager(mockUniverse);
     connectionLog = createConnectionLog();
 
-    app = await buildServer({
+    ({ app } = await buildServer({
       config: createTestConfig(),
       manager,
       driver: "null",
@@ -41,7 +41,7 @@ describe("Diagnostics routes", () => {
       oflClient: createMockOflClient(),
       registry: createMockRegistry(),
       connectionLog,
-    });
+    }));
   });
 
   afterEach(async () => {
@@ -153,7 +153,7 @@ describe("Diagnostics routes", () => {
 
   describe("routes not registered without connectionLog", () => {
     it("returns 404 when connectionLog is not provided", async () => {
-      const appNoLog = await buildServer({
+      const { app: appNoLog } = await buildServer({
         config: createTestConfig(),
         manager: createUniverseManager(createMockUniverse()),
         driver: "null",

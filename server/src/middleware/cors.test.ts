@@ -19,7 +19,7 @@ describe("CORS", () => {
 
   describe("default origins (localhost)", () => {
     beforeEach(async () => {
-      app = await buildServer({
+      ({ app } = await buildServer({
         config: createTestConfig(),
         manager: createUniverseManager(createMockUniverse()),
         driver: "null",
@@ -27,7 +27,7 @@ describe("CORS", () => {
         fixtureStore: createTestFixtureStore(),
         oflClient: createMockOflClient(),
         registry: createMockRegistry(),
-      });
+      }));
     });
 
     it("allows localhost origin", async () => {
@@ -79,7 +79,7 @@ describe("CORS", () => {
 
   describe("custom CORS_ORIGIN override", () => {
     beforeEach(async () => {
-      app = await buildServer({
+      ({ app } = await buildServer({
         config: createTestConfig({
           corsOrigin: "https://myapp.example.com, https://other.example.com",
         }),
@@ -89,7 +89,7 @@ describe("CORS", () => {
         fixtureStore: createTestFixtureStore(),
         oflClient: createMockOflClient(),
         registry: createMockRegistry(),
-      });
+      }));
     });
 
     it("allows configured custom origin", async () => {

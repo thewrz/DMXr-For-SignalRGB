@@ -46,7 +46,7 @@ describe("Fixture routes", () => {
     manager = createUniverseManager(universe);
     manager.resumeNormal();
     store = createTestFixtureStore();
-    app = await buildServer({
+    ({ app } = await buildServer({
       config: createTestConfig(),
       manager,
       driver: "null",
@@ -54,7 +54,7 @@ describe("Fixture routes", () => {
       fixtureStore: store,
       oflClient: createMockOflClient(),
       registry: createMockRegistry(),
-    });
+    }));
   });
 
   afterEach(async () => {

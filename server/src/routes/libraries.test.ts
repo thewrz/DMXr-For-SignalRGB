@@ -50,7 +50,7 @@ describe("Library routes", () => {
 
   beforeEach(async () => {
     const manager = createUniverseManager(createMockUniverse());
-    app = await buildServer({
+    ({ app } = await buildServer({
       config: createTestConfig(),
       manager,
       driver: "null",
@@ -58,7 +58,7 @@ describe("Library routes", () => {
       fixtureStore: createTestFixtureStore(),
       oflClient: createMockOflClient(),
       registry: createMockRegistry(createMockLocalDbProvider()),
-    });
+    }));
   });
 
   afterEach(async () => {

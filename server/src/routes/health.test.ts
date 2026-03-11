@@ -10,7 +10,7 @@ describe("GET /health", () => {
 
   beforeEach(async () => {
     const manager = createUniverseManager(createMockUniverse());
-    app = await buildServer({
+    ({ app } = await buildServer({
       config: createTestConfig(),
       manager,
       driver: "null",
@@ -18,7 +18,7 @@ describe("GET /health", () => {
       fixtureStore: createTestFixtureStore(),
       oflClient: createMockOflClient(),
       registry: createMockRegistry(),
-    });
+    }));
   });
 
   afterEach(async () => {
@@ -38,7 +38,7 @@ describe("GET /health", () => {
 
   it("returns the configured driver name", async () => {
     const manager = createUniverseManager(createMockUniverse());
-    const customApp = await buildServer({
+    const { app: customApp } = await buildServer({
       config: createTestConfig({ dmxDriver: "enttec-usb-dmx-pro", dmxDevicePath: "/dev/ttyUSB0" }),
       manager,
       driver: "enttec-usb-dmx-pro",
@@ -56,7 +56,7 @@ describe("GET /health", () => {
 
   it("includes serverId and serverName in response", async () => {
     const manager = createUniverseManager(createMockUniverse());
-    const identityApp = await buildServer({
+    const { app: identityApp } = await buildServer({
       config: createTestConfig(),
       manager,
       driver: "null",
@@ -92,7 +92,7 @@ describe("GET /health", () => {
     };
 
     const manager = createUniverseManager(createMockUniverse());
-    const udpApp = await buildServer({
+    const { app: udpApp } = await buildServer({
       config: createTestConfig(),
       manager,
       driver: "null",
@@ -116,7 +116,7 @@ describe("GET /health", () => {
 
   it("reports active channel count after updates", async () => {
     const manager = createUniverseManager(createMockUniverse());
-    const testApp = await buildServer({
+    const { app: testApp } = await buildServer({
       config: createTestConfig(),
       manager,
       driver: "null",

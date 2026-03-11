@@ -15,7 +15,7 @@ describe("Rate limiting", () => {
 
   beforeEach(async () => {
     const manager = createUniverseManager(createMockUniverse());
-    app = await buildServer({
+    ({ app } = await buildServer({
       config: createTestConfig(),
       manager,
       driver: "null",
@@ -23,7 +23,7 @@ describe("Rate limiting", () => {
       fixtureStore: createTestFixtureStore(),
       oflClient: createMockOflClient(),
       registry: createMockRegistry(),
-    });
+    }));
   });
 
   afterEach(async () => {

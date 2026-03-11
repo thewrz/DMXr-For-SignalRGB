@@ -25,7 +25,7 @@ describe("Fixture color routes", () => {
 
     const monitor = createDmxMonitor({ manager });
 
-    app = await buildServer({
+    ({ app } = await buildServer({
       config: createTestConfig(),
       manager,
       driver: "null",
@@ -34,7 +34,7 @@ describe("Fixture color routes", () => {
       oflClient: createMockOflClient(),
       registry: createMockRegistry(),
       dmxMonitor: monitor,
-    });
+    }));
   });
 
   afterEach(async () => {

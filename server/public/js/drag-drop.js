@@ -270,6 +270,13 @@ function dmxrDragDrop() {
             var fEnd = f.dmxStartAddress + f.channelCount - 1;
             if (newStart <= fEnd && newEnd >= f.dmxStartAddress) return false;
           }
+
+          // Check against other moved fixtures in this batch
+          for (var mc = 0; mc < mj; mc++) {
+            var otherStart = moved[mc].dmxStartAddress + delta;
+            var otherEnd = otherStart + moved[mc].channelCount - 1;
+            if (newStart <= otherEnd && newEnd >= otherStart) return false;
+          }
         }
         return true;
       }

@@ -90,7 +90,7 @@ describe("Control routes", () => {
     mockUniverse = createMockUniverse();
     const manager = createUniverseManager(mockUniverse);
     store = createTestFixtureStore();
-    app = await buildServer({
+    ({ app } = await buildServer({
       config: createTestConfig(),
       manager,
       driver: "null",
@@ -98,7 +98,7 @@ describe("Control routes", () => {
       fixtureStore: store,
       oflClient: createMockOflClient(),
       registry: createMockRegistry(),
-    });
+    }));
   });
 
   afterEach(async () => {

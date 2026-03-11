@@ -12,7 +12,7 @@ describe("POST /update", () => {
   beforeEach(async () => {
     const manager = createUniverseManager(createMockUniverse());
     store = createTestFixtureStore();
-    app = await buildServer({
+    ({ app } = await buildServer({
       config: createTestConfig(),
       manager,
       driver: "null",
@@ -20,7 +20,7 @@ describe("POST /update", () => {
       fixtureStore: store,
       oflClient: createMockOflClient(),
       registry: createMockRegistry(),
-    });
+    }));
   });
 
   afterEach(async () => {
@@ -106,7 +106,7 @@ describe("POST /update/colors", () => {
   beforeEach(async () => {
     const manager = createUniverseManager(createMockUniverse());
     store = createTestFixtureStore();
-    app = await buildServer({
+    ({ app } = await buildServer({
       config: createTestConfig(),
       manager,
       driver: "null",
@@ -114,7 +114,7 @@ describe("POST /update/colors", () => {
       fixtureStore: store,
       oflClient: createMockOflClient(),
       registry: createMockRegistry(),
-    });
+    }));
   });
 
   afterEach(async () => {

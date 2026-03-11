@@ -119,8 +119,8 @@ export function createUserFixtureStore(filePath: string): UserFixtureStore {
       }
       saveTimer = setTimeout(() => {
         saveTimer = null;
-        this.save().catch(() => {
-          // best-effort persistence
+        this.save().catch((err) => {
+          process.stderr.write(`[DMXr] WARN: Failed to persist user fixture store: ${err instanceof Error ? err.message : String(err)}\n`);
         });
       }, SAVE_DEBOUNCE_MS);
     },

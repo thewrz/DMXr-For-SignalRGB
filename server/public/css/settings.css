@@ -1,0 +1,118 @@
+/* Settings modal */
+.settings-modal { max-width: 520px; }
+
+.settings-version {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  margin-bottom: 1rem;
+}
+
+.settings-loading {
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-dim);
+}
+
+.port-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.port-row select { flex: 1; }
+
+.checkbox-label {
+  display: flex !important;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  margin-top: 0.75rem !important;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+  cursor: pointer;
+}
+
+.settings-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+}
+
+.settings-saved {
+  color: var(--success);
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
+}
+
+.restart-banner {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: rgba(243, 156, 18, 0.1);
+  border: 1px solid var(--warning);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.restart-banner p {
+  font-size: 0.85rem;
+  color: var(--warning);
+}
+
+/* Setup wizard */
+.wizard-overlay {
+  z-index: 200;
+}
+
+.wizard-modal {
+  max-width: 480px;
+}
+
+.wizard-logo {
+  text-align: center;
+  margin-bottom: 0.5rem;
+}
+
+.wizard-text {
+  font-size: 0.9rem;
+  color: var(--text-dim);
+  line-height: 1.5;
+  margin: 0.75rem 0;
+}
+
+.wizard-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 1.5rem;
+}
+
+.wizard-hint {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  margin-top: 0.5rem;
+  font-style: italic;
+}
+
+.wizard-summary {
+  background: var(--surface2);
+  border-radius: 6px;
+  padding: 1rem;
+  margin: 1rem 0;
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.35rem 0;
+  font-size: 0.9rem;
+}
+
+.summary-label {
+  color: var(--text-dim);
+}
+

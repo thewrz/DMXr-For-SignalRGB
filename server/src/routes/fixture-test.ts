@@ -1,9 +1,16 @@
 import type { FastifyInstance } from "fastify";
-import type { UniverseManager } from "../dmx/universe-manager.js";
+import type { UniverseManager, DmxWriteResult } from "../dmx/universe-manager.js";
 import type { FixtureStore } from "../fixtures/fixture-store.js";
 import type { FixtureConfig } from "../types/protocol.js";
 import { analyzeFixture } from "../fixtures/fixture-capabilities.js";
 import { resolveAddress } from "../fixtures/channel-remap.js";
+
+function dmxStatus(result: DmxWriteResult) {
+  return {
+    dmxStatus: result.ok ? ("ok" as const) : ("error" as const),
+    ...(result.error ? { dmxError: result.error } : {}),
+  };
+}
 
 export interface FixtureTestDeps {
   readonly manager: UniverseManager;
@@ -126,7 +133,7 @@ export function registerFixtureTestRoutes(
       if (action === "flash") {
         const snapshot = deps.manager.getChannelSnapshot(start, count);
         const flashValues = buildFlashValues(fixture, snapshot, channelOffset);
-        deps.manager.applyRawUpdate(flashValues);
+        const dmxResult = deps.manager.applyRawUpdate(flashValues);
 
         request.log.info(
           {
@@ -151,7 +158,7 @@ export function registerFixtureTestRoutes(
         timer.unref();
         activeTimers.set(fixture.id, timer);
 
-        return { success: true, action, fixtureId: fixture.id, durationMs };
+        return { success: true, action, fixtureId: fixture.id, durationMs, ...dmxStatus(dmxResult) };
       }
 
       if (action === "flash-hold") {
@@ -160,7 +167,7 @@ export function registerFixtureTestRoutes(
 
         const flashValues = buildFlashValues(fixture, snapshot, channelOffset);
         const addresses = getFixtureAddresses(fixture);
-        deps.manager.applyRawUpdate(flashValues);
+        const dmxResult = deps.manager.applyRawUpdate(flashValues);
         deps.manager.lockChannels(addresses);
 
         request.log.info(
@@ -183,7 +190,7 @@ export function registerFixtureTestRoutes(
         safety.unref();
         activeTimers.set(fixture.id, safety);
 
-        return { success: true, action, fixtureId: fixture.id };
+        return { success: true, action, fixtureId: fixture.id, ...dmxStatus(dmxResult) };
       }
 
       if (action === "flash-click") {
@@ -192,7 +199,7 @@ export function registerFixtureTestRoutes(
 
         const flashValues = buildFlashValues(fixture, snapshot, channelOffset);
         const addresses = getFixtureAddresses(fixture);
-        deps.manager.applyRawUpdate(flashValues);
+        const dmxResult = deps.manager.applyRawUpdate(flashValues);
         deps.manager.lockChannels(addresses);
 
         request.log.info(
@@ -210,7 +217,7 @@ export function registerFixtureTestRoutes(
         timer.unref();
         activeTimers.set(fixture.id, timer);
 
-        return { success: true, action, fixtureId: fixture.id, durationMs: FLASH_CLICK_SUSTAIN_MS };
+        return { success: true, action, fixtureId: fixture.id, durationMs: FLASH_CLICK_SUSTAIN_MS, ...dmxStatus(dmxResult) };
       }
 
       if (action === "flash-release") {

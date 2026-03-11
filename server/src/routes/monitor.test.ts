@@ -23,7 +23,7 @@ describe("Monitor routes", () => {
     manager = createUniverseManager(mockUniverse);
     const monitor = createDmxMonitor({ manager });
 
-    app = await buildServer({
+    ({ app } = await buildServer({
       config: createTestConfig(),
       manager,
       driver: "null",
@@ -32,7 +32,7 @@ describe("Monitor routes", () => {
       oflClient: createMockOflClient(),
       registry: createMockRegistry(),
       dmxMonitor: monitor,
-    });
+    }));
   });
 
   afterEach(async () => {
@@ -90,7 +90,7 @@ describe("Monitor routes", () => {
       const store = createTestFixtureStore();
       const monitor = createDmxMonitor({ manager });
 
-      const appWithFixtures = await buildServer({
+      const { app: appWithFixtures } = await buildServer({
         config: createTestConfig(),
         manager,
         driver: "null",
@@ -191,7 +191,7 @@ describe("Monitor routes", () => {
       managerA.applyFixtureUpdate({ fixture: "par", channels: { "1": 111 } });
       managerB.applyFixtureUpdate({ fixture: "mover", channels: { "40": 222 } });
 
-      const uniApp = await buildServer({
+      const { app: uniApp } = await buildServer({
         config: createTestConfig(),
         manager,
         driver: "null",
@@ -232,7 +232,7 @@ describe("Monitor routes", () => {
 
       managerA.applyFixtureUpdate({ fixture: "par", channels: { "5": 55 } });
 
-      const uniApp = await buildServer({
+      const { app: uniApp } = await buildServer({
         config: createTestConfig(),
         manager,
         driver: "null",
@@ -268,7 +268,7 @@ describe("Monitor routes", () => {
       const monitor = createDmxMonitor({ coordinator });
       const store = createTestFixtureStore();
 
-      const uniApp = await buildServer({
+      const { app: uniApp } = await buildServer({
         config: createTestConfig(),
         manager,
         driver: "null",
@@ -329,7 +329,7 @@ describe("Monitor routes", () => {
 
   describe("route not registered without monitor", () => {
     it("returns 404 when dmxMonitor is not provided", async () => {
-      const appNoMonitor = await buildServer({
+      const { app: appNoMonitor } = await buildServer({
         config: createTestConfig(),
         manager,
         driver: "null",

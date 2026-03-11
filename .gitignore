@@ -6,6 +6,8 @@ server/config/fixtures.json
 *.sqlite
 *.sqlite3
 screenshots/
+server/test-screenshots/
+!server/test-screenshots/baselines/
 tools/
 query-attrs.js
 query-attrs.ts

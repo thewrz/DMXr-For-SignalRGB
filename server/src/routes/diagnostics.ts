@@ -43,10 +43,23 @@ export function registerDiagnosticsRoutes(
     });
 
     const unsubscribe = deps.connectionLog.subscribe((event) => {
-      reply.raw.write(`data:${JSON.stringify(event)}\n\n`);
+      if (!reply.raw.destroyed) {
+        reply.raw.write(`data:${JSON.stringify(event)}\n\n`);
+      }
     });
 
+    const heartbeat = setInterval(() => {
+      if (reply.raw.destroyed) {
+        clearInterval(heartbeat);
+        unsubscribe();
+        return;
+      }
+      reply.raw.write(":heartbeat\n\n");
+    }, 30_000);
+    heartbeat.unref();
+
     request.raw.on("close", () => {
+      clearInterval(heartbeat);
       unsubscribe();
     });
 

@@ -6,53 +6,12 @@ import { validateFixtureAddress, validateFixtureChannels, findNextAvailableAddre
 import { computeOverrideChannels } from "../fixtures/fixture-override-service.js";
 import { validateChannelRemap } from "../fixtures/channel-remap.js";
 import { pipeLog, resetSample } from "../logging/pipeline-logger.js";
+import { addFixtureSchema, updateFixtureSchema, duplicateFixtureSchema } from "./schemas/fixture-schemas.js";
 
 interface FixtureRouteDeps {
   readonly store: FixtureStore;
   readonly manager?: UniverseManager;
 }
-
-const addFixtureSchema = {
-  body: {
-    type: "object" as const,
-    required: [
-      "name",
-      "mode",
-      "dmxStartAddress",
-      "channelCount",
-      "channels",
-    ],
-    properties: {
-      name: { type: "string" as const, minLength: 1 },
-      universeId: { type: "string" as const },
-      oflKey: { type: "string" as const },
-      oflFixtureName: { type: "string" as const },
-      source: { type: "string" as const, enum: ["ofl", "local-db", "custom"] },
-      category: { type: "string" as const },
-      mode: { type: "string" as const, minLength: 1 },
-      dmxStartAddress: { type: "integer" as const, minimum: 1, maximum: 512 },
-      channelCount: { type: "integer" as const, minimum: 1 },
-      channels: {
-        type: "array" as const,
-        items: {
-          type: "object" as const,
-          required: ["offset", "name", "type", "defaultValue"],
-          properties: {
-            offset: { type: "integer" as const, minimum: 0 },
-            name: { type: "string" as const },
-            type: { type: "string" as const },
-            color: { type: "string" as const },
-            defaultValue: { type: "integer" as const, minimum: 0, maximum: 255 },
-          },
-        },
-      },
-      channelRemap: {
-        type: "object" as const,
-        additionalProperties: { type: "integer" as const, minimum: 0 },
-      },
-    },
-  },
-};
 
 export function registerFixtureRoutes(
   app: FastifyInstance,
@@ -112,78 +71,20 @@ export function registerFixtureRoutes(
 
   app.patch<{ Params: { id: string }; Body: UpdateFixtureRequest }>(
     "/fixtures/:id",
-    {
-      schema: {
-        body: {
-          type: "object" as const,
-          properties: {
-            name: { type: "string" as const, minLength: 1 },
-            universeId: { type: "string" as const },
-            dmxStartAddress: { type: "integer" as const, minimum: 1, maximum: 512 },
-            channelOverrides: {
-              type: "object" as const,
-              additionalProperties: {
-                type: "object" as const,
-                required: ["value", "enabled"],
-                properties: {
-                  value: { type: "integer" as const, minimum: 0, maximum: 255 },
-                  enabled: { type: "boolean" as const },
-                },
-                additionalProperties: false,
-              },
-            },
-            channelRemap: {
-              type: "object" as const,
-              additionalProperties: { type: "integer" as const, minimum: 0 },
-            },
-            whiteGateThreshold: { type: "integer" as const, minimum: 0, maximum: 255 },
-            motorGuardEnabled: { type: "boolean" as const },
-            motorGuardBuffer: { type: "integer" as const, minimum: 0, maximum: 20 },
-            resetConfig: {
-              type: "object" as const,
-              required: ["channelOffset", "value", "holdMs"],
-              properties: {
-                channelOffset: { type: "integer" as const, minimum: 0 },
-                value: { type: "integer" as const, minimum: 0, maximum: 255 },
-                holdMs: { type: "integer" as const, minimum: 1000, maximum: 15000 },
-              },
-              additionalProperties: false,
-            },
-            colorCalibration: {
-              type: "object" as const,
-              required: ["gain", "offset"],
-              properties: {
-                gain: {
-                  type: "object" as const,
-                  required: ["r", "g", "b"],
-                  properties: {
-                    r: { type: "number" as const, minimum: 0, maximum: 2 },
-                    g: { type: "number" as const, minimum: 0, maximum: 2 },
-                    b: { type: "number" as const, minimum: 0, maximum: 2 },
-                  },
-                  additionalProperties: false,
-                },
-                offset: {
-                  type: "object" as const,
-                  required: ["r", "g", "b"],
-                  properties: {
-                    r: { type: "number" as const, minimum: -50, maximum: 50 },
-                    g: { type: "number" as const, minimum: -50, maximum: 50 },
-                    b: { type: "number" as const, minimum: -50, maximum: 50 },
-                  },
-                  additionalProperties: false,
-                },
-              },
-              additionalProperties: false,
-            },
-          },
-        },
-      },
-    },
+    { schema: updateFixtureSchema },
     async (request, reply) => {
       const existing = deps.store.getById(request.params.id);
       if (!existing) {
         return reply.status(404).send({ success: false, error: "Fixture not found" });
+      }
+
+      if (request.body.version !== undefined && request.body.version !== existing.version) {
+        return reply.status(409).send({
+          success: false,
+          error: "Conflict: fixture was modified by another request",
+          currentVersion: existing.version,
+          fixture: existing,
+        });
       }
 
       if (request.body.dmxStartAddress !== undefined) {
@@ -259,18 +160,7 @@ export function registerFixtureRoutes(
     Body: { dmxStartAddress?: number; name?: string; universeId?: string };
   }>(
     "/fixtures/:id/duplicate",
-    {
-      schema: {
-        body: {
-          type: "object" as const,
-          properties: {
-            dmxStartAddress: { type: "integer" as const, minimum: 1, maximum: 512 },
-            name: { type: "string" as const, minLength: 1 },
-            universeId: { type: "string" as const },
-          },
-        },
-      },
-    },
+    { schema: duplicateFixtureSchema },
     async (request, reply) => {
       const source = deps.store.getById(request.params.id);
       if (!source) {
@@ -349,6 +239,7 @@ export function registerFixtureRoutes(
   }>(
     "/fixtures/batch",
     {
+      bodyLimit: 256 * 1024,
       schema: {
         body: {
           type: "object" as const,
@@ -359,7 +250,7 @@ export function registerFixtureRoutes(
             channels: addFixtureSchema.body.properties.channels,
             channelCount: { type: "integer" as const, minimum: 1 },
             startAddress: { type: "integer" as const, minimum: 1, maximum: 512 },
-            count: { type: "integer" as const, minimum: 1, maximum: 32 },
+            count: { type: "integer" as const, minimum: 1, maximum: 50 },
             spacing: { type: "integer" as const, minimum: 1 },
             universeId: { type: "string" as const },
             oflKey: { type: "string" as const },

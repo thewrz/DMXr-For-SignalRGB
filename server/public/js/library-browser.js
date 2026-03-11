@@ -79,7 +79,8 @@ function dmxrLibraryBrowser() {
         var data = await res.json();
         this.mfrFixtures = data.fixtures || [];
         this.filteredFixtures = this.mfrFixtures;
-      } catch {
+      } catch (err) {
+        console.warn("DMXr: loadMfrFixtures failed:", err);
         this.mfrFixtures = [];
         this.filteredFixtures = [];
       }
@@ -106,7 +107,8 @@ function dmxrLibraryBrowser() {
 
         this.fixtureName = fixture.name;
         this.validateAddress();
-      } catch {
+      } catch (err) {
+        console.warn("DMXr: selectFixture failed:", err);
         this.selectedFixtureDef = null;
       }
     },
@@ -170,7 +172,8 @@ function dmxrLibraryBrowser() {
         if (!res.ok) return;
         this.libMfrs = await res.json();
         this.libFilteredMfrs = this.libMfrs;
-      } catch {
+      } catch (err) {
+        console.warn("DMXr: loadLibMfrs failed:", err);
         this.libMfrs = [];
         this.libFilteredMfrs = [];
       }
@@ -188,7 +191,8 @@ function dmxrLibraryBrowser() {
         var res = await fetch("/libraries/" + this.browseSource + "/manufacturers/" + mfr.id + "/fixtures");
         this.libFixtures = await res.json();
         this.libFilteredFixtures = this.libFixtures;
-      } catch {
+      } catch (err) {
+        console.warn("DMXr: selectLibMfr failed:", err);
         this.libFixtures = [];
         this.libFilteredFixtures = [];
       }
@@ -212,7 +216,8 @@ function dmxrLibraryBrowser() {
           await this.loadLibChannels();
         }
         this.validateAddress();
-      } catch {
+      } catch (err) {
+        console.warn("DMXr: selectLibFixture failed:", err);
         this.libModes = [];
       }
     },
@@ -240,7 +245,8 @@ function dmxrLibraryBrowser() {
         );
         this.libChannels = await res.json();
         this.channelCount = this.libChannels.length;
-      } catch {
+      } catch (err) {
+        console.warn("DMXr: loadLibChannels failed:", err);
         this.libChannels = [];
       }
     },

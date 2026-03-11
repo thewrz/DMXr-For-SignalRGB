@@ -63,7 +63,7 @@ describe("GET /search", () => {
 
   beforeEach(async () => {
     const manager = createUniverseManager(createMockUniverse());
-    app = await buildServer({
+    ({ app } = await buildServer({
       config: createTestConfig(),
       manager,
       driver: "null",
@@ -71,7 +71,7 @@ describe("GET /search", () => {
       fixtureStore: createTestFixtureStore(),
       oflClient: createMockOflClient(),
       registry: createMockRegistry(createMockLocalDbProvider()),
-    });
+    }));
   });
 
   afterEach(async () => {
@@ -156,7 +156,7 @@ describe("GET /search", () => {
 
   it("handles missing local-db gracefully (OFL-only)", async () => {
     const manager = createUniverseManager(createMockUniverse());
-    const oflOnlyApp = await buildServer({
+    const { app: oflOnlyApp } = await buildServer({
       config: createTestConfig(),
       manager,
       driver: "null",

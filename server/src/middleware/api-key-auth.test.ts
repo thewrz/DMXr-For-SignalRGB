@@ -16,7 +16,7 @@ describe("API key authentication", () => {
     const API_KEY = "test-secret-key-123";
 
     beforeEach(async () => {
-      app = await buildServer({
+      ({ app } = await buildServer({
         config: createTestConfig({ apiKey: API_KEY }),
         manager: createUniverseManager(createMockUniverse()),
         driver: "null",
@@ -24,7 +24,7 @@ describe("API key authentication", () => {
         fixtureStore: createTestFixtureStore(),
         oflClient: createMockOflClient(),
         registry: createMockRegistry(),
-      });
+      }));
     });
 
     afterEach(async () => {
@@ -96,7 +96,7 @@ describe("API key authentication", () => {
     let app: FastifyInstance;
 
     beforeEach(async () => {
-      app = await buildServer({
+      ({ app } = await buildServer({
         config: createTestConfig(),
         manager: createUniverseManager(createMockUniverse()),
         driver: "null",
@@ -104,7 +104,7 @@ describe("API key authentication", () => {
         fixtureStore: createTestFixtureStore(),
         oflClient: createMockOflClient(),
         registry: createMockRegistry(),
-      });
+      }));
     });
 
     afterEach(async () => {

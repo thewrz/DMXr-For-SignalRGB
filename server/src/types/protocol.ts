@@ -67,6 +67,7 @@ export interface HealthResponse {
   readonly controlMode?: "normal" | "blackout" | "whiteout";
   readonly serverId?: string;
   readonly serverName?: string;
+  readonly sseSubscribers?: number;
   readonly universes?: readonly {
     readonly id: string;
     readonly name: string;
@@ -137,6 +138,7 @@ export interface FixtureConfig {
   };
   readonly colorCalibration?: ColorCalibration;
   readonly movementConfig?: MovementConfig;
+  readonly version?: number;
 }
 
 /** POST /fixtures request body */
@@ -170,7 +172,8 @@ export interface UpdateFixtureRequest {
     readonly holdMs: number;
   };
   readonly colorCalibration?: ColorCalibration;
-  readonly movementConfig?: Partial<MovementConfig>;
+  readonly movementConfig?: MovementConfig;
+  readonly version?: number;
 }
 
 /** Stored fixture group configuration */
@@ -205,4 +208,11 @@ export interface ColorUpdatePayload {
     readonly b: number;
     readonly brightness: number;
   }[];
+}
+
+/** Future: RDM/Art-Net response confirmation */
+export interface DmxConfirmation {
+  readonly sent: true;
+  readonly confirmed?: boolean;
+  readonly roundTripMs?: number;
 }

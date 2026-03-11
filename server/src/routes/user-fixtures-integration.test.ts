@@ -60,7 +60,7 @@ describe("Custom fixture integration: create → browse → import", () => {
       userProvider,
     ]);
 
-    app = await buildServer({
+    ({ app } = await buildServer({
       config: createTestConfig(),
       manager,
       driver: "null",
@@ -69,7 +69,7 @@ describe("Custom fixture integration: create → browse → import", () => {
       oflClient: createMockOflClient(),
       registry,
       userFixtureStore: userStore,
-    });
+    }));
   });
 
   afterEach(async () => {

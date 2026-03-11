@@ -87,6 +87,12 @@ export function registerUpdateRoute(
         return reply.status(500).send({ error: "Fixture store not available" });
       }
 
+      if (request.body.fixtures.length > 100) {
+        return reply.status(400).send({
+          error: `Color update contains ${request.body.fixtures.length} fixtures, maximum is 100`,
+        });
+      }
+
       const blackoutActive = deps.manager.isBlackoutActive();
       const result = processColorBatch(
         request.body.fixtures,

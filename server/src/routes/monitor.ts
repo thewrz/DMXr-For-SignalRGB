@@ -78,10 +78,23 @@ export function registerMonitorRoutes(
       reply.raw.write(initialPayload);
 
       const unsubscribe = deps.monitor.subscribe((frame) => {
-        reply.raw.write(`data:${JSON.stringify(frame)}\n\n`);
+        if (!reply.raw.destroyed) {
+          reply.raw.write(`data:${JSON.stringify(frame)}\n\n`);
+        }
       }, universeId);
 
+      const heartbeat = setInterval(() => {
+        if (reply.raw.destroyed) {
+          clearInterval(heartbeat);
+          unsubscribe();
+          return;
+        }
+        reply.raw.write(":heartbeat\n\n");
+      }, 30_000);
+      heartbeat.unref();
+
       request.raw.on("close", () => {
+        clearInterval(heartbeat);
         unsubscribe();
       });
 

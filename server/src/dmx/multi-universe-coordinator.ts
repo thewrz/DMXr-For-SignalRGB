@@ -1,14 +1,14 @@
 import type { FixtureUpdatePayload } from "../types/protocol.js";
 import { DEFAULT_UNIVERSE_ID } from "../types/protocol.js";
-import type { UniverseManager, DmxSendStatus, ControlMode } from "./universe-manager.js";
+import type { UniverseManager, DmxSendStatus, ControlMode, DmxWriteResult } from "./universe-manager.js";
 
 export interface MultiUniverseCoordinator {
   readonly applyFixtureUpdate: (universeId: string | undefined, payload: FixtureUpdatePayload) => number;
-  readonly blackout: (universeId: string) => void;
+  readonly blackout: (universeId: string) => DmxWriteResult;
   readonly blackoutAll: () => void;
-  readonly whiteout: (universeId: string) => void;
+  readonly whiteout: (universeId: string) => DmxWriteResult;
   readonly whiteoutAll: () => void;
-  readonly resumeNormal: (universeId: string) => void;
+  readonly resumeNormal: (universeId: string) => DmxWriteResult;
   readonly resumeNormalAll: () => void;
   readonly isBlackoutActive: (universeId: string) => boolean;
   readonly getChannelSnapshot: (universeId: string, start: number, count: number) => Record<number, number>;
@@ -17,7 +17,7 @@ export interface MultiUniverseCoordinator {
   readonly registerSafePositions: (universeId: string, channels: Record<number, number>) => void;
   readonly lockChannels: (universeId: string, addresses: readonly number[]) => void;
   readonly unlockChannels: (universeId: string, addresses: readonly number[]) => void;
-  readonly applyRawUpdate: (universeId: string, channels: Record<number, number>) => void;
+  readonly applyRawUpdate: (universeId: string, channels: Record<number, number>) => DmxWriteResult;
   readonly getDmxSendStatus: (universeId: string) => DmxSendStatus | undefined;
   readonly getControlMode: (universeId: string) => ControlMode;
 }
@@ -44,24 +44,24 @@ export function createMultiUniverseCoordinator(
       return manager.applyFixtureUpdate(payload);
     },
 
-    blackout(universeId: string): void {
-      resolve(universeId)?.blackout();
+    blackout(universeId: string): DmxWriteResult {
+      return resolve(universeId)?.blackout() ?? { ok: true };
     },
 
     blackoutAll(): void {
       forAll((m) => m.blackout());
     },
 
-    whiteout(universeId: string): void {
-      resolve(universeId)?.whiteout();
+    whiteout(universeId: string): DmxWriteResult {
+      return resolve(universeId)?.whiteout() ?? { ok: true };
     },
 
     whiteoutAll(): void {
       forAll((m) => m.whiteout());
     },
 
-    resumeNormal(universeId: string): void {
-      resolve(universeId)?.resumeNormal();
+    resumeNormal(universeId: string): DmxWriteResult {
+      return resolve(universeId)?.resumeNormal() ?? { ok: true };
     },
 
     resumeNormalAll(): void {
@@ -96,8 +96,8 @@ export function createMultiUniverseCoordinator(
       resolve(universeId)?.unlockChannels(addresses);
     },
 
-    applyRawUpdate(universeId: string, channels: Record<number, number>): void {
-      resolve(universeId)?.applyRawUpdate(channels);
+    applyRawUpdate(universeId: string, channels: Record<number, number>): DmxWriteResult {
+      return resolve(universeId)?.applyRawUpdate(channels) ?? { ok: true };
     },
 
     getDmxSendStatus(universeId: string): DmxSendStatus | undefined {

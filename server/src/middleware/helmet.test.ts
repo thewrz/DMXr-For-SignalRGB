@@ -14,7 +14,7 @@ describe("Security headers (helmet)", () => {
   let app: FastifyInstance;
 
   beforeEach(async () => {
-    app = await buildServer({
+    ({ app } = await buildServer({
       config: createTestConfig(),
       manager: createUniverseManager(createMockUniverse()),
       driver: "null",
@@ -22,7 +22,7 @@ describe("Security headers (helmet)", () => {
       fixtureStore: createTestFixtureStore(),
       oflClient: createMockOflClient(),
       registry: createMockRegistry(),
-    });
+    }));
   });
 
   afterEach(async () => {

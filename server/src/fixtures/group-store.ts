@@ -125,8 +125,8 @@ export function createGroupStore(filePath: string): GroupStore {
       }
       saveTimer = setTimeout(() => {
         saveTimer = null;
-        this.save().catch(() => {
-          // best-effort persistence — in-memory state is authoritative
+        this.save().catch((err) => {
+          process.stderr.write(`[DMXr] WARN: Failed to persist group store: ${err instanceof Error ? err.message : String(err)}\n`);
         });
       }, SAVE_DEBOUNCE_MS);
     },

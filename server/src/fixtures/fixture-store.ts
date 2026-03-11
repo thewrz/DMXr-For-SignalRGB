@@ -57,6 +57,7 @@ export function createFixtureStore(filePath: string): FixtureStore {
     add(request: AddFixtureRequest): FixtureConfig {
       const fixture: FixtureConfig = {
         id: randomUUID(),
+        version: 1,
         name: request.name,
         universeId: request.universeId ?? DEFAULT_UNIVERSE_ID,
         ...(request.oflKey ? { oflKey: request.oflKey } : {}),
@@ -82,6 +83,7 @@ export function createFixtureStore(filePath: string): FixtureStore {
       for (const request of requests) {
         const fixture: FixtureConfig = {
           id: randomUUID(),
+          version: 1,
           name: request.name,
           universeId: request.universeId ?? DEFAULT_UNIVERSE_ID,
           ...(request.oflKey ? { oflKey: request.oflKey } : {}),
@@ -124,6 +126,7 @@ export function createFixtureStore(filePath: string): FixtureStore {
         ...(changes.resetConfig !== undefined ? { resetConfig: changes.resetConfig } : {}),
         ...(changes.colorCalibration !== undefined ? { colorCalibration: changes.colorCalibration } : {}),
         ...(changes.movementConfig !== undefined ? { movementConfig: changes.movementConfig } : {}),
+        version: (fixtures[index].version ?? 1) + 1,
       };
 
       fixtures = fixtures.map((f, i) => (i === index ? updated : f));
@@ -165,8 +168,8 @@ export function createFixtureStore(filePath: string): FixtureStore {
       }
       saveTimer = setTimeout(() => {
         saveTimer = null;
-        this.save().catch(() => {
-          // best-effort persistence — in-memory state is authoritative
+        this.save().catch((err) => {
+          process.stderr.write(`[DMXr] WARN: Failed to persist fixture store: ${err instanceof Error ? err.message : String(err)}\n`);
         });
       }, SAVE_DEBOUNCE_MS);
     },

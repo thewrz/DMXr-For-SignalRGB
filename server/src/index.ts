@@ -138,7 +138,7 @@ async function main() {
   const dmxMonitor = createDmxMonitor({ manager, coordinator });
 
   // ── HTTP Server ──
-  const app = await buildServer({
+  const { app, timerMaps } = await buildServer({
     config: finalConfig,
     manager,
     driver: finalConfig.dmxDriver,
@@ -180,6 +180,7 @@ async function main() {
     connection,
     getMdnsAdvertiser: () => mdnsAdvertiser,
     movementInterval,
+    timerMaps,
   });
 
   // ── Start Listeners ──

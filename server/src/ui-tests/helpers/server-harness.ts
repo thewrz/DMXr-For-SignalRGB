@@ -63,7 +63,7 @@ export async function startTestServer(): Promise<TestServer> {
     userFixturesPath,
   });
 
-  const app = await buildServer({
+  const { app } = await buildServer({
     config,
     manager,
     driver: "null",

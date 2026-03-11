@@ -45,9 +45,10 @@ function buildZeroChannels(fixture: FixtureConfig): Record<number, number> {
 export function registerGroupControlRoutes(
   app: FastifyInstance,
   deps: GroupControlDeps,
-): void {
+): { activeTimers: Map<string, NodeJS.Timeout> } {
   // Track locked channels per group so resume can unlock them
   const groupLocked = new Map<string, LockedEntry[]>();
+  const activeTimers = new Map<string, NodeJS.Timeout>();
 
   function lockFixtures(groupId: string, fixtures: readonly FixtureConfig[]): void {
     const entries: LockedEntry[] = [];
@@ -152,7 +153,7 @@ export function registerGroupControlRoutes(
       }
 
       const { group, fixtures } = resolved;
-      const durationMs = request.body?.durationMs ?? 500;
+      const durationMs = Math.max(50, Math.min(10000, request.body?.durationMs ?? 500));
 
       const snapshots: Array<{ universeId: string; channels: Record<number, number> }> = [];
 
@@ -172,12 +173,22 @@ export function registerGroupControlRoutes(
       // Lock during flash so SignalRGB doesn't overwrite mid-flash
       lockFixtures(group.id, fixtures);
 
-      setTimeout(() => {
+      // Clear any existing flash timer for this group
+      const existingTimer = activeTimers.get(group.id);
+      if (existingTimer !== undefined) {
+        clearTimeout(existingTimer);
+        activeTimers.delete(group.id);
+      }
+
+      const timer = setTimeout(() => {
         unlockGroup(group.id);
         for (const { universeId, channels } of snapshots) {
           deps.dispatcher.applyRawUpdate(universeId, channels);
         }
+        activeTimers.delete(group.id);
       }, durationMs);
+      timer.unref();
+      activeTimers.set(group.id, timer);
 
       request.log.info(
         { action: "group-flash", groupId: group.id, fixtureCount: fixtures.length, durationMs },
@@ -225,4 +236,6 @@ export function registerGroupControlRoutes(
       });
     },
   );
+
+  return { activeTimers };
 }

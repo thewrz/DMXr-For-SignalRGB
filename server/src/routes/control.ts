@@ -17,7 +17,7 @@ interface ControlRouteDeps {
 export function registerControlRoutes(
   app: FastifyInstance,
   deps: ControlRouteDeps,
-): void {
+): { activeTimers: Map<string, NodeJS.Timeout> } {
   const dispatcher = createDmxDispatcher(deps.manager, deps.coordinator);
 
   registerControlModeRoutes(app, { dispatcher, store: deps.store });
@@ -27,4 +27,6 @@ export function registerControlRoutes(
   registerFixtureResetRoutes(app, deps, activeTimers);
 
   registerDebugRoutes(app, { dispatcher, store: deps.store });
+
+  return { activeTimers };
 }

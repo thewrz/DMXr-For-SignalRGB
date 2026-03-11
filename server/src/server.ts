@@ -79,9 +79,14 @@ interface BuildServerDeps {
   readonly movementEngine?: import("./fixtures/movement-interpolator.js").MovementEngine;
 }
 
+export interface BuildServerResult {
+  readonly app: FastifyInstance;
+  readonly timerMaps: Map<string, NodeJS.Timeout>[];
+}
+
 export async function buildServer(
   deps: BuildServerDeps,
-): Promise<FastifyInstance> {
+): Promise<BuildServerResult> {
   const app = Fastify({
     logger: {
       level: deps.config.logLevel,
@@ -123,6 +128,10 @@ export async function buildServer(
     crossOriginResourcePolicy: { policy: "cross-origin" },
   });
 
+  app.addHook("onSend", async (request, reply) => {
+    reply.header("x-request-id", request.id);
+  });
+
   if (deps.config.apiKey) {
     registerApiKeyAuth(app, deps.config.apiKey);
   }
@@ -141,6 +150,7 @@ export async function buildServer(
     getConnectionStatus: deps.getConnectionStatus,
     serverVersion: deps.serverVersion,
     dmxDevicePath: deps.config.dmxDevicePath,
+    dmxMonitor: deps.dmxMonitor,
     latencyTracker: deps.latencyTracker,
     udpServer: deps.udpServer,
     serverId: deps.serverId,
@@ -168,11 +178,14 @@ export async function buildServer(
     oflClient: deps.oflClient,
   });
 
-  registerControlRoutes(app, {
+  const timerMaps: Map<string, NodeJS.Timeout>[] = [];
+
+  const { activeTimers: controlTimers } = registerControlRoutes(app, {
     manager: deps.manager,
     store: deps.fixtureStore,
     coordinator: deps.coordinator,
   });
+  timerMaps.push(controlTimers);
 
   registerLibraryRoutes(app, {
     registry: deps.registry,
@@ -249,11 +262,12 @@ export async function buildServer(
     });
 
     const groupDispatcher = createDmxDispatcher(deps.manager, deps.coordinator);
-    registerGroupControlRoutes(app, {
+    const { activeTimers: groupTimers } = registerGroupControlRoutes(app, {
       groupStore: deps.groupStore,
       fixtureStore: deps.fixtureStore,
       dispatcher: groupDispatcher,
     });
+    timerMaps.push(groupTimers);
   }
 
   if (deps.diskCache) {
@@ -272,15 +286,15 @@ export async function buildServer(
   }
 
   app.setErrorHandler((error: FastifyError, request, reply) => {
-    request.log.error({ err: error }, "Unhandled error");
+    request.log.error({ err: error, requestId: request.id }, "Unhandled error");
     const statusCode = error.statusCode ?? 500;
     if (statusCode >= 500) {
-      return reply.status(statusCode).send({ error: "Internal server error" });
+      return reply.status(statusCode).send({ error: "Internal server error", requestId: request.id });
     }
     return reply
       .status(statusCode)
-      .send({ error: error.message || "Request error" });
+      .send({ error: error.message || "Request error", requestId: request.id });
   });
 
-  return app;
+  return { app, timerMaps };
 }

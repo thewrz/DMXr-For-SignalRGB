@@ -6,6 +6,12 @@
   Control your DMX lighting fixtures from <a href="https://signalrgb.com">SignalRGB</a> — sync stage lights, PARs, moving heads, and strobes with your PC lighting effects.
 </p>
 
+<p align="center">
+  <a href="https://github.com/thewrz/DMXr/actions/workflows/ci.yml"><img src="https://github.com/thewrz/DMXr/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/thewrz/DMXr/actions/workflows/build-server.yml"><img src="https://github.com/thewrz/DMXr/actions/workflows/build-server.yml/badge.svg" alt="Build"></a>
+  <a href="https://github.com/thewrz/DMXr/blob/main/LICENSE"><img src="https://img.shields.io/github/license/thewrz/DMXr" alt="License"></a>
+</p>
+
 > Currently targets SignalRGB (Windows). [OpenRGB](https://openrgb.org) support for native Linux is planned.
 
 [![Add to SignalRGB](https://github.com/SRGBmods/QMK-Images/blob/main/images/add-to-signalrgb.png)](https://srgbmods.net/s?p=addon/install?url=https://github.com/thewrz/DMXr)
@@ -79,6 +85,7 @@ Add fixtures through the web UI at `http://localhost:8080`.
 | `FIXTURE_DB_PATH` | *(auto-detect)* | Path to a local fixture database file |
 | `FIXTURES_PATH` | `./config/fixtures.json` | Persisted fixture configuration |
 | `MDNS_ENABLED` | `true` | Advertise via mDNS |
+| `LOG_FORMAT` | `pretty` | Set to `json` for structured JSON logs (machine-parseable) |
 | `API_KEY` | *(none)* | Optional API key for endpoint auth |
 
 ### Running as a service
@@ -92,11 +99,37 @@ nssm start DMXr
 
 Linux (systemd): see `service/dmxr.service`.
 
+## Troubleshooting
+
+**Server won't detect my DMX adapter**
+- Check `DMX_DEVICE_PATH` — on Windows it's `COM3`, `COM4`, etc. On Linux it's `/dev/ttyUSB0`
+- Only one process can hold the serial port. Close any other DMX software first
+- Try unplugging and replugging the adapter; the port number may change
+
+**Fixtures aren't responding to color changes**
+- Verify the fixture's DMX start address matches what's configured in the web UI
+- Check that the correct driver is set (`enttec-usb-dmx-pro` or `enttec-open-usb-dmx`)
+- Open the DMX monitor at `http://localhost:8080` to see live channel values
+
+**SignalRGB plugin can't find the server**
+- Ensure `MDNS_ENABLED=true` (default) and that your firewall allows UDP port 5353 (mDNS)
+- If mDNS fails, the plugin falls back to manual server probing — add the server IP in the plugin settings panel
+- Restart SignalRGB after installing or updating the plugin
+
+**Connection drops or "disconnected" status**
+- The server auto-reconnects on USB disconnect/reconnect with exponential backoff
+- Check the connection event log in the web UI for diagnostics
+- On Windows VMs, USB passthrough re-enumeration requires reattaching the device
+
+**Web UI won't load**
+- Default is `http://localhost:8080` — check `PORT` and `HOST` env vars
+- If running as a service, check logs: NSSM logs at `%AppData%\DMXr\logs\`, systemd via `journalctl -u dmxr`
+
 ## Development
 
 ```bash
 cd server
-npm test          # Run tests (460+)
+npm test          # Run tests (1350+)
 npx tsc --noEmit  # Type check
 ```
 

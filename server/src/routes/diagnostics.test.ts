@@ -300,6 +300,143 @@ describe("Diagnostics routes", () => {
 
       await miniApp.close();
     }, 10000);
+
+    it("two SSE clients connected → one disconnects → other still receives events", async () => {
+      const streamLog = createConnectionLog();
+      const miniApp = Fastify();
+      registerDiagnosticsRoutes(miniApp, { connectionLog: streamLog });
+      await miniApp.listen({ port: 0, host: "127.0.0.1" });
+
+      const addr = miniApp.server.address();
+      const port = typeof addr === "object" && addr ? addr.port : 0;
+      const baseUrl = `http://127.0.0.1:${port}`;
+
+      const client1Chunks: string[] = [];
+      const client2Chunks: string[] = [];
+
+      await new Promise<void>((resolve) => {
+        // Client 1 — will disconnect early
+        const req1 = http.get(
+          `${baseUrl}/api/diagnostics/connection-log/stream`,
+          (res) => {
+            res.setEncoding("utf8");
+            res.on("data", (chunk: string) => {
+              client1Chunks.push(chunk);
+              // Disconnect client 1 after first event
+              if (client1Chunks.some((c) => c.includes('"phase":"before"'))) {
+                req1.destroy();
+              }
+            });
+            res.on("error", () => {});
+          },
+        );
+        req1.on("error", () => {});
+
+        // Client 2 — stays connected
+        const req2 = http.get(
+          `${baseUrl}/api/diagnostics/connection-log/stream`,
+          (res) => {
+            res.setEncoding("utf8");
+            res.on("data", (chunk: string) => {
+              client2Chunks.push(chunk);
+              if (client2Chunks.some((c) => c.includes('"phase":"after"'))) {
+                req2.destroy();
+                resolve();
+              }
+            });
+            res.on("error", () => resolve());
+            res.on("end", () => resolve());
+          },
+        );
+        req2.on("error", () => resolve());
+
+        // Push "before" event — both clients should get it
+        setTimeout(() => {
+          streamLog.push(makeEvent({ type: "connected", details: { phase: "before" } as any }));
+        }, 100);
+
+        // After client 1 disconnects, push "after" event — only client 2 should get it
+        setTimeout(() => {
+          streamLog.push(makeEvent({ type: "disconnected", details: { phase: "after" } as any }));
+        }, 400);
+
+        setTimeout(() => {
+          req1.destroy();
+          req2.destroy();
+          resolve();
+        }, 3000);
+      });
+
+      await miniApp.close();
+
+      const combined2 = client2Chunks.join("");
+      expect(combined2).toContain('"phase":"after"');
+    }, 10000);
+
+    it("rapid burst of events → all arrive in order", async () => {
+      const streamLog = createConnectionLog();
+      const miniApp = Fastify();
+      registerDiagnosticsRoutes(miniApp, { connectionLog: streamLog });
+      await miniApp.listen({ port: 0, host: "127.0.0.1" });
+
+      const addr = miniApp.server.address();
+      const port = typeof addr === "object" && addr ? addr.port : 0;
+      const baseUrl = `http://127.0.0.1:${port}`;
+
+      const receivedEvents: ConnectionEvent[] = [];
+      const BURST_SIZE = 50;
+
+      await new Promise<void>((resolve) => {
+        const req = http.get(
+          `${baseUrl}/api/diagnostics/connection-log/stream`,
+          (res) => {
+            res.setEncoding("utf8");
+            res.on("data", (chunk: string) => {
+              // Parse SSE data frames
+              const lines = chunk.split("\n");
+              for (const line of lines) {
+                if (line.startsWith("data:")) {
+                  try {
+                    receivedEvents.push(JSON.parse(line.slice(5)));
+                  } catch { /* heartbeat or partial */ }
+                }
+              }
+              if (receivedEvents.length >= BURST_SIZE) {
+                req.destroy();
+                resolve();
+              }
+            });
+            res.on("error", () => resolve());
+            res.on("end", () => resolve());
+          },
+        );
+
+        req.on("error", () => resolve());
+
+        // Burst of events after connection establishes
+        setTimeout(() => {
+          for (let i = 0; i < BURST_SIZE; i++) {
+            streamLog.push(makeEvent({
+              type: "connected",
+              details: { seq: i } as any,
+            }));
+          }
+        }, 100);
+
+        setTimeout(() => {
+          req.destroy();
+          resolve();
+        }, 5000);
+      });
+
+      await miniApp.close();
+
+      // Verify we got events and they're in order
+      expect(receivedEvents.length).toBeGreaterThanOrEqual(BURST_SIZE);
+      for (let i = 0; i < BURST_SIZE; i++) {
+        expect((receivedEvents[i].details as any).seq).toBe(i);
+      }
+    }, 10000);
   });
 
   describe("routes not registered without connectionLog", () => {

@@ -46,7 +46,7 @@ function makeMockCoordinator(): MultiUniverseCoordinator {
 }
 
 describe("DmxDispatcher (no coordinator)", () => {
-  it("delegates applyFixtureUpdate to manager", () => {
+  it("delegates applyFixtureUpdate to manager and returns its value", () => {
     const mgr = makeMockManager();
     const d = createDmxDispatcher(mgr);
     const payload = { fixture: "test", channels: { 1: 255 } };
@@ -102,7 +102,7 @@ describe("DmxDispatcher (no coordinator)", () => {
     expect(mgr.whiteout).toHaveBeenCalled();
   });
 
-  it("delegates isBlackoutActive to manager", () => {
+  it("delegates isBlackoutActive to manager and returns its value", () => {
     const mgr = makeMockManager();
     const d = createDmxDispatcher(mgr);
 
@@ -112,7 +112,7 @@ describe("DmxDispatcher (no coordinator)", () => {
     expect(mgr.isBlackoutActive).toHaveBeenCalled();
   });
 
-  it("delegates getControlMode to manager", () => {
+  it("delegates getControlMode to manager and returns its value", () => {
     const mgr = makeMockManager();
     const d = createDmxDispatcher(mgr);
 
@@ -122,7 +122,7 @@ describe("DmxDispatcher (no coordinator)", () => {
     expect(mgr.getControlMode).toHaveBeenCalled();
   });
 
-  it("delegates getActiveChannelCount to manager", () => {
+  it("delegates getActiveChannelCount to manager and returns its value", () => {
     const mgr = makeMockManager();
     const d = createDmxDispatcher(mgr);
 
@@ -149,10 +149,20 @@ describe("DmxDispatcher (no coordinator)", () => {
 
     expect(mgr.unlockChannels).toHaveBeenCalledWith([4, 5]);
   });
+
+  it("applyRawUpdate without coordinator falls through to manager cleanly", () => {
+    const mgr = makeMockManager();
+    const d = createDmxDispatcher(mgr);
+
+    // No coordinator present — should not throw
+    d.applyRawUpdate(undefined, { 10: 200 });
+
+    expect(mgr.applyRawUpdate).toHaveBeenCalledWith({ 10: 200 });
+  });
 });
 
 describe("DmxDispatcher (with coordinator)", () => {
-  it("delegates universe-scoped applyFixtureUpdate to coordinator", () => {
+  it("delegates universe-scoped applyFixtureUpdate to coordinator and returns its value", () => {
     const mgr = makeMockManager();
     const coord = makeMockCoordinator();
     const d = createDmxDispatcher(mgr, coord);
@@ -170,13 +180,14 @@ describe("DmxDispatcher (with coordinator)", () => {
     const coord = makeMockCoordinator();
     const d = createDmxDispatcher(mgr, coord);
 
-    d.applyFixtureUpdate(undefined, { fixture: "test", channels: {} });
+    const result = d.applyFixtureUpdate(undefined, { fixture: "test", channels: {} });
 
+    expect(result).toBe(3);
     expect(mgr.applyFixtureUpdate).toHaveBeenCalled();
     expect(coord.applyFixtureUpdate).not.toHaveBeenCalled();
   });
 
-  it("blackout with universeId targets coordinator + always hits manager", () => {
+  it("blackout with universeId → coordinator.blackout AND manager.blackout both called", () => {
     const mgr = makeMockManager();
     const coord = makeMockCoordinator();
     const d = createDmxDispatcher(mgr, coord);
@@ -187,7 +198,7 @@ describe("DmxDispatcher (with coordinator)", () => {
     expect(mgr.blackout).toHaveBeenCalled();
   });
 
-  it("blackout without universeId calls blackoutAll + manager", () => {
+  it("blackout without universeId → coordinator.blackoutAll + manager.blackout", () => {
     const mgr = makeMockManager();
     const coord = makeMockCoordinator();
     const d = createDmxDispatcher(mgr, coord);
@@ -195,6 +206,7 @@ describe("DmxDispatcher (with coordinator)", () => {
     d.blackout();
 
     expect(coord.blackoutAll).toHaveBeenCalled();
+    expect(coord.blackout).not.toHaveBeenCalled();
     expect(mgr.blackout).toHaveBeenCalled();
   });
 
@@ -220,7 +232,7 @@ describe("DmxDispatcher (with coordinator)", () => {
     expect(mgr.resumeNormal).toHaveBeenCalled();
   });
 
-  it("getChannelSnapshot delegates to coordinator for universe", () => {
+  it("getChannelSnapshot delegates to coordinator for universe and returns its value", () => {
     const mgr = makeMockManager();
     const coord = makeMockCoordinator();
     const d = createDmxDispatcher(mgr, coord);
@@ -231,7 +243,7 @@ describe("DmxDispatcher (with coordinator)", () => {
     expect(coord.getChannelSnapshot).toHaveBeenCalledWith("uni-1", 1, 3);
   });
 
-  it("isBlackoutActive delegates to coordinator for universe", () => {
+  it("isBlackoutActive delegates to coordinator for universe and returns its value", () => {
     const mgr = makeMockManager();
     const coord = makeMockCoordinator();
     const d = createDmxDispatcher(mgr, coord);
@@ -240,7 +252,7 @@ describe("DmxDispatcher (with coordinator)", () => {
     expect(coord.isBlackoutActive).toHaveBeenCalledWith("uni-1");
   });
 
-  it("applyRawUpdate delegates to coordinator for universe", () => {
+  it("applyRawUpdate delegates to coordinator for universe and not manager", () => {
     const mgr = makeMockManager();
     const coord = makeMockCoordinator();
     const d = createDmxDispatcher(mgr, coord);
@@ -273,7 +285,7 @@ describe("DmxDispatcher (with coordinator)", () => {
     expect(mgr.resumeNormal).toHaveBeenCalled();
   });
 
-  it("getControlMode delegates to coordinator for universe", () => {
+  it("getControlMode delegates to coordinator for universe and returns its value", () => {
     const mgr = makeMockManager();
     const coord = makeMockCoordinator();
     const d = createDmxDispatcher(mgr, coord);
@@ -285,7 +297,7 @@ describe("DmxDispatcher (with coordinator)", () => {
     expect(mgr.getControlMode).not.toHaveBeenCalled();
   });
 
-  it("getActiveChannelCount delegates to coordinator for universe", () => {
+  it("getActiveChannelCount delegates to coordinator for universe and returns its value", () => {
     const mgr = makeMockManager();
     const coord = makeMockCoordinator();
     const d = createDmxDispatcher(mgr, coord);
@@ -339,5 +351,72 @@ describe("DmxDispatcher (with coordinator)", () => {
 
     expect(coord.unlockChannels).not.toHaveBeenCalled();
     expect(mgr.unlockChannels).toHaveBeenCalledWith([6]);
+  });
+});
+
+describe("DmxDispatcher (behavioral / return-value correctness)", () => {
+  it("applyFixtureUpdate returns coordinator value (5) not manager value (3) when universe-scoped", () => {
+    const mgr = makeMockManager();
+    const coord = makeMockCoordinator();
+    const d = createDmxDispatcher(mgr, coord);
+
+    const result = d.applyFixtureUpdate("uni-1", { fixture: "f", channels: { 1: 0 } });
+
+    expect(result).toBe(5);
+  });
+
+  it("applyFixtureUpdate returns manager value (3) when no universeId", () => {
+    const mgr = makeMockManager();
+    const coord = makeMockCoordinator();
+    const d = createDmxDispatcher(mgr, coord);
+
+    const result = d.applyFixtureUpdate(undefined, { fixture: "f", channels: { 1: 0 } });
+
+    expect(result).toBe(3);
+  });
+
+  it("getChannelSnapshot returns coordinator snapshot when universe-scoped", () => {
+    const mgr = makeMockManager();
+    const coord = makeMockCoordinator();
+    const d = createDmxDispatcher(mgr, coord);
+
+    const result = d.getChannelSnapshot("uni-1", 1, 5);
+    expect(result).toEqual({ 1: 128 });
+  });
+
+  it("getChannelSnapshot returns manager snapshot (empty) when no universeId", () => {
+    const mgr = makeMockManager();
+    const coord = makeMockCoordinator();
+    const d = createDmxDispatcher(mgr, coord);
+
+    const result = d.getChannelSnapshot(undefined, 1, 5);
+    expect(result).toEqual({});
+  });
+
+  it("isBlackoutActive returns coordinator value (true) vs manager value (false)", () => {
+    const mgr = makeMockManager();
+    const coord = makeMockCoordinator();
+    const d = createDmxDispatcher(mgr, coord);
+
+    expect(d.isBlackoutActive("uni-1")).toBe(true);
+    expect(d.isBlackoutActive()).toBe(false);
+  });
+
+  it("getControlMode returns coordinator value vs manager value per path", () => {
+    const mgr = makeMockManager();
+    const coord = makeMockCoordinator();
+    const d = createDmxDispatcher(mgr, coord);
+
+    expect(d.getControlMode("uni-1")).toBe("blackout");
+    expect(d.getControlMode()).toBe("normal");
+  });
+
+  it("getActiveChannelCount returns coordinator value vs manager value per path", () => {
+    const mgr = makeMockManager();
+    const coord = makeMockCoordinator();
+    const d = createDmxDispatcher(mgr, coord);
+
+    expect(d.getActiveChannelCount("uni-1")).toBe(20);
+    expect(d.getActiveChannelCount()).toBe(10);
   });
 });

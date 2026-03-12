@@ -79,6 +79,15 @@ describe("detectResetChannel", () => {
     // "reset" pattern comes first in RESET_CHANNEL_PATTERNS
     expect(detectResetChannel(channels)).toEqual(channels[1]);
   });
+
+  it("'Reset' wins over 'Control Ch' when both present (pattern order priority)", () => {
+    const channels: FixtureChannel[] = [
+      { offset: 0, name: "Control Ch1", type: "Generic", defaultValue: 0 },
+      { offset: 1, name: "Reset", type: "Generic", defaultValue: 0 },
+    ];
+    // "reset" is the first pattern, so it should match channel[1] before "control ch" matches channel[0]
+    expect(detectResetChannel(channels)).toEqual(channels[1]);
+  });
 });
 
 const resetChannels = [
@@ -314,6 +323,93 @@ describe("Fixture reset routes", () => {
         (call) => call[dmxAddr] === 0,
       );
       expect(afterExpiry.length).toBe(1);
+    });
+
+    // --- Compound-condition tests ---
+
+    it("two rapid resets with different holdMs → second timer duration wins", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+
+      const { id, dmxStartAddress } = await addFixture(app, {
+        name: "Timer Override",
+        dmxStartAddress: 60,
+        channels: [
+          { offset: 0, name: "Maintenance", type: "Generic", defaultValue: 0 },
+        ],
+        channelCount: 1,
+        mode: "1ch",
+      });
+
+      // First reset: 5000ms hold (default)
+      await app.inject({ method: "POST", url: `/fixtures/${id}/reset` });
+
+      // Second reset: 3000ms hold (configured)
+      await app.inject({
+        method: "PATCH",
+        url: `/fixtures/${id}`,
+        payload: { resetConfig: { channelOffset: 0, value: 220, holdMs: 3000 } },
+      });
+      await app.inject({ method: "POST", url: `/fixtures/${id}/reset` });
+
+      const dmxAddr = dmxStartAddress;
+
+      // At 3000ms, second timer should fire
+      vi.advanceTimersByTime(3000);
+      const restores = mockUniverse.updateCalls.filter((c) => c[dmxAddr] === 0);
+      expect(restores.length).toBe(1);
+
+      // At 5000ms total, no second restore (first timer was cleared)
+      vi.advanceTimersByTime(2000);
+      const restoresAfter = mockUniverse.updateCalls.filter((c) => c[dmxAddr] === 0);
+      expect(restoresAfter.length).toBe(1);
+    });
+
+    it("reset fixture A then reset fixture B → both timers tracked independently", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+
+      const fixtureA = await addFixture(app, {
+        name: "Fixture A",
+        dmxStartAddress: 70,
+      });
+      const fixtureB = await addFixture(app, {
+        name: "Fixture B",
+        dmxStartAddress: 80,
+      });
+
+      const dmxAddrA = fixtureA.dmxStartAddress + 5;
+      const dmxAddrB = fixtureB.dmxStartAddress + 5;
+
+      // Reset both
+      await app.inject({ method: "POST", url: `/fixtures/${fixtureA.id}/reset` });
+      await app.inject({ method: "POST", url: `/fixtures/${fixtureB.id}/reset` });
+
+      // Both should have the reset value applied
+      expect(mockUniverse.updateCalls).toContainEqual({ [dmxAddrA]: 200 });
+      expect(mockUniverse.updateCalls).toContainEqual({ [dmxAddrB]: 200 });
+
+      // After hold time, both should restore
+      vi.advanceTimersByTime(5000);
+      expect(mockUniverse.updateCalls).toContainEqual({ [dmxAddrA]: 0 });
+      expect(mockUniverse.updateCalls).toContainEqual({ [dmxAddrB]: 0 });
+    });
+
+    it("reset uses captured dmxAddr even if fixture config would change the address", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+
+      const { id, dmxStartAddress } = await addFixture(app, {
+        name: "Address Change",
+        dmxStartAddress: 90,
+      });
+
+      const originalDmxAddr = dmxStartAddress + 5;
+
+      // Trigger reset — this captures dmxAddr at the current address
+      await app.inject({ method: "POST", url: `/fixtures/${id}/reset` });
+      expect(mockUniverse.updateCalls).toContainEqual({ [originalDmxAddr]: 200 });
+
+      // Let the timer expire — the restore should write to the original captured address
+      vi.advanceTimersByTime(5000);
+      expect(mockUniverse.updateCalls).toContainEqual({ [originalDmxAddr]: 0 });
     });
   });
 

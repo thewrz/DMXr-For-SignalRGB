@@ -22,7 +22,7 @@ describe("Metrics routes", () => {
     store = createTestFixtureStore();
     const latencyTracker = createLatencyTracker(100);
 
-    // Seed some latency data
+    // Seed known latency data for precise assertions
     latencyTracker.recordNetwork(1.5);
     latencyTracker.recordNetwork(2.0);
     latencyTracker.recordColorMap(0.5);
@@ -46,15 +46,23 @@ describe("Metrics routes", () => {
   });
 
   describe("GET /metrics", () => {
-    it("returns JSON metrics", async () => {
+    it("returns JSON metrics with correct structure and non-zero values", async () => {
       const res = await app.inject({ method: "GET", url: "/metrics" });
       expect(res.statusCode).toBe(200);
       const body = res.json();
+
+      // Verify structure
       expect(body.latency).toBeDefined();
       expect(body.latency.network).toHaveProperty("avg");
       expect(body.latency.network).toHaveProperty("p95");
       expect(body.latency.network).toHaveProperty("p99");
       expect(body.latency.network).toHaveProperty("count");
+
+      // Verify network count matches the 2 recordings we seeded
+      expect(body.latency.network.count).toBe(2);
+
+      // Verify avg is the average of 1.5 and 2.0
+      expect(body.latency.network.avg).toBeCloseTo(1.75, 1);
     });
 
     it("returns null udp stats when no UDP server provided", async () => {
@@ -65,7 +73,7 @@ describe("Metrics routes", () => {
   });
 
   describe("GET /metrics/prometheus", () => {
-    it("returns Prometheus text format", async () => {
+    it("returns Prometheus text format with correct structure", async () => {
       const res = await app.inject({ method: "GET", url: "/metrics/prometheus" });
       expect(res.statusCode).toBe(200);
       expect(res.headers["content-type"]).toContain("text/plain");
@@ -92,7 +100,7 @@ describe("Metrics routes", () => {
       expect(body).toContain("dmxr_packets_per_second ");
     });
 
-    it("includes active fixtures gauge", async () => {
+    it("active fixtures gauge shows 0 when no fixtures seeded", async () => {
       const res = await app.inject({ method: "GET", url: "/metrics/prometheus" });
       const body = res.body;
       expect(body).toContain("# TYPE dmxr_active_fixtures gauge");
@@ -105,21 +113,64 @@ describe("Metrics routes", () => {
       expect(body).not.toContain("dmxr_udp_packets_received_total");
     });
 
-    it("converts milliseconds to seconds in latency values", async () => {
+    it("converts ms to seconds correctly (p95 of 1.5ms and 2.0ms ≈ 0.002s)", async () => {
       const res = await app.inject({ method: "GET", url: "/metrics/prometheus" });
       const body = res.body;
-      // Network latency was recorded as 1.5ms and 2.0ms
-      // p95 should be ~2.0ms = 0.002000 seconds
+
+      // With 2 samples [1.5, 2.0], p95 index = floor(2 * 0.95) = 1, so p95 = 2.0ms = 0.002000s
       const p95Match = body.match(/dmxr_network_latency_seconds\{quantile="0\.95"\} ([\d.]+)/);
       expect(p95Match).toBeTruthy();
       const p95Value = parseFloat(p95Match![1]);
-      expect(p95Value).toBeLessThan(0.01); // less than 10ms in seconds
-      expect(p95Value).toBeGreaterThan(0); // non-zero
+      expect(p95Value).toBeCloseTo(0.002, 4);
+
+      // p99 index = floor(2 * 0.99) = 1, so p99 = 2.0ms = 0.002000s
+      const p99Match = body.match(/dmxr_network_latency_seconds\{quantile="0\.99"\} ([\d.]+)/);
+      expect(p99Match).toBeTruthy();
+      const p99Value = parseFloat(p99Match![1]);
+      expect(p99Value).toBeCloseTo(0.002, 4);
+    });
+
+    it("network latency count line matches seeded count", async () => {
+      const res = await app.inject({ method: "GET", url: "/metrics/prometheus" });
+      const body = res.body;
+
+      const countMatch = body.match(/dmxr_network_latency_seconds_count (\d+)/);
+      expect(countMatch).toBeTruthy();
+      expect(parseInt(countMatch![1], 10)).toBe(2);
     });
 
     it("ends with a newline", async () => {
       const res = await app.inject({ method: "GET", url: "/metrics/prometheus" });
       expect(res.body.endsWith("\n")).toBe(true);
+    });
+  });
+
+  describe("GET /metrics/prometheus (with fixtures seeded)", () => {
+    it("active fixtures gauge reflects actual fixture count", async () => {
+      // Add 3 fixtures via API
+      for (let i = 0; i < 3; i++) {
+        await app.inject({
+          method: "POST",
+          url: "/fixtures",
+          payload: {
+            name: `Fixture ${i}`,
+            oflKey: "test/test",
+            oflFixtureName: "Test",
+            mode: "3ch",
+            dmxStartAddress: 1 + i * 10,
+            channelCount: 3,
+            channels: [
+              { offset: 0, name: "Red", type: "ColorIntensity", color: "Red", defaultValue: 0 },
+              { offset: 1, name: "Green", type: "ColorIntensity", color: "Green", defaultValue: 0 },
+              { offset: 2, name: "Blue", type: "ColorIntensity", color: "Blue", defaultValue: 0 },
+            ],
+          },
+        });
+      }
+
+      const res = await app.inject({ method: "GET", url: "/metrics/prometheus" });
+      const body = res.body;
+      expect(body).toContain("dmxr_active_fixtures 3");
     });
   });
 });

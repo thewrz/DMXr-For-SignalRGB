@@ -56,17 +56,32 @@ export function installShutdownHandlers(deps: ShutdownDeps): (signal: string) =>
         map.clear();
       }
     }
-    deps.getMdnsAdvertiser()?.unpublishAll();
-    for (const provider of deps.registry.getAll()) {
-      provider.close?.();
+    try { deps.getMdnsAdvertiser()?.unpublishAll(); } catch (e) {
+      deps.app.log.info(`mDNS unpublish failed: ${e}`);
     }
-    deps.dmxMonitor.close();
+    for (const provider of deps.registry.getAll()) {
+      try { provider.close?.(); } catch (e) {
+        deps.app.log.info(`Provider close failed: ${e}`);
+      }
+    }
+    try { deps.dmxMonitor.close(); } catch (e) {
+      deps.app.log.info(`DMX monitor close failed: ${e}`);
+    }
+    // Blackout is critical — must always run even if above steps fail
     deps.coordinator.blackoutAll();
     deps.manager.blackout();
-    await deps.udpServer.close();
-    await deps.app.close();
-    await deps.connectionPool.closeAll();
-    await deps.connection.close();
+    try { await deps.udpServer.close(); } catch (e) {
+      deps.app.log.info(`UDP server close failed: ${e}`);
+    }
+    try { await deps.app.close(); } catch (e) {
+      deps.app.log.info(`Fastify close failed: ${e}`);
+    }
+    try { await deps.connectionPool.closeAll(); } catch (e) {
+      deps.app.log.info(`Connection pool close failed: ${e}`);
+    }
+    try { await deps.connection.close(); } catch (e) {
+      deps.app.log.info(`Connection close failed: ${e}`);
+    }
     process.exit(0);
   };
 

@@ -163,4 +163,57 @@ describe("pipeline-logger", () => {
     expect(shouldSample("a1")).toBe(true);
     expect(shouldSample("a2")).toBe(true);
   });
+
+  // --- Compound-condition tests ---
+
+  it("verbose → shouldSample fires → info → suppressed → verbose again → fires again", () => {
+    vi.useFakeTimers();
+    try {
+      // Start at verbose — sampling should work
+      setPipelineLogLevel("verbose");
+      expect(shouldSample("level-change-key", 1000)).toBe(true);
+
+      // Advance time past interval
+      vi.advanceTimersByTime(1000);
+
+      // Switch to info — shouldSample always returns false
+      setPipelineLogLevel("info");
+      expect(shouldSample("level-change-key", 1000)).toBe(false);
+
+      // Switch back to verbose — shouldSample should fire again
+      // because enough time has elapsed
+      setPipelineLogLevel("verbose");
+      expect(shouldSample("level-change-key", 1000)).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("two keys interleaved at precise intervals → each respects its own timer", () => {
+    vi.useFakeTimers();
+    try {
+      // Key A fires at t=0
+      expect(shouldSample("interleave-a", 500)).toBe(true);
+
+      // 250ms later, key B fires
+      vi.advanceTimersByTime(250);
+      expect(shouldSample("interleave-b", 500)).toBe(true);
+
+      // At t=400, neither should fire (both within their intervals)
+      vi.advanceTimersByTime(150);
+      expect(shouldSample("interleave-a", 500)).toBe(false);
+      expect(shouldSample("interleave-b", 500)).toBe(false);
+
+      // At t=500, key A should fire (500ms since t=0), B still suppressed (250ms since t=250)
+      vi.advanceTimersByTime(100);
+      expect(shouldSample("interleave-a", 500)).toBe(true);
+      expect(shouldSample("interleave-b", 500)).toBe(false);
+
+      // At t=750, key B should fire (500ms since t=250)
+      vi.advanceTimersByTime(250);
+      expect(shouldSample("interleave-b", 500)).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { installShutdownHandlers, type ShutdownDeps } from "./shutdown.js";
 
 function makeMockDeps(overrides: Partial<ShutdownDeps> = {}): ShutdownDeps {
@@ -25,9 +25,15 @@ function makeMockDeps(overrides: Partial<ShutdownDeps> = {}): ShutdownDeps {
 
 describe("installShutdownHandlers", () => {
   let exitSpy: ReturnType<typeof vi.spyOn>;
+  let stderrSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+  });
 
   afterEach(() => {
     exitSpy?.mockRestore();
+    stderrSpy?.mockRestore();
   });
 
   it("clears movementInterval during shutdown", async () => {
@@ -93,5 +99,138 @@ describe("installShutdownHandlers", () => {
     await shutdown("SIGTERM");
 
     expect((deps.coordinator as any).blackoutAll).toHaveBeenCalled();
+  });
+
+  it("guards against duplicate shutdown calls", async () => {
+    const deps = makeMockDeps();
+    exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+
+    const shutdown = installShutdownHandlers(deps);
+    await shutdown("SIGINT");
+    await shutdown("SIGINT");
+
+    // blackout should only be called once despite two shutdown calls
+    expect(deps.coordinator.blackoutAll).toHaveBeenCalledTimes(1);
+    expect(deps.manager.blackout).toHaveBeenCalledTimes(1);
+  });
+
+  it("clears all timerMaps during shutdown", async () => {
+    const timer1 = setTimeout(() => {}, 60_000);
+    const timer2 = setTimeout(() => {}, 60_000);
+    const map1 = new Map<string, NodeJS.Timeout>([["a", timer1]]);
+    const map2 = new Map<string, NodeJS.Timeout>([["b", timer2]]);
+
+    const deps = makeMockDeps({ timerMaps: [map1, map2] });
+    exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+
+    const shutdown = installShutdownHandlers(deps);
+    await shutdown("SIGTERM");
+
+    expect(map1.size).toBe(0);
+    expect(map2.size).toBe(0);
+  });
+
+  it("calls close on registry providers that have a close method", async () => {
+    const closeFn = vi.fn();
+    const providers = [
+      { close: closeFn },
+      { /* no close method */ },
+      { close: closeFn },
+    ];
+    const deps = makeMockDeps({
+      registry: { getAll: () => providers } as any,
+    });
+    exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+
+    const shutdown = installShutdownHandlers(deps);
+    await shutdown("SIGTERM");
+
+    expect(closeFn).toHaveBeenCalledTimes(2);
+  });
+
+  it("calls unpublishAll on mdns advertiser when present", async () => {
+    const unpublishAll = vi.fn();
+    const deps = makeMockDeps({
+      getMdnsAdvertiser: () => ({ unpublishAll }) as any,
+    });
+    exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+
+    const shutdown = installShutdownHandlers(deps);
+    await shutdown("SIGTERM");
+
+    expect(unpublishAll).toHaveBeenCalledOnce();
+  });
+
+  it("handles uncaughtException by writing to stderr and shutting down", async () => {
+    const deps = makeMockDeps();
+    exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+
+    installShutdownHandlers(deps);
+
+    const error = new Error("test fatal error");
+    process.emit("uncaughtException", error);
+
+    // Allow the async shutdown to complete
+    await vi.waitFor(() => {
+      expect(exitSpy).toHaveBeenCalled();
+    });
+
+    expect(stderrSpy).toHaveBeenCalledWith(
+      expect.stringContaining("FATAL uncaughtException"),
+    );
+    expect(stderrSpy).toHaveBeenCalledWith(
+      expect.stringContaining("test fatal error"),
+    );
+  });
+
+  it("handles unhandledRejection by writing to stderr and shutting down", async () => {
+    const deps = makeMockDeps();
+    exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+
+    installShutdownHandlers(deps);
+
+    process.emit("unhandledRejection", "promise rejected reason", Promise.resolve());
+
+    await vi.waitFor(() => {
+      expect(exitSpy).toHaveBeenCalled();
+    });
+
+    expect(stderrSpy).toHaveBeenCalledWith(
+      expect.stringContaining("FATAL unhandledRejection"),
+    );
+    expect(stderrSpy).toHaveBeenCalledWith(
+      expect.stringContaining("promise rejected reason"),
+    );
+  });
+
+  it("exit handler performs last-resort blackout when shutdown was not called", () => {
+    const deps = makeMockDeps();
+    exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+
+    installShutdownHandlers(deps);
+
+    // Emit exit directly without going through shutdown
+    process.emit("exit", 0);
+
+    expect(deps.coordinator.blackoutAll).toHaveBeenCalledOnce();
+    expect(deps.manager.blackout).toHaveBeenCalledOnce();
+  });
+
+  it("exit handler does not double-blackout after graceful shutdown", async () => {
+    const deps = makeMockDeps();
+    exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+
+    const shutdown = installShutdownHandlers(deps);
+    await shutdown("SIGTERM");
+
+    // Reset call counts after the graceful shutdown
+    (deps.coordinator.blackoutAll as ReturnType<typeof vi.fn>).mockClear();
+    (deps.manager.blackout as ReturnType<typeof vi.fn>).mockClear();
+
+    // Now emit exit -- should not blackout again since exitBlackoutDone is true
+    process.emit("exit", 0);
+
+    expect(deps.coordinator.blackoutAll).not.toHaveBeenCalled();
+    expect(deps.manager.blackout).not.toHaveBeenCalled();
   });
 });

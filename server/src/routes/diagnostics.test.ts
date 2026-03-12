@@ -1,7 +1,10 @@
+import http from "node:http";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import Fastify from "fastify";
 import { buildServer } from "../server.js";
 import { createUniverseManager } from "../dmx/universe-manager.js";
 import { createConnectionLog } from "../dmx/connection-log.js";
+import { registerDiagnosticsRoutes } from "./diagnostics.js";
 import {
   createMockUniverse,
   createTestConfig,
@@ -149,6 +152,154 @@ describe("Diagnostics routes", () => {
       expect(res.headers["cache-control"]).toBe("no-cache");
       expect(res.headers["connection"]).toBe("keep-alive");
     });
+  });
+
+  describe("GET /api/diagnostics/connection-log/stream (SSE connection path)", () => {
+    it("subscribes to events and writes SSE data frames", async () => {
+      const streamLog = createConnectionLog();
+      const miniApp = Fastify();
+      registerDiagnosticsRoutes(miniApp, { connectionLog: streamLog });
+      await miniApp.listen({ port: 0, host: "127.0.0.1" });
+
+      const addr = miniApp.server.address();
+      const port = typeof addr === "object" && addr ? addr.port : 0;
+      const baseUrl = `http://127.0.0.1:${port}`;
+
+      const chunks: string[] = [];
+
+      await new Promise<void>((resolve) => {
+        const req = http.get(
+          `${baseUrl}/api/diagnostics/connection-log/stream`,
+          (res) => {
+            res.setEncoding("utf8");
+            res.on("data", (chunk: string) => {
+              chunks.push(chunk);
+              if (chunks.some((c) => c.includes('"type":"connected"'))) {
+                req.destroy();
+              }
+            });
+            res.on("error", () => resolve());
+            res.on("end", () => resolve());
+          },
+        );
+
+        req.on("error", () => resolve());
+        req.on("close", () => resolve());
+
+        // Push events with a small delay to let the connection establish
+        const pushInterval = setInterval(() => {
+          streamLog.push(makeEvent({ type: "connected", universeId: "stream-test" }));
+        }, 30);
+
+        // Safety timeout
+        setTimeout(() => {
+          clearInterval(pushInterval);
+          req.destroy();
+          resolve();
+        }, 3000);
+      });
+
+      await miniApp.close();
+
+      const combined = chunks.join("");
+      expect(combined).toContain("data:");
+      const dataMatch = combined.match(/data:(.+)\n/);
+      expect(dataMatch).not.toBeNull();
+      const parsed = JSON.parse(dataMatch![1]);
+      expect(parsed.type).toBe("connected");
+      expect(parsed.universeId).toBe("stream-test");
+    }, 10000);
+
+    it("unsubscribes when client disconnects", async () => {
+      const streamLog = createConnectionLog();
+      const miniApp = Fastify();
+      registerDiagnosticsRoutes(miniApp, { connectionLog: streamLog });
+      await miniApp.listen({ port: 0, host: "127.0.0.1" });
+
+      const addr = miniApp.server.address();
+      const port = typeof addr === "object" && addr ? addr.port : 0;
+      const baseUrl = `http://127.0.0.1:${port}`;
+
+      // Connect then immediately disconnect after first data
+      await new Promise<void>((resolve) => {
+        const req = http.get(
+          `${baseUrl}/api/diagnostics/connection-log/stream`,
+          (res) => {
+            res.once("data", () => {
+              req.destroy();
+            });
+            res.on("error", () => resolve());
+            res.on("end", () => resolve());
+          },
+        );
+
+        req.on("error", () => resolve());
+        req.on("close", () => resolve());
+
+        setTimeout(() => {
+          streamLog.push(makeEvent({ type: "connected" }));
+        }, 50);
+
+        setTimeout(() => {
+          req.destroy();
+          resolve();
+        }, 2000);
+      });
+
+      // Allow close event to propagate
+      await new Promise((r) => setTimeout(r, 100));
+
+      // After disconnect, pushing events should not throw
+      expect(() => {
+        streamLog.push(makeEvent({ type: "disconnected" }));
+      }).not.toThrow();
+
+      await miniApp.close();
+    }, 10000);
+
+    it("does not write to destroyed response stream", async () => {
+      const streamLog = createConnectionLog();
+      const miniApp = Fastify();
+      registerDiagnosticsRoutes(miniApp, { connectionLog: streamLog });
+      await miniApp.listen({ port: 0, host: "127.0.0.1" });
+
+      const addr = miniApp.server.address();
+      const port = typeof addr === "object" && addr ? addr.port : 0;
+      const baseUrl = `http://127.0.0.1:${port}`;
+
+      // Connect, receive one event, destroy, then push more
+      await new Promise<void>((resolve) => {
+        const req = http.get(
+          `${baseUrl}/api/diagnostics/connection-log/stream`,
+          (res) => {
+            res.once("data", () => {
+              req.destroy();
+              // Give close event time to fire
+              setTimeout(resolve, 100);
+            });
+            res.on("error", () => {});
+          },
+        );
+
+        req.on("error", () => {});
+
+        setTimeout(() => {
+          streamLog.push(makeEvent({ type: "reconnecting" }));
+        }, 50);
+
+        setTimeout(() => {
+          req.destroy();
+          resolve();
+        }, 2000);
+      });
+
+      // Push after stream is destroyed — the guard at line 46 should prevent write
+      expect(() => {
+        streamLog.push(makeEvent({ type: "connected" }));
+      }).not.toThrow();
+
+      await miniApp.close();
+    }, 10000);
   });
 
   describe("routes not registered without connectionLog", () => {

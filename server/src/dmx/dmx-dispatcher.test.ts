@@ -92,6 +92,63 @@ describe("DmxDispatcher (no coordinator)", () => {
 
     expect(mgr.getChannelSnapshot).toHaveBeenCalledWith(1, 3);
   });
+
+  it("delegates whiteout to manager", () => {
+    const mgr = makeMockManager();
+    const d = createDmxDispatcher(mgr);
+
+    d.whiteout();
+
+    expect(mgr.whiteout).toHaveBeenCalled();
+  });
+
+  it("delegates isBlackoutActive to manager", () => {
+    const mgr = makeMockManager();
+    const d = createDmxDispatcher(mgr);
+
+    const result = d.isBlackoutActive();
+
+    expect(result).toBe(false);
+    expect(mgr.isBlackoutActive).toHaveBeenCalled();
+  });
+
+  it("delegates getControlMode to manager", () => {
+    const mgr = makeMockManager();
+    const d = createDmxDispatcher(mgr);
+
+    const result = d.getControlMode();
+
+    expect(result).toBe("normal");
+    expect(mgr.getControlMode).toHaveBeenCalled();
+  });
+
+  it("delegates getActiveChannelCount to manager", () => {
+    const mgr = makeMockManager();
+    const d = createDmxDispatcher(mgr);
+
+    const result = d.getActiveChannelCount();
+
+    expect(result).toBe(10);
+    expect(mgr.getActiveChannelCount).toHaveBeenCalled();
+  });
+
+  it("delegates lockChannels to manager", () => {
+    const mgr = makeMockManager();
+    const d = createDmxDispatcher(mgr);
+
+    d.lockChannels(undefined, [1, 2, 3]);
+
+    expect(mgr.lockChannels).toHaveBeenCalledWith([1, 2, 3]);
+  });
+
+  it("delegates unlockChannels to manager", () => {
+    const mgr = makeMockManager();
+    const d = createDmxDispatcher(mgr);
+
+    d.unlockChannels(undefined, [4, 5]);
+
+    expect(mgr.unlockChannels).toHaveBeenCalledWith([4, 5]);
+  });
 });
 
 describe("DmxDispatcher (with coordinator)", () => {
@@ -192,5 +249,95 @@ describe("DmxDispatcher (with coordinator)", () => {
 
     expect(coord.applyRawUpdate).toHaveBeenCalledWith("uni-1", { 5: 200 });
     expect(mgr.applyRawUpdate).not.toHaveBeenCalled();
+  });
+
+  it("whiteout without universeId calls whiteoutAll + manager", () => {
+    const mgr = makeMockManager();
+    const coord = makeMockCoordinator();
+    const d = createDmxDispatcher(mgr, coord);
+
+    d.whiteout();
+
+    expect(coord.whiteoutAll).toHaveBeenCalled();
+    expect(mgr.whiteout).toHaveBeenCalled();
+  });
+
+  it("resumeNormal without universeId calls resumeNormalAll + manager", () => {
+    const mgr = makeMockManager();
+    const coord = makeMockCoordinator();
+    const d = createDmxDispatcher(mgr, coord);
+
+    d.resumeNormal();
+
+    expect(coord.resumeNormalAll).toHaveBeenCalled();
+    expect(mgr.resumeNormal).toHaveBeenCalled();
+  });
+
+  it("getControlMode delegates to coordinator for universe", () => {
+    const mgr = makeMockManager();
+    const coord = makeMockCoordinator();
+    const d = createDmxDispatcher(mgr, coord);
+
+    const result = d.getControlMode("uni-1");
+
+    expect(result).toBe("blackout");
+    expect(coord.getControlMode).toHaveBeenCalledWith("uni-1");
+    expect(mgr.getControlMode).not.toHaveBeenCalled();
+  });
+
+  it("getActiveChannelCount delegates to coordinator for universe", () => {
+    const mgr = makeMockManager();
+    const coord = makeMockCoordinator();
+    const d = createDmxDispatcher(mgr, coord);
+
+    const result = d.getActiveChannelCount("uni-1");
+
+    expect(result).toBe(20);
+    expect(coord.getActiveChannelCount).toHaveBeenCalledWith("uni-1");
+    expect(mgr.getActiveChannelCount).not.toHaveBeenCalled();
+  });
+
+  it("lockChannels with universeId targets coordinator + always hits manager", () => {
+    const mgr = makeMockManager();
+    const coord = makeMockCoordinator();
+    const d = createDmxDispatcher(mgr, coord);
+
+    d.lockChannels("uni-1", [1, 2]);
+
+    expect(coord.lockChannels).toHaveBeenCalledWith("uni-1", [1, 2]);
+    expect(mgr.lockChannels).toHaveBeenCalledWith([1, 2]);
+  });
+
+  it("unlockChannels with universeId targets coordinator + always hits manager", () => {
+    const mgr = makeMockManager();
+    const coord = makeMockCoordinator();
+    const d = createDmxDispatcher(mgr, coord);
+
+    d.unlockChannels("uni-1", [3, 4]);
+
+    expect(coord.unlockChannels).toHaveBeenCalledWith("uni-1", [3, 4]);
+    expect(mgr.unlockChannels).toHaveBeenCalledWith([3, 4]);
+  });
+
+  it("lockChannels without universeId skips coordinator, hits manager", () => {
+    const mgr = makeMockManager();
+    const coord = makeMockCoordinator();
+    const d = createDmxDispatcher(mgr, coord);
+
+    d.lockChannels(undefined, [5]);
+
+    expect(coord.lockChannels).not.toHaveBeenCalled();
+    expect(mgr.lockChannels).toHaveBeenCalledWith([5]);
+  });
+
+  it("unlockChannels without universeId skips coordinator, hits manager", () => {
+    const mgr = makeMockManager();
+    const coord = makeMockCoordinator();
+    const d = createDmxDispatcher(mgr, coord);
+
+    d.unlockChannels(undefined, [6]);
+
+    expect(coord.unlockChannels).not.toHaveBeenCalled();
+    expect(mgr.unlockChannels).toHaveBeenCalledWith([6]);
   });
 });

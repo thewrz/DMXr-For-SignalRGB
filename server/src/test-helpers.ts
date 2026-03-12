@@ -42,6 +42,7 @@ export function createTestConfig(overrides: Partial<ServerConfig> = {}): ServerC
     dmxDriver: "null",
     dmxDevicePath: "",
     logLevel: "silent",
+    logFormat: "json",
     fixturesPath: uniqueFixturesPath(),
     userFixturesPath: `/tmp/dmxr-test-user-fixtures-${randomUUID()}.json`,
     mdnsEnabled: false,

@@ -20,7 +20,23 @@ export async function createDmxStack(
   const connection = await createResilientConnection({
     config,
     logger,
-    getChannelSnapshot: () => managerRef?.getFullSnapshot() ?? {},
+    getChannelSnapshot: () => {
+      if (!managerRef) return {};
+      // When in blackout, return an empty snapshot so the reconnect
+      // zero-flush + onReconnect blackout is the only thing sent.
+      // This prevents stale defaults (e.g. Strobe: 255) from leaking
+      // through the reconnect replay while the server is blacked out.
+      if (managerRef.isBlackoutActive()) return {};
+      return managerRef.getFullSnapshot();
+    },
+    onReconnect: () => {
+      // Re-apply blackout on the fresh connection so fixtures go dark
+      // immediately instead of showing stale values from the snapshot.
+      if (managerRef?.isBlackoutActive()) {
+        managerRef.blackout();
+        logger.info("Re-applied blackout after reconnect");
+      }
+    },
     onStateChange: (status) => {
       logger.info(
         `Connection state: ${status.state}` +

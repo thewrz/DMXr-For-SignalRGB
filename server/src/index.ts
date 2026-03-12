@@ -53,10 +53,23 @@ async function main() {
 
   // Auto-detect DMX port if set to "auto"
   let resolvedDevicePath = config.dmxDevicePath;
+  let detectedDeviceInfo: string | undefined;
   if (resolvedDevicePath === "auto" && config.dmxDriver !== "null") {
     const detected = await autoDetectDmxPort();
     if (detected) {
-      resolvedDevicePath = detected;
+      resolvedDevicePath = detected.path;
+      const d = detected.device;
+      const serial = d.serialNumber ? ` SN:${d.serialNumber}` : "";
+      const mfr = d.manufacturer ? ` (${d.manufacturer})` : "";
+      detectedDeviceInfo = `${d.path}${mfr}${serial}`;
+      process.stdout.write(
+        `[DMXr] Auto-detected ENTTEC device: ${detectedDeviceInfo}\n`,
+      );
+      if (detected.allDevices.length > 1) {
+        process.stdout.write(
+          `[DMXr] ${detected.allDevices.length} ENTTEC devices found, using first: ${d.path}\n`,
+        );
+      }
     } else {
       process.stderr.write(
         "[DMXr] No DMX adapter detected. Falling back to null driver (test mode).\n" +

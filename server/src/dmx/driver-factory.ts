@@ -81,6 +81,10 @@ export async function createDmxConnection(
     const driver = new EnttecUSBDMXProDriver(config.dmxDevicePath);
     await dmx.addUniverse(UNIVERSE_NAME, driver);
 
+    // Flush all channels to zero immediately — ensures the ENTTEC hardware
+    // starts clean before the 25ms send interval delivers the first frame.
+    dmx.updateAll(UNIVERSE_NAME, 0);
+
     return {
       universe: {
         update: (channels) => dmx.update(UNIVERSE_NAME, channels),
@@ -109,6 +113,9 @@ export async function createDmxConnection(
     };
     const driver = new EnttecOpenUSBDMXDriver(config.dmxDevicePath);
     await dmx.addUniverse(UNIVERSE_NAME, driver);
+
+    // Flush all channels to zero immediately
+    dmx.updateAll(UNIVERSE_NAME, 0);
 
     return {
       universe: {

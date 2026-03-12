@@ -1,14 +1,18 @@
 import type { UniverseManager } from "../dmx/universe-manager.js";
 import type { FixtureStore } from "../fixtures/fixture-store.js";
-import { getFixtureDefaults } from "../fixtures/channel-mapper.js";
 import { computeSafePositions } from "../fixtures/motor-guard.js";
 import { pipeLog } from "../logging/pipeline-logger.js";
 
 /**
  * Initialize fixture defaults on the DMX universe.
  * - Registers motor safe positions (so blackout/whiteout doesn't slam motors)
- * - Sets all channels to fixture defaults via applyRawUpdate (bypasses blackout guard)
+ * - Enters blackout: zeros all channels, restores motor-safe positions
  * - Server stays in blackout until a client resumes or SignalRGB sends colors
+ *
+ * NOTE: We intentionally do NOT push full fixture defaults (via applyRawUpdate)
+ * at startup. Doing so would bypass the blackout guard and turn on lighting
+ * channels (e.g. Strobe: 255) before any client has connected. Motor channels
+ * are already handled by registerSafePositions + blackout.
  */
 export function initializeFixtureDefaults(
   fixtureStore: FixtureStore,
@@ -17,15 +21,13 @@ export function initializeFixtureDefaults(
   const fixtures = fixtureStore.getAll();
   pipeLog("info", `Loaded ${fixtures.length} fixtures, initializing defaults...`);
 
-  manager.registerSafePositions(computeSafePositions(fixtures));
+  const safePositions = computeSafePositions(fixtures);
+  manager.registerSafePositions(safePositions);
   manager.blackout();
 
-  for (const fixture of fixtures) {
-    const defaults = getFixtureDefaults(fixture);
-    manager.applyRawUpdate(defaults);
-    const count = Object.keys(defaults).length;
-    pipeLog("info", `Startup defaults for "${fixture.name}": ${count} channels pushed to DMX`);
-  }
-
-  pipeLog("info", "Fixture defaults initialization complete");
+  const motorCount = Object.keys(safePositions).length;
+  pipeLog("info",
+    `Fixture defaults initialization complete: ${fixtures.length} fixtures, ` +
+    `${motorCount} motor channels registered, server in blackout`,
+  );
 }

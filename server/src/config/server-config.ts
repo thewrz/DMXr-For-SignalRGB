@@ -8,6 +8,7 @@ export interface ServerConfig {
   readonly dmxDriver: string;
   readonly dmxDevicePath: string;
   readonly logLevel: string;
+  readonly logFormat: "pretty" | "json";
   readonly fixturesPath: string;
   readonly mdnsEnabled: boolean;
   readonly portRangeSize: number;
@@ -72,6 +73,7 @@ export function loadConfig(
     dmxDevicePath:
       process.env["DMX_DEVICE_PATH"] ?? base.dmxDevicePath ?? "auto",
     logLevel: process.env["LOG_LEVEL"] ?? "info",
+    logFormat: process.env["LOG_FORMAT"] === "json" ? "json" : "pretty",
     fixturesPath: process.env["FIXTURES_PATH"] ?? "./config/fixtures.json",
     userFixturesPath: process.env["USER_FIXTURES_PATH"] ?? "./config/user-fixtures.json",
     mdnsEnabled:

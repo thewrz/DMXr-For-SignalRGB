@@ -243,6 +243,7 @@ export async function buildServer(
     registerMetricsRoute(app, {
       latencyTracker: deps.latencyTracker,
       udpServer: deps.udpServer,
+      fixtureStore: deps.fixtureStore,
     });
   }
 

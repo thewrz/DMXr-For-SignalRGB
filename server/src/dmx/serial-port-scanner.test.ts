@@ -111,7 +111,7 @@ describe("serial-port-scanner", () => {
   });
 
   describe("autoDetectDmxPort", () => {
-    it("returns path of first ENTTEC device", async () => {
+    it("returns result with path and device info for first ENTTEC device", async () => {
       mockList.mockResolvedValue([
         { path: "COM1", vendorId: "067B", productId: "2303" },
         { path: "COM3", vendorId: "0403", productId: "6001", manufacturer: "FTDI" },
@@ -120,7 +120,12 @@ describe("serial-port-scanner", () => {
 
       const result = await autoDetectDmxPort();
 
-      expect(result).toBe("COM3");
+      expect(result).not.toBeNull();
+      expect(result!.path).toBe("COM3");
+      expect(result!.device.isEnttec).toBe(true);
+      expect(result!.device.manufacturer).toBe("FTDI");
+      expect(result!.allDevices).toHaveLength(2);
+      expect(result!.allDevices[1].path).toBe("COM5");
     });
 
     it("returns null when no ENTTEC device found", async () => {

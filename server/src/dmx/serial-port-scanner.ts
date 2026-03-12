@@ -72,9 +72,20 @@ export async function listDmxDevices(): Promise<readonly SerialPortInfo[]> {
   return ports.filter((p) => p.isEnttec);
 }
 
-export async function autoDetectDmxPort(): Promise<string | null> {
+export interface AutoDetectResult {
+  readonly path: string;
+  readonly device: SerialPortInfo;
+  readonly allDevices: readonly SerialPortInfo[];
+}
+
+export async function autoDetectDmxPort(): Promise<AutoDetectResult | null> {
   const devices = await listDmxDevices();
-  return devices[0]?.path ?? null;
+  if (devices.length === 0) return null;
+  return {
+    path: devices[0].path,
+    device: devices[0],
+    allDevices: devices,
+  };
 }
 
 export async function autoDetectDmxPorts(): Promise<readonly string[]> {

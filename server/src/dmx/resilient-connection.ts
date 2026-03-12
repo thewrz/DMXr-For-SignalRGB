@@ -26,6 +26,9 @@ export interface ResilientConnectionOptions {
   readonly logger: DmxLogger;
   readonly getChannelSnapshot: () => Record<number, number>;
   readonly onStateChange?: (status: ConnectionStatus) => void;
+  /** Called after a successful reconnect, before snapshot replay.
+   *  Use this to re-apply blackout or other state to the fresh connection. */
+  readonly onReconnect?: (universe: DmxUniverse) => void;
 }
 
 export interface ResilientConnection {
@@ -46,7 +49,7 @@ export interface ResilientConnection {
 export async function createResilientConnection(
   options: ResilientConnectionOptions,
 ): Promise<ResilientConnection> {
-  const { config, logger, getChannelSnapshot, onStateChange } = options;
+  const { config, logger, getChannelSnapshot, onStateChange, onReconnect } = options;
 
   let currentConnection: DmxConnection | null = null;
   let status: MutableStatus = { ...createInitialStatus("disconnected") };
@@ -126,7 +129,13 @@ export async function createResilientConnection(
       attachDisconnectListener(conn);
       transitionTo("connected");
 
-      // Replay channel state
+      // Zero-flush first so unoccupied channels don't retain stale values
+      conn.universe.updateAll(0);
+
+      // Let the caller re-apply state (e.g. blackout with safe positions)
+      onReconnect?.(conn.universe);
+
+      // Replay channel state on top of the zero base
       const snapshot = getChannelSnapshot();
       const channelCount = Object.keys(snapshot).length;
       if (channelCount > 0) {

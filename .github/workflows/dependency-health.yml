@@ -1,0 +1,61 @@
+name: Dependency Health
+
+on:
+  schedule:
+    - cron: "30 9 * * 1" # Monday 9:30 UTC
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  ofl-contract:
+    name: OFL API Contract Tests
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Run contract tests
+        id: contract
+        working-directory: server
+        run: npm run test:contract 2>&1 | tee contract-results.txt
+
+      - name: Create issue body on failure
+        if: failure() || steps.contract.outcome == 'failure'
+        working-directory: server
+        run: |
+          cat > issue-body.md << 'HEADER'
+          ## OFL API Contract Drift Detected
+
+          The weekly contract tests against the live [Open Fixture Library](https://open-fixture-library.org) API have failed. This means the OFL API response shape may have changed in a way that affects DMXr.
+
+          ### What to do
+          1. Check the test output below for which schema fields changed
+          2. Update `server/src/ofl/ofl-types.ts` and `server/src/ofl/ofl-schemas.ts` to match
+          3. Update `server/src/ofl/ofl-client.ts` if the parsing logic needs adjustment
+          4. Run `npm run test:contract` locally to verify the fix
+
+          ### Test Output
+          ```
+          HEADER
+          cat contract-results.txt >> issue-body.md
+          echo '```' >> issue-body.md
+
+      - name: Create or update issue
+        if: failure() || steps.contract.outcome == 'failure'
+        uses: peter-evans/create-issue-from-file@v5
+        with:
+          title: "OFL API contract drift detected"
+          content-filepath: server/issue-body.md
+          labels: bug,ofl,automated

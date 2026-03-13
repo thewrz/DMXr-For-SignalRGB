@@ -3,6 +3,6 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     include: ["src/**/*.test.ts"],
-    exclude: ["src/ui-tests/**"],
+    exclude: ["src/ui-tests/**", "src/**/*.contract.test.ts"],
   },
 });

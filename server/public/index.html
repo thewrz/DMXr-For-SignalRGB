@@ -93,7 +93,17 @@
         Settings
       </button>
       <span class="status" :class="serverOnline ? 'online' : 'offline'"
-            x-text="serverOnline ? 'Connected' : 'Disconnected'"></span>
+            x-text="serverOnline ? 'Online' : 'Offline'"></span>
+      <span class="status dmx-hw-status" x-show="serverOnline"
+            :class="{
+              'dmx-connected': dmxConnectionState === 'connected',
+              'dmx-disconnected': dmxConnectionState === 'disconnected',
+              'dmx-reconnecting': dmxConnectionState === 'reconnecting'
+            }"
+            x-text="dmxConnectionState === 'connected' ? 'DMX Connected'
+                  : dmxConnectionState === 'disconnected' ? 'DMX Disconnected'
+                  : dmxConnectionState === 'reconnecting' ? 'Reconnecting...'
+                  : ''"></span>
     </div>
   </header>
 

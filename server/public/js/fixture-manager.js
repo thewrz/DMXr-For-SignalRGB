@@ -68,6 +68,9 @@ function dmxrFixtureManager() {
             this.controlMode = data.controlMode;
             this.overrideActive = data.controlMode !== "normal";
           }
+          if (data.connectionState) {
+            this.dmxConnectionState = data.connectionState;
+          }
         }
       } catch {
         // Non-critical — will retry on next poll

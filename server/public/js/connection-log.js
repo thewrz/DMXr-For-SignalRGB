@@ -6,16 +6,18 @@ function dmxrConnectionLog() {
     connectionLogError: "",
     _connLogSource: null,
 
+    initConnectionStream() {
+      this.connectConnectionLogStream();
+    },
+
     openConnectionLog() {
       this.showConnectionLog = true;
       this.connectionLogError = "";
       this.loadConnectionLog();
-      this.connectConnectionLogStream();
     },
 
     closeConnectionLog() {
       this.showConnectionLog = false;
-      this.disconnectConnectionLogStream();
     },
 
     async loadConnectionLog() {
@@ -39,6 +41,15 @@ function dmxrConnectionLog() {
         this.connectionLogEvents.unshift(event);
         if (this.connectionLogEvents.length > 200) {
           this.connectionLogEvents.pop();
+        }
+        // Update DMX hardware state reactively
+        if (event.type === "connected" || event.type === "disconnected" || event.type === "reconnecting") {
+          this.dmxConnectionState = event.type;
+        }
+        // Update control mode immediately
+        if (event.type === "control_mode_changed" && event.details && event.details.controlMode) {
+          this.controlMode = event.details.controlMode;
+          this.overrideActive = event.details.controlMode !== "normal";
         }
       }.bind(this);
       src.onerror = function () {
@@ -71,6 +82,7 @@ function dmxrConnectionLog() {
         reconnect_failed: "var(--danger)",
         reconnecting: "var(--warning)",
         port_changed: "var(--accent)",
+        control_mode_changed: "var(--warning)",
       };
       return colors[type] || "var(--text-dim)";
     },
@@ -83,6 +95,7 @@ function dmxrConnectionLog() {
         reconnect_failed: "\u2717",
         reconnecting: "\u21BB",
         port_changed: "\u2194",
+        control_mode_changed: "\u25C9",
       };
       return icons[type] || "\u2022";
     },
@@ -106,6 +119,7 @@ function dmxrConnectionLog() {
         reconnect_failed: "Reconnect Failed",
         reconnect_success: "Reconnect Success",
         port_changed: "Port Changed",
+        control_mode_changed: "Control Mode Changed",
       };
       return labels[type] || type;
     },

@@ -115,6 +115,38 @@ describe("createConnectionLog", () => {
   });
 });
 
+describe("control_mode_changed events", () => {
+  it("stores control_mode_changed events with controlMode detail", () => {
+    const log = createConnectionLog();
+    const event = makeEvent({
+      type: "control_mode_changed",
+      details: { controlMode: "blackout" },
+    });
+    log.push(event);
+
+    const events = log.getEvents();
+    expect(events).toHaveLength(1);
+    expect(events[0].type).toBe("control_mode_changed");
+    expect(events[0].details.controlMode).toBe("blackout");
+  });
+
+  it("delivers control_mode_changed events to subscribers", () => {
+    const log = createConnectionLog();
+    const received: ConnectionEvent[] = [];
+    log.subscribe((event) => received.push(event));
+
+    const event = makeEvent({
+      type: "control_mode_changed",
+      details: { controlMode: "blackout" },
+    });
+    log.push(event);
+
+    expect(received).toHaveLength(1);
+    expect(received[0].type).toBe("control_mode_changed");
+    expect(received[0].details.controlMode).toBe("blackout");
+  });
+});
+
 describe("mapStatusToEvent", () => {
   it("maps connected status with devicePath", () => {
     const status: ConnectionStatus = {

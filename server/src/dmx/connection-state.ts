@@ -16,7 +16,8 @@ export type ConnectionEventType =
   | "reconnecting"
   | "reconnect_failed"
   | "reconnect_success"
-  | "port_changed";
+  | "port_changed"
+  | "control_mode_changed";
 
 export interface ConnectionEvent {
   readonly timestamp: string;
@@ -30,6 +31,7 @@ export interface ConnectionEvent {
     readonly attempt?: number;
     readonly backoffMs?: number;
     readonly downtimeMs?: number;
+    readonly controlMode?: string;
   };
 }
 

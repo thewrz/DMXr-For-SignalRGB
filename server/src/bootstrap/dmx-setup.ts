@@ -3,6 +3,8 @@ import type { DmxLogger } from "../dmx/universe-manager.js";
 import { createUniverseManager, type UniverseManager } from "../dmx/universe-manager.js";
 import { createResilientConnection, type ResilientConnection } from "../dmx/resilient-connection.js";
 import { createLatencyTracker, type LatencyTracker } from "../metrics/latency-tracker.js";
+import { mapStatusToEvent, type ConnectionLog } from "../dmx/connection-log.js";
+import { DEFAULT_UNIVERSE_ID } from "../types/protocol.js";
 
 export interface DmxStack {
   readonly connection: ResilientConnection;
@@ -13,6 +15,7 @@ export interface DmxStack {
 export async function createDmxStack(
   config: ServerConfig,
   logger: DmxLogger,
+  connectionLog?: ConnectionLog,
 ): Promise<DmxStack> {
   // Late-binding: manager reference filled after creation
   let managerRef: UniverseManager | null = null;
@@ -35,6 +38,12 @@ export async function createDmxStack(
       if (managerRef?.isBlackoutActive()) {
         managerRef.blackout();
         logger.info("Re-applied blackout after reconnect");
+        connectionLog?.push({
+          timestamp: new Date().toISOString(),
+          type: "control_mode_changed",
+          universeId: DEFAULT_UNIVERSE_ID,
+          details: { controlMode: "blackout" },
+        });
       }
     },
     onStateChange: (status) => {
@@ -43,6 +52,7 @@ export async function createDmxStack(
         (status.reconnectAttempts > 0 ? ` (attempt ${status.reconnectAttempts})` : "") +
         (status.lastError ? ` — ${status.lastError}` : ""),
       );
+      connectionLog?.push(mapStatusToEvent(status, DEFAULT_UNIVERSE_ID));
     },
   });
 

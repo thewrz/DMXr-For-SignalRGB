@@ -68,6 +68,10 @@ header {
 }
 .status.online { background: var(--success); color: #000; }
 .status.offline { background: var(--danger); color: #fff; }
+.dmx-connected { background: var(--success); color: #000; }
+.dmx-disconnected { background: var(--danger); color: #fff; }
+.dmx-reconnecting { background: var(--warning); color: #000; animation: dmxPulse 1.5s infinite; }
+@keyframes dmxPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 
 /* Two-panel layout */
 .app-layout {

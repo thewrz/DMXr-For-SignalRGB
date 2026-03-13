@@ -2,6 +2,7 @@ function dmxrApp() {
   var app = {
     fixtures: [],
     serverOnline: false,
+    dmxConnectionState: "unknown",
     controlMode: "normal",
     overrideActive: false,
     sidebarOpen: false,
@@ -90,6 +91,7 @@ function dmxrApp() {
       await this.loadGroups();
       this.loadServerName();
       this.pollFixtures();
+      this.initConnectionStream();
       await this.checkWizardNeeded();
       await this.checkOnboardingNeeded();
       this.startColorStream();

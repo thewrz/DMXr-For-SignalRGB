@@ -23,6 +23,7 @@ import { createDmxDispatcher } from "./dmx/dmx-dispatcher.js";
 import { createDmxStack } from "./bootstrap/dmx-setup.js";
 import { createMultiUniverseStack } from "./bootstrap/multi-universe-setup.js";
 import { createLibraryStack } from "./bootstrap/library-setup.js";
+import { createConnectionLog } from "./dmx/connection-log.js";
 import { initializeFixtureDefaults } from "./bootstrap/fixture-init.js";
 import { installShutdownHandlers } from "./bootstrap/shutdown.js";
 
@@ -93,8 +94,11 @@ async function main() {
     error: (msg: string) => process.stderr.write(`[DMX] ERROR: ${msg}\n`),
   };
 
+  // ── Shared Connection Log ──
+  const connectionLog = createConnectionLog();
+
   // ── DMX Stack ──
-  const { connection, manager, latencyTracker } = await createDmxStack(finalConfig, consoleLogger);
+  const { connection, manager, latencyTracker } = await createDmxStack(finalConfig, consoleLogger, connectionLog);
 
   // ── Remap Presets ──
   const remapPresetStore = createRemapPresetStore("./config/remap-presets.json");
@@ -117,8 +121,8 @@ async function main() {
   const movementEngine = new MovementEngine();
 
   // ── Multi-Universe Stack ──
-  const { registry: universeRegistry, pool: connectionPool, coordinator, connectionLog } =
-    await createMultiUniverseStack(finalConfig, consoleLogger, latencyTracker, manager);
+  const { registry: universeRegistry, pool: connectionPool, coordinator } =
+    await createMultiUniverseStack(finalConfig, consoleLogger, latencyTracker, manager, connectionLog);
 
   // ── Movement Tick (after coordinator so dispatcher can route by universe) ──
   const MOVEMENT_TICK_MS = 25;

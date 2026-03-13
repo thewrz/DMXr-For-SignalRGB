@@ -23,11 +23,12 @@ export async function createMultiUniverseStack(
   logger: DmxLogger,
   latencyTracker: LatencyTracker,
   fallbackManager?: UniverseManager,
+  connectionLog?: ConnectionLog,
 ): Promise<MultiUniverseStack> {
   const registry = createUniverseRegistry("./config/universes.json");
   await registry.load();
 
-  const connectionLog = createConnectionLog();
+  const resolvedLog = connectionLog ?? createConnectionLog();
 
   const pool = createConnectionPool({
     createConnection: async (uniConfig) => {
@@ -42,7 +43,7 @@ export async function createMultiUniverseStack(
         getChannelSnapshot: () =>
           pool.getManager(uniConfig.id)?.getFullSnapshot() ?? {},
         onStateChange: (status) => {
-          connectionLog.push(mapStatusToEvent(status, uniConfig.id));
+          resolvedLog.push(mapStatusToEvent(status, uniConfig.id));
         },
       });
     },
@@ -79,5 +80,5 @@ export async function createMultiUniverseStack(
     }
   }
 
-  return { registry, pool, coordinator, connectionLog };
+  return { registry, pool, coordinator, connectionLog: resolvedLog };
 }

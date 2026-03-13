@@ -20,24 +20,40 @@
 
 - Turns any DMX fixture into a draggable tile on the SignalRGB canvas
 - RGB color mapping with automatic white extraction for RGBW fixtures
-- Strobe-only fixtures (no RGB) are white-gated — they only fire on near-white input, so your strobe doesn't pop on every red/blue effect
+- **Multi-universe support** — manage multiple DMX adapters with per-universe fixture assignment
+- **Movement control** — pan/tilt interpolation for moving heads, driven by canvas position
+- **Per-fixture color calibration** — gain and offset tuning per RGB channel
+- **Channel remapping** — remap any channel to a different function with saveable presets
+- **Fixture grouping** — organize fixtures into groups for bulk control operations
+- **Multi-select** — marquee drag-select on the DMX grid with batch move, delete, and group operations
+- Strobe-only fixtures (no RGB) are white-gated — they only fire on near-white input
 - Per-channel overrides let you lock individual channels (strobe speed, gobo, macros) from the web UI while SignalRGB drives everything else
 - Motor guard protects pan/tilt channels on moving heads during blackout/whiteout
 - Multi-server — run multiple DMXr instances on different machines; the plugin discovers and manages all of them
- - Tested over Wi-Fi with a RaspberryPi 5 with sub 30ms latency and no UDP packet loss! 
+  - Tested over Wi-Fi with a RaspberryPi 5 with sub 30ms latency and no UDP packet loss!
 - UDP color transport for lower-latency updates (falls back to HTTP automatically)
-- Resilient USB connection — survives unplug/replug with automatic reconnect and state replay
+- Resilient USB connection — survives unplug/replug with automatic reconnect, state replay, and real-time UI status
 - Guaranteed blackout on shutdown
+
+## Web Manager
+
+The built-in web UI at `http://localhost:8080` provides:
+
+- **DMX grid** — visual 512-channel map with drag-to-readdress, fixture color coding, and hover tooltips
+- **Live DMX monitor** — real-time channel values streamed via SSE
+- **Connection log** — hardware connect/disconnect/reconnect events with timestamps
+- **DMX hardware indicator** — top-bar badge showing adapter status (connected/disconnected/reconnecting) in real-time
+- **Fixture library browser** — search and browse the Open Fixture Library (15,000+ fixtures) with offline caching
+- **Custom fixture builder** — create fixture definitions from scratch with a template system
+- **Configuration backup/restore** — export and import your entire setup
+- **Onboarding tour** — guided walkthrough for new users
+- **Setup wizard** — auto-detects your DMX adapter and walks you through first-time configuration
 
 ## Hardware & fixture support
 
 Tested with an **ENTTEC DMX USB Pro** and **Open DMX USB** (FTDI-based) adapters. However the low cost FTDI adapters that don't address DMX timing natively are very finnicky. Devices in the class of the ENTTEC DMX USB Pro are worth their money.
 
-Fixture-wise, I've only tested with what I own: a couple of RGB PAR cans, two moving heads (color only — pan/tilt isn't driven yet), and a strobe. It works well for RGB color mapping, but fixtures like lasers and movers that need interpreted movement/pattern data are still a work in progress. If you try it with something else and it works (or doesn't), let me know.
-
-## Why DMX and not Artnet or RDM / more modern protocols
-
-There's tons of lower cost DMX light fixtures out there, IP based, Artnet etc. are getting better supported, but I'm just focused on my own DMX fixtures I have kicking around my studio.
+Fixtures tested: RGB PAR cans, RGBW moving heads (with pan/tilt), fog machines, white strobes, and scanning lasers. The color pipeline handles RGB, RGBW, dimmer-only, strobe-only, and multi-channel fixtures. If you try it with something else and it works (or doesn't), let me know.
 
 ## Architecture
 
@@ -47,8 +63,9 @@ There's tons of lower cost DMX light fixtures out there, IP based, Artnet etc. a
 
 ## Fixture Libraries
 
-- **Open Fixture Library** — community database at [open-fixture-library.org](https://open-fixture-library.org)
+- **Open Fixture Library** — community database at [open-fixture-library.org](https://open-fixture-library.org) with offline disk cache
 - **Local fixture databases** — auto-detects compatible third-party databases on the system
+- **Custom fixtures** — build your own fixture definitions with the built-in template editor
 
 ## Setup
 
@@ -81,7 +98,7 @@ Add fixtures through the web UI at `http://localhost:8080`.
 | `PORT` | `8080` | HTTP server port |
 | `HOST` | `127.0.0.1` | Bind address |
 | `DMX_DRIVER` | `null` | `null`, `enttec-usb-dmx-pro`, or `enttec-open-usb-dmx` |
-| `DMX_DEVICE_PATH` | `/dev/ttyUSB0` | Serial port for DMX adapter |
+| `DMX_DEVICE_PATH` | `auto` | Serial port (`COM3`, `/dev/ttyUSB0`) or `auto` for detection |
 | `FIXTURE_DB_PATH` | *(auto-detect)* | Path to a local fixture database file |
 | `FIXTURES_PATH` | `./config/fixtures.json` | Persisted fixture configuration |
 | `MDNS_ENABLED` | `true` | Advertise via mDNS |
@@ -102,7 +119,7 @@ Linux (systemd): see `service/dmxr.service`.
 ## Troubleshooting
 
 **Server won't detect my DMX adapter**
-- Check `DMX_DEVICE_PATH` — on Windows it's `COM3`, `COM4`, etc. On Linux it's `/dev/ttyUSB0`
+- Set `DMX_DEVICE_PATH=auto` (default) for automatic detection, or specify the port manually
 - Only one process can hold the serial port. Close any other DMX software first
 - Try unplugging and replugging the adapter; the port number may change
 
@@ -118,7 +135,7 @@ Linux (systemd): see `service/dmxr.service`.
 
 **Connection drops or "disconnected" status**
 - The server auto-reconnects on USB disconnect/reconnect with exponential backoff
-- Check the connection event log in the web UI for diagnostics
+- Check the DMX hardware indicator in the top bar and connection event log for diagnostics
 - On Windows VMs, USB passthrough re-enumeration requires reattaching the device
 
 **Web UI won't load**
@@ -129,7 +146,7 @@ Linux (systemd): see `service/dmxr.service`.
 
 ```bash
 cd server
-npm test          # Run tests (1350+)
+npm test          # Run tests (1450+)
 npx tsc --noEmit  # Type check
 ```
 

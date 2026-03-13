@@ -7,17 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-03-12
+
 ### Added
+- Real-time DMX hardware indicator in web UI top bar (connected/disconnected/reconnecting)
+- Always-on SSE connection log stream — hardware state updates push to UI instantly
+- `control_mode_changed` event type for immediate blackout/whiteout UI feedback on reconnect
 - DMX write result propagation and action feedback toasts
 - Optimistic concurrency control (version field on fixtures)
 - SSE heartbeat and destroyed-guard for connection cleanup
 - Puppeteer UI test infrastructure (23 tests across 6 suites)
 - Onboarding tour and contextual help system
-- Movement control for moving fixtures (pan/tilt)
+- Movement control for moving fixtures (pan/tilt interpolation)
 - Multi-select fixture management with batch operations
-- Marquee drag-select on DMX grid
+- Marquee drag-select on DMX grid with visual rectangle overlay
 - Selection-aware groups with multi-fixture drag-move
-- Per-fixture color calibration
+- Per-fixture color calibration (gain/offset per RGB channel)
 - Connection event log for DMX diagnostics
 - Offline OFL cache for disconnected environments
 - Fixture grouping and bulk control
@@ -37,9 +42,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Flash click-to-sustain with channel locking
 - DMXr logo across README, web UI, and SignalRGB plugin
 - CLAUDE.md and per-module README files
+- Prometheus metrics endpoint and structured log format config
+- MIT license
 - Dependabot, CODEOWNERS, and security audit CI job
 
 ### Fixed
+- USB disconnect no longer crashes server (serial port error/close events properly handled)
+- Null TypeError on Windows serial port close event (`null !== undefined` guard)
+- Single-universe `onStateChange` now pushes to ConnectionLog for SSE propagation
+- Startup defaults no longer bypass blackout (S100 strobe bug)
+- ENTTEC flushed to blackout on connect and reconnect
+- Error boundaries added to shutdown sequence
 - Request body size limits and input bounds enforcement
 - Fixture validation before replace-mode deletion in config import
 - Save errors now logged instead of silently swallowed
@@ -52,6 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Per-device icons in SignalRGB via setImageFromBase64
 
 ### Changed
+- Shared ConnectionLog injected from index.ts into both DMX stacks
 - Refactored style.css into feature-scoped CSS files
 - Split fixture-manager.js into motor-guard, fixture-reset, color-calibration mixins
 - Extracted Fastify schemas from fixtures route
@@ -127,7 +141,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Linux systemd installer and launcher scripts
 - Alpine.js web manager UI
 
-[Unreleased]: https://github.com/thewrz/DMXr/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/thewrz/DMXr/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/thewrz/DMXr/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/thewrz/DMXr/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/thewrz/DMXr/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/thewrz/DMXr/compare/v1.0.0...v1.0.1

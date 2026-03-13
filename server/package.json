@@ -1,6 +1,6 @@
 {
   "name": "dmxr-server",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "DMXr bridge server — receives fixture color data via HTTP and outputs DMX",
   "license": "MIT",
   "type": "module",

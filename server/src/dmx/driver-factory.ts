@@ -93,13 +93,19 @@ export async function createDmxConnection(
       driver: config.dmxDriver,
       close: () => flushAndClose(dmx, driver),
       onDisconnect: (callback) => {
+        // Absorb serial port errors from dmx-ts's internal 25ms send loop
+        // so they don't become uncaughtExceptions (e.g. COM error 31 on
+        // Windows when USB is yanked mid-write).
+        driver.serialPort.on("error", (err?: Error) => {
+          callback(err ?? new Error("Serial port error"));
+        });
         driver.serialPort.on("close", (err?: Error) => {
-          const disconnected =
-            err !== undefined &&
-            (err as unknown as Record<string, unknown>)["disconnected"] === true;
-          if (disconnected) {
-            callback(err);
-          }
+          // On Linux, err.disconnected === true signals USB removal.
+          // On Windows, err is often null for the same event.
+          // Either way, treat any close as a disconnect — the resilient
+          // connection's `closed` guard prevents false triggers during
+          // intentional shutdown.
+          callback(err ?? new Error("Serial port closed"));
         });
       },
     };
@@ -125,13 +131,11 @@ export async function createDmxConnection(
       driver: config.dmxDriver,
       close: () => flushAndClose(dmx, driver),
       onDisconnect: (callback) => {
+        driver.serialPort.on("error", (err?: Error) => {
+          callback(err ?? new Error("Serial port error"));
+        });
         driver.serialPort.on("close", (err?: Error) => {
-          const disconnected =
-            err !== undefined &&
-            (err as unknown as Record<string, unknown>)["disconnected"] === true;
-          if (disconnected) {
-            callback(err);
-          }
+          callback(err ?? new Error("Serial port closed"));
         });
       },
     };

@@ -54,7 +54,7 @@ jobs:
 
       - name: Create or update issue
         if: failure() || steps.contract.outcome == 'failure'
-        uses: peter-evans/create-issue-from-file@v5
+        uses: peter-evans/create-issue-from-file@v6
         with:
           title: "OFL API contract drift detected"
           content-filepath: server/issue-body.md

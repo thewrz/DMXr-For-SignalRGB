@@ -178,11 +178,14 @@ export function createSsClient(dbPath: string): SsClient {
     },
 
     searchFixtures(query: string, limit = 50): readonly SsSearchResult[] {
+      const clampedLimit = Math.max(1, Math.min(200, limit));
+      if (query.length > 200) return [];
+
       const tokens = query
         .toLowerCase()
         .split(/\s+/)
         .filter((t) => t.length >= 2);
-      if (tokens.length === 0) return [];
+      if (tokens.length === 0 || tokens.length > 10) return [];
 
       const whereClauses = tokens.map(
         () => "(INSTR(LOWER(f.name), ?) > 0 OR INSTR(LOWER(m.name), ?) > 0)",
@@ -202,7 +205,7 @@ export function createSsClient(dbPath: string): SsClient {
 
       const rows = getDb()
         .prepare(sql)
-        .all(...params, limit) as Array<Omit<SsSearchResult, "category">>;
+        .all(...params, clampedLimit) as Array<Omit<SsSearchResult, "category">>;
 
       if (rows.length === 0) return [];
 

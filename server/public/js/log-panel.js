@@ -70,9 +70,9 @@ function dmxrLogPanel() {
         var res = await fetch("/health");
         if (res.ok) {
           var data = await res.json();
-          this.logPanelUdpActive = !!(data.udp && data.udp.packetsReceived > 0);
-          if (data.uptimeSeconds != null) {
-            var s = Math.floor(data.uptimeSeconds);
+          this.logPanelUdpActive = !!(data.udpActive || data.udpPacketsReceived > 0);
+          if (data.uptime != null) {
+            var s = Math.floor(data.uptime);
             var h = Math.floor(s / 3600);
             var m = Math.floor((s % 3600) / 60);
             this.logPanelUptime = h > 0 ? h + "h " + m + "m" : m + "m";
@@ -97,21 +97,45 @@ function dmxrLogPanel() {
     initLogStream() {
       this.disconnectLogStream();
       var self = this;
+      var pending = [];
+      var flushTimer = null;
+
+      function flushPending() {
+        flushTimer = null;
+        if (pending.length === 0) return;
+        // Splice batch into the array in one shot to minimize Alpine reactivity cycles
+        var batch = pending;
+        pending = [];
+        for (var i = batch.length - 1; i >= 0; i--) {
+          self.logPanelEntries.unshift(batch[i]);
+        }
+        // Trim excess in one pass
+        if (self.logPanelEntries.length > MAX_ENTRIES) {
+          self.logPanelEntries.splice(MAX_ENTRIES);
+        }
+      }
+
       var src = new EventSource("/api/logs/stream");
       src.onmessage = function (e) {
         var entry = JSON.parse(e.data);
-        self.logPanelEntries.unshift(entry);
-        if (self.logPanelEntries.length > MAX_ENTRIES) {
-          self.logPanelEntries.pop();
+        pending.push(entry);
+        // Flush at most every 250ms to avoid hammering the DOM
+        if (flushTimer === null) {
+          flushTimer = setTimeout(flushPending, 250);
         }
       };
       src.onerror = function () {
         // SSE auto-reconnects
       };
       this._logStreamSource = src;
+      this._logFlushTimer = flushTimer;
     },
 
     disconnectLogStream() {
+      if (this._logFlushTimer) {
+        clearTimeout(this._logFlushTimer);
+        this._logFlushTimer = null;
+      }
       if (this._logStreamSource) {
         this._logStreamSource.close();
         this._logStreamSource = null;

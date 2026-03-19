@@ -90,6 +90,24 @@ describe("API key authentication", () => {
       });
       expect(res.statusCode).toBe(401);
     });
+
+    it("returns 401 for matching-prefix wrong-suffix key", async () => {
+      const res = await app.inject({
+        method: "GET",
+        url: "/fixtures",
+        headers: { "x-api-key": "test-secret-key-124" },
+      });
+      expect(res.statusCode).toBe(401);
+    });
+
+    it("returns 401 for key that is a prefix of the correct key", async () => {
+      const res = await app.inject({
+        method: "GET",
+        url: "/fixtures",
+        headers: { "x-api-key": "test-secret" },
+      });
+      expect(res.statusCode).toBe(401);
+    });
   });
 
   describe("when API_KEY is not set", () => {

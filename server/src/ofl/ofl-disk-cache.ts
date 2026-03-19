@@ -1,5 +1,5 @@
 import { readFile, writeFile, readdir, unlink, mkdir, rename, stat } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { join, resolve, sep } from "node:path";
 
 export interface CacheResult {
   readonly data: unknown;
@@ -47,7 +47,8 @@ function filenameToKey(filename: string): string {
 function safeCachePath(cacheDir: string, filename: string): string {
   const filePath = join(cacheDir, filename);
   const resolved = resolve(filePath);
-  if (!resolved.startsWith(resolve(cacheDir) + "/") && resolved !== resolve(cacheDir)) {
+  const resolvedDir = resolve(cacheDir) + sep;
+  if (!resolved.startsWith(resolvedDir) && resolved !== resolve(cacheDir)) {
     throw new Error("Cache key resolves outside cache directory");
   }
   return filePath;

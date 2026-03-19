@@ -46,7 +46,9 @@ import type { MultiUniverseCoordinator } from "./dmx/multi-universe-coordinator.
 import type { UniverseRegistry } from "./dmx/universe-registry.js";
 import type { ConnectionPool } from "./dmx/connection-pool.js";
 import type { ConnectionLog } from "./dmx/connection-log.js";
+import type { LogBuffer } from "./logging/log-buffer.js";
 import { registerDiagnosticsRoutes } from "./routes/diagnostics.js";
+import { registerLogRoutes } from "./routes/logs.js";
 import { registerMovementRoutes } from "./routes/movement.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -76,6 +78,7 @@ interface BuildServerDeps {
   readonly groupStore?: GroupStore;
   readonly diskCache?: OflDiskCache;
   readonly connectionLog?: ConnectionLog;
+  readonly logBuffer?: LogBuffer;
   readonly movementEngine?: import("./fixtures/movement-interpolator.js").MovementEngine;
 }
 
@@ -315,6 +318,10 @@ function registerAllRoutes(
 
   if (deps.connectionLog) {
     registerDiagnosticsRoutes(app, { connectionLog: deps.connectionLog });
+  }
+
+  if (deps.logBuffer) {
+    registerLogRoutes(app, { logBuffer: deps.logBuffer });
   }
 
   if (deps.movementEngine) {

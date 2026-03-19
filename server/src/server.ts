@@ -151,6 +151,35 @@ export async function buildServer(
     decorateReply: false,
   });
 
+  const timerMaps = registerAllRoutes(app, deps);
+
+  app.addHook("onError", async (request, _reply, error) => {
+    request.log.error({
+      err: error,
+      requestId: request.id,
+      route: request.routeOptions?.url ?? request.url,
+      method: request.method,
+      params: request.params,
+    }, "Route error");
+  });
+
+  app.setErrorHandler((error: FastifyError, request, reply) => {
+    const statusCode = error.statusCode ?? 500;
+    if (statusCode >= 500) {
+      return reply.status(statusCode).send({ error: "Internal server error", requestId: request.id });
+    }
+    return reply
+      .status(statusCode)
+      .send({ error: error.message || "Request error", requestId: request.id });
+  });
+
+  return { app, timerMaps };
+}
+
+function registerAllRoutes(
+  app: FastifyInstance,
+  deps: BuildServerDeps,
+): Map<string, NodeJS.Timeout>[] {
   registerHealthRoute(app, {
     manager: deps.manager,
     driver: deps.driver,
@@ -295,16 +324,5 @@ export async function buildServer(
     });
   }
 
-  app.setErrorHandler((error: FastifyError, request, reply) => {
-    request.log.error({ err: error, requestId: request.id }, "Unhandled error");
-    const statusCode = error.statusCode ?? 500;
-    if (statusCode >= 500) {
-      return reply.status(statusCode).send({ error: "Internal server error", requestId: request.id });
-    }
-    return reply
-      .status(statusCode)
-      .send({ error: error.message || "Request error", requestId: request.id });
-  });
-
-  return { app, timerMaps };
+  return timerMaps;
 }

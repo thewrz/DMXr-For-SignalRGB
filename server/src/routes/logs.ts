@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import type { LogBuffer, LogLevel, LogSource } from "../logging/log-buffer.js";
+import type { LogBuffer, LogEntry, LogLevel, LogSource } from "../logging/log-buffer.js";
 
 interface LogRouteDeps {
   readonly logBuffer: LogBuffer;
@@ -7,6 +7,11 @@ interface LogRouteDeps {
 
 const VALID_LEVELS = new Set<LogLevel>(["error", "warn", "info", "debug"]);
 const VALID_SOURCES = new Set<LogSource>(["connection", "pipeline", "server", "api"]);
+
+/** Max SSE flushes per second per subscriber. */
+const STREAM_FLUSH_INTERVAL_MS = 250;
+/** Max entries batched before forcing a flush (back-pressure safety valve). */
+const STREAM_BATCH_LIMIT = 50;
 
 export function registerLogRoutes(
   app: FastifyInstance,
@@ -46,15 +51,58 @@ export function registerLogRoutes(
       Connection: "keep-alive",
     });
 
-    const unsubscribe = deps.logBuffer.subscribe((entry) => {
-      if (!reply.raw.destroyed) {
+    // Throttled SSE: batch entries and flush at a fixed interval.
+    // Error/warn entries flush immediately; debug entries are batched.
+    let pending: LogEntry[] = [];
+    let flushTimer: ReturnType<typeof setTimeout> | null = null;
+    function flush(): void {
+      if (reply.raw.destroyed) return;
+      if (pending.length === 0) return;
+
+      const batch = pending;
+      pending = [];
+
+      for (const entry of batch) {
         reply.raw.write(`data:${JSON.stringify(entry)}\n\n`);
       }
+    }
+
+    function scheduleFlush(): void {
+      if (flushTimer !== null) return;
+      flushTimer = setTimeout(() => {
+        flushTimer = null;
+        flush();
+      }, STREAM_FLUSH_INTERVAL_MS);
+    }
+
+    const unsubscribe = deps.logBuffer.subscribe((entry) => {
+      if (reply.raw.destroyed) return;
+
+      // Error and warn entries flush immediately — never delay bad news.
+      if (entry.level === "error" || entry.level === "warn") {
+        pending.push(entry);
+        flush();
+        return;
+      }
+
+      // Under back-pressure: drop debug entries first, then cap info too.
+      if (pending.length >= STREAM_BATCH_LIMIT) {
+        if (entry.level === "debug") {
+          return;
+        }
+        if (pending.length >= STREAM_BATCH_LIMIT * 2) {
+          return;
+        }
+      }
+
+      pending.push(entry);
+      scheduleFlush();
     });
 
     const heartbeat = setInterval(() => {
       if (reply.raw.destroyed) {
         clearInterval(heartbeat);
+        if (flushTimer !== null) clearTimeout(flushTimer);
         unsubscribe();
         return;
       }
@@ -64,6 +112,7 @@ export function registerLogRoutes(
 
     request.raw.on("close", () => {
       clearInterval(heartbeat);
+      if (flushTimer !== null) clearTimeout(flushTimer);
       unsubscribe();
     });
 

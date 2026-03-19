@@ -7,6 +7,8 @@ function dmxrLogPanel() {
     logPanelEntries: [],
     logLevelFilter: "info",
     _logStreamSource: null,
+    _logFlushTimer: null,
+    _healthPollTimer: null,
     logPanelLastOpenedAt: null,
     logPanelUdpActive: false,
     logPanelUptime: "",
@@ -54,6 +56,7 @@ function dmxrLogPanel() {
         this.logPanelLastOpenedAt = new Date().toISOString();
         this.fetchLogHistory();
         this.fetchLogPanelHealth();
+        this.startHealthPoll();
         this.initLogStream();
       } else {
         this.disconnectLogStream();
@@ -65,14 +68,29 @@ function dmxrLogPanel() {
       this.disconnectLogStream();
     },
 
+    startHealthPoll() {
+      this.stopHealthPoll();
+      var self = this;
+      this._healthPollTimer = setInterval(function () {
+        self.fetchLogPanelHealth();
+      }, 5000);
+    },
+
+    stopHealthPoll() {
+      if (this._healthPollTimer) {
+        clearInterval(this._healthPollTimer);
+        this._healthPollTimer = null;
+      }
+    },
+
     async fetchLogPanelHealth() {
       try {
         var res = await fetch("/health");
         if (res.ok) {
           var data = await res.json();
-          this.logPanelUdpActive = !!(data.udp && data.udp.packetsReceived > 0);
-          if (data.uptimeSeconds != null) {
-            var s = Math.floor(data.uptimeSeconds);
+          this.logPanelUdpActive = !!(data.udpActive || data.udpPacketsReceived > 0);
+          if (data.uptime != null) {
+            var s = Math.floor(data.uptime);
             var h = Math.floor(s / 3600);
             var m = Math.floor((s % 3600) / 60);
             this.logPanelUptime = h > 0 ? h + "h " + m + "m" : m + "m";
@@ -97,12 +115,23 @@ function dmxrLogPanel() {
     initLogStream() {
       this.disconnectLogStream();
       var self = this;
+      var pending = [];
+
+      function flushPending() {
+        self._logFlushTimer = null;
+        if (pending.length === 0) return;
+        var batch = pending;
+        pending = [];
+        // Atomic array replacement — single Alpine reactivity trigger
+        self.logPanelEntries = batch.reverse().concat(self.logPanelEntries).slice(0, MAX_ENTRIES);
+      }
+
       var src = new EventSource("/api/logs/stream");
       src.onmessage = function (e) {
         var entry = JSON.parse(e.data);
-        self.logPanelEntries.unshift(entry);
-        if (self.logPanelEntries.length > MAX_ENTRIES) {
-          self.logPanelEntries.pop();
+        pending.push(entry);
+        if (self._logFlushTimer === null) {
+          self._logFlushTimer = setTimeout(flushPending, 250);
         }
       };
       src.onerror = function () {
@@ -112,6 +141,11 @@ function dmxrLogPanel() {
     },
 
     disconnectLogStream() {
+      this.stopHealthPoll();
+      if (this._logFlushTimer) {
+        clearTimeout(this._logFlushTimer);
+        this._logFlushTimer = null;
+      }
       if (this._logStreamSource) {
         this._logStreamSource.close();
         this._logStreamSource = null;

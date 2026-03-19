@@ -70,7 +70,7 @@ export const OflModeSchema = z
   .object({
     name: z.string(),
     shortName: z.string().optional(),
-    channels: z.array(z.union([z.string(), z.null(), z.record(z.unknown())])),
+    channels: z.array(z.union([z.string(), z.null(), z.record(z.string(), z.unknown())])),
   })
   .passthrough();
 

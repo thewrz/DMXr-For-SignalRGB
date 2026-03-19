@@ -1,5 +1,5 @@
 import { readFile, writeFile, readdir, unlink, mkdir, rename, stat } from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 export interface CacheResult {
   readonly data: unknown;
@@ -44,6 +44,15 @@ function filenameToKey(filename: string): string {
     .replace(/_/g, ":");
 }
 
+function safeCachePath(cacheDir: string, filename: string): string {
+  const filePath = join(cacheDir, filename);
+  const resolved = resolve(filePath);
+  if (!resolved.startsWith(resolve(cacheDir) + "/") && resolved !== resolve(cacheDir)) {
+    throw new Error("Cache key resolves outside cache directory");
+  }
+  return filePath;
+}
+
 async function safeReaddir(dir: string): Promise<readonly string[]> {
   try {
     const entries = await readdir(dir);
@@ -60,7 +69,7 @@ export function createOflDiskCache(options: OflDiskCacheOptions = {}): OflDiskCa
   return {
     async get(key: string): Promise<CacheResult | undefined> {
       try {
-        const filePath = join(cacheDir, keyToFilename(key));
+        const filePath = safeCachePath(cacheDir, keyToFilename(key));
         const raw = await readFile(filePath, "utf-8");
         const envelope: unknown = JSON.parse(raw);
 
@@ -93,7 +102,7 @@ export function createOflDiskCache(options: OflDiskCacheOptions = {}): OflDiskCa
         ttlMs: ttlMs ?? defaultTtlMs,
       };
 
-      const filePath = join(cacheDir, keyToFilename(key));
+      const filePath = safeCachePath(cacheDir, keyToFilename(key));
       const tmpPath = filePath + ".tmp";
       await writeFile(tmpPath, JSON.stringify(envelope, null, 2), "utf-8");
       await rename(tmpPath, filePath);

@@ -56,18 +56,19 @@ function isEnabled(level: PipelineLogLevel): boolean {
   return LEVEL_RANK[level] <= LEVEL_RANK[activeLevel];
 }
 
+// Bridge pipeline levels to the UI log buffer. Debug is excluded — per-packet
+// color data is useful on stdout but floods the web UI log panel.  Verbose is
+// also excluded (stdout-only trace output).
 const PIPELINE_TO_BUFFER_LEVEL: Partial<Record<PipelineLogLevel, LogLevel>> = {
   error: "error",
   warn: "warn",
   info: "info",
-  debug: "debug",
 };
 
 export function pipeLog(level: PipelineLogLevel, msg: string): void {
   if (!isEnabled(level)) return;
   process.stdout.write(`[PIPE:${LEVEL_TAG[level]}] ${msg}\n`);
 
-  // Bridge non-verbose levels to the structured log buffer
   const bufferLevel = PIPELINE_TO_BUFFER_LEVEL[level];
   if (logBuffer && bufferLevel) {
     logBuffer.push({

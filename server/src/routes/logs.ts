@@ -55,26 +55,12 @@ export function registerLogRoutes(
     // Error/warn entries flush immediately; debug entries are batched.
     let pending: LogEntry[] = [];
     let flushTimer: ReturnType<typeof setTimeout> | null = null;
-    let droppedCount = 0;
-
     function flush(): void {
       if (reply.raw.destroyed) return;
-      if (pending.length === 0 && droppedCount === 0) return;
+      if (pending.length === 0) return;
 
       const batch = pending;
-      const dropped = droppedCount;
       pending = [];
-      droppedCount = 0;
-
-      if (dropped > 0) {
-        const summary: LogEntry = {
-          timestamp: new Date().toISOString(),
-          level: "warn",
-          source: "server",
-          message: `${dropped} debug log entries dropped (rate too high)`,
-        };
-        reply.raw.write(`data:${JSON.stringify(summary)}\n\n`);
-      }
 
       for (const entry of batch) {
         reply.raw.write(`data:${JSON.stringify(entry)}\n\n`);
@@ -102,12 +88,9 @@ export function registerLogRoutes(
       // Under back-pressure: drop debug entries first, then cap info too.
       if (pending.length >= STREAM_BATCH_LIMIT) {
         if (entry.level === "debug") {
-          droppedCount++;
           return;
         }
-        // Info entries also capped at 2x limit to prevent unbounded growth.
         if (pending.length >= STREAM_BATCH_LIMIT * 2) {
-          droppedCount++;
           return;
         }
       }

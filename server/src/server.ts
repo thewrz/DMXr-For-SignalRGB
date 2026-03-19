@@ -217,6 +217,7 @@ function registerAllRoutes(
 
   registerOflRoutes(app, {
     oflClient: deps.oflClient,
+    logBuffer: deps.logBuffer,
   });
 
   const timerMaps: Map<string, NodeJS.Timeout>[] = [];

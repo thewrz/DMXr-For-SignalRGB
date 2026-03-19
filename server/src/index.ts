@@ -16,7 +16,8 @@ import { buildServer } from "./server.js";
 import { createUdpColorServer } from "./udp/udp-color-server.js";
 import { createDmxMonitor } from "./dmx/dmx-monitor.js";
 import { shortId } from "./utils/format.js";
-import { setPipelineLogLevel, parsePipelineLogLevel, pipeLog } from "./logging/pipeline-logger.js";
+import { setPipelineLogLevel, parsePipelineLogLevel, pipeLog, setLogBuffer } from "./logging/pipeline-logger.js";
+import { createLogBuffer, mapConnectionEventToLogEntry } from "./logging/log-buffer.js";
 import { MovementEngine } from "./fixtures/movement-interpolator.js";
 import { createMovementTickHandler } from "./fixtures/movement-tick.js";
 import { createDmxDispatcher } from "./dmx/dmx-dispatcher.js";
@@ -94,8 +95,17 @@ async function main() {
     error: (msg: string) => process.stderr.write(`[DMX] ERROR: ${msg}\n`),
   };
 
+  // ── Structured Log Buffer ──
+  const logBuffer = createLogBuffer({ maxSize: 1000 });
+  setLogBuffer(logBuffer);
+
   // ── Shared Connection Log ──
   const connectionLog = createConnectionLog();
+
+  // Bridge connection events into the unified log buffer
+  connectionLog.subscribe((event) => {
+    logBuffer.push(mapConnectionEventToLogEntry(event));
+  });
 
   // ── DMX Stack ──
   const { connection, manager, latencyTracker } = await createDmxStack(finalConfig, consoleLogger, connectionLog);
@@ -180,6 +190,7 @@ async function main() {
     groupStore,
     diskCache,
     connectionLog,
+    logBuffer,
     movementEngine,
   });
 
@@ -236,6 +247,14 @@ async function main() {
     `  Web Manager: http://localhost:${boundPort}\n` +
     "\n",
   );
+
+  logBuffer.push({
+    timestamp: new Date().toISOString(),
+    level: "info",
+    source: "server",
+    message: `DMXr server v${serverVersion} started on port ${boundPort}`,
+    details: { httpPort: boundPort, udpPort: boundUdpPort, driver: finalConfig.dmxDriver },
+  });
 
   if (finalConfig.mdnsEnabled) {
     app.log.info(`mDNS: advertising _dmxr._tcp on port ${boundPort} (UDP: ${boundUdpPort})`);

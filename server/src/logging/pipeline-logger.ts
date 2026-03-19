@@ -9,6 +9,8 @@
  * to avoid flooding the journal — logs first frame then every N seconds.
  */
 
+import type { LogBuffer, LogLevel } from "./log-buffer.js";
+
 export type PipelineLogLevel = "error" | "warn" | "info" | "debug" | "verbose";
 
 const LEVEL_RANK: Record<PipelineLogLevel, number> = {
@@ -28,6 +30,11 @@ const LEVEL_TAG: Record<PipelineLogLevel, string> = {
 };
 
 let activeLevel: PipelineLogLevel = "verbose";
+let logBuffer: LogBuffer | null = null;
+
+export function setLogBuffer(buf: LogBuffer): void {
+  logBuffer = buf;
+}
 
 export function setPipelineLogLevel(level: PipelineLogLevel): void {
   activeLevel = level;
@@ -49,9 +56,27 @@ function isEnabled(level: PipelineLogLevel): boolean {
   return LEVEL_RANK[level] <= LEVEL_RANK[activeLevel];
 }
 
+const PIPELINE_TO_BUFFER_LEVEL: Partial<Record<PipelineLogLevel, LogLevel>> = {
+  error: "error",
+  warn: "warn",
+  info: "info",
+  debug: "debug",
+};
+
 export function pipeLog(level: PipelineLogLevel, msg: string): void {
   if (!isEnabled(level)) return;
   process.stdout.write(`[PIPE:${LEVEL_TAG[level]}] ${msg}\n`);
+
+  // Bridge non-verbose levels to the structured log buffer
+  const bufferLevel = PIPELINE_TO_BUFFER_LEVEL[level];
+  if (logBuffer && bufferLevel) {
+    logBuffer.push({
+      timestamp: new Date().toISOString(),
+      level: bufferLevel,
+      source: "pipeline",
+      message: msg,
+    });
+  }
 }
 
 // --- Sampled logging for hot paths ---

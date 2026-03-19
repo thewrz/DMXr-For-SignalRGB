@@ -13,4 +13,6 @@ tools/
 query-attrs.js
 query-attrs.ts
 trace-whiteout.ts
+test-results/
+playwright-report/
 .claude/

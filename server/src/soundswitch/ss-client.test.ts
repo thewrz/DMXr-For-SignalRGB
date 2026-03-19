@@ -202,6 +202,38 @@ describe.skipIf(!hasDb)("mapToFixtureChannels range clamping (integration)", () 
   });
 });
 
+describe.skipIf(!hasDb)("searchFixtures input bounds", () => {
+  let client: SsClient;
+
+  beforeEach(() => {
+    client = createSsClient(SS_DB_PATH);
+  });
+
+  afterEach(() => {
+    client.close();
+  });
+
+  it("returns empty for query longer than 200 chars", () => {
+    const results = client.searchFixtures("a".repeat(201));
+    expect(results).toEqual([]);
+  });
+
+  it("returns empty when more than 10 tokens", () => {
+    const results = client.searchFixtures("aa bb cc dd ee ff gg hh ii jj kk");
+    expect(results).toEqual([]);
+  });
+
+  it("clamps limit to maximum of 200", () => {
+    const results = client.searchFixtures("LED", 999);
+    expect(results.length).toBeLessThanOrEqual(200);
+  });
+
+  it("clamps limit to minimum of 1", () => {
+    const results = client.searchFixtures("LED", -5);
+    expect(results.length).toBeLessThanOrEqual(1);
+  });
+});
+
 describe("createSsClientIfConfigured", () => {
   it("returns not_configured status when dbPath is undefined", () => {
     const result = createSsClientIfConfigured(undefined);

@@ -14,12 +14,15 @@
   <link rel="stylesheet" href="/css/channel-remap.css">
   <link rel="stylesheet" href="/css/groups.css">
   <link rel="stylesheet" href="/css/extras.css">
+  <link rel="stylesheet" href="/css/log-panel.css">
   <script defer src="/js/alpine.min.js"></script>
   <script src="/js/channel-label.js"></script>
   <script src="/js/drag-drop.js"></script>
   <script src="/js/motor-guard.js"></script>
   <script src="/js/fixture-reset.js"></script>
   <script src="/js/color-calibration.js"></script>
+  <script src="/js/fixture-crud.js"></script>
+  <script src="/js/fixture-controls.js"></script>
   <script src="/js/fixture-manager.js"></script>
   <script src="/js/library-browser.js"></script>
   <script src="/js/search.js"></script>
@@ -36,6 +39,9 @@
   <script src="/js/channel-remap.js"></script>
   <script src="/js/groups.js"></script>
   <script src="/js/connection-log.js"></script>
+  <script src="/js/log-panel.js"></script>
+  <script src="/js/selection-core.js"></script>
+  <script src="/js/selection-actions.js"></script>
   <script src="/js/selection.js"></script>
   <script src="/js/movement.js"></script>
   <script src="/js/onboarding.js"></script>
@@ -75,13 +81,6 @@
         </svg>
         Latency
       </button>
-      <button class="btn btn-sm" @click="openConnectionLog()" title="Connection Log">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-          <path d="M5 8.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5zm0-2a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5zm0-2a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5zm0 6a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5z"/>
-          <path d="M3 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H3zm0 1h10a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1z"/>
-        </svg>
-        Log
-      </button>
       <button class="btn btn-sm btn-icon btn-help" @click="toggleHelpMode()"
               :class="{ 'btn-help-active': helpMode }" title="Help"
               style="z-index:180">?</button>
@@ -92,18 +91,11 @@
         </svg>
         Settings
       </button>
-      <span class="status" :class="serverOnline ? 'online' : 'offline'"
-            x-text="serverOnline ? 'Online' : 'Offline'"></span>
-      <span class="status dmx-hw-status" x-show="serverOnline"
-            :class="{
-              'dmx-connected': dmxConnectionState === 'connected',
-              'dmx-disconnected': dmxConnectionState === 'disconnected',
-              'dmx-reconnecting': dmxConnectionState === 'reconnecting'
-            }"
-            x-text="dmxConnectionState === 'connected' ? 'DMX Connected'
-                  : dmxConnectionState === 'disconnected' ? 'DMX Disconnected'
-                  : dmxConnectionState === 'reconnecting' ? 'Reconnecting...'
-                  : ''"></span>
+      <button class="btn btn-sm btn-status" @click="toggleLogPanel()" title="System Status & Logs">
+        <span class="status-dot" :class="statusDotClass"></span>
+        <span x-text="statusSummaryText"></span>
+        <span class="unread-badge" x-show="unreadErrorCount > 0" x-text="unreadErrorCount" x-cloak></span>
+      </button>
     </div>
   </header>
 
@@ -1458,53 +1450,69 @@
     </div>
   </div>
 
-  <!-- Connection Log Modal -->
-  <div class="modal-overlay" x-show="showConnectionLog" x-cloak @click.self="closeConnectionLog()">
-    <div class="modal connlog-modal">
-      <h2>Connection Log</h2>
+  <!-- Log Panel (slide-down) -->
+  <div class="log-panel-backdrop" x-show="logPanelOpen" x-cloak @click="closeLogPanel()"></div>
+  <div class="log-panel" x-show="logPanelOpen" x-cloak
+       x-transition:enter="log-slide-enter"
+       x-transition:enter-start="log-slide-enter-start"
+       x-transition:enter-end="log-slide-enter-end"
+       x-transition:leave="log-slide-leave"
+       x-transition:leave-start="log-slide-leave-start"
+       x-transition:leave-end="log-slide-leave-end">
+    <div class="log-panel-header">
+      <h3>System Logs</h3>
+      <button class="log-panel-close" @click="closeLogPanel()" title="Close">&times;</button>
+    </div>
 
-      <div class="connlog-toolbar">
-        <button class="btn btn-sm" @click="clearConnectionLog()" :disabled="connectionLogEvents.length === 0">
-          Clear
-        </button>
-        <span class="connlog-count" x-show="connectionLogEvents.length > 0"
-              x-text="connectionLogEvents.length + ' event' + (connectionLogEvents.length !== 1 ? 's' : '')"></span>
+    <div class="log-panel-status">
+      <span class="log-status-badge">
+        <span class="status-dot" :class="serverOnline ? 'dot-ok' : 'dot-error'"></span>
+        <span x-text="serverOnline ? 'Server Online' : 'Server Offline'"></span>
+      </span>
+      <span class="log-status-badge">
+        <span class="status-dot" :class="dmxConnectionState === 'connected' ? 'dot-ok' : dmxConnectionState === 'reconnecting' ? 'dot-warn' : 'dot-error'"></span>
+        <span x-text="dmxConnectionState === 'connected' ? 'DMX Connected' : dmxConnectionState === 'reconnecting' ? 'Reconnecting' : 'DMX Disconnected'"></span>
+      </span>
+      <span class="log-status-badge">
+        <span class="status-dot" :class="logPanelUdpActive ? 'dot-ok' : 'dot-warn'"></span>
+        <span x-text="logPanelUdpActive ? 'SignalRGB Active' : 'SignalRGB Idle'"></span>
+      </span>
+      <span class="log-status-badge" x-show="controlMode !== 'normal'">
+        <span class="status-dot dot-warn"></span>
+        <span x-text="controlMode"></span>
+      </span>
+      <span class="log-status-badge" x-show="logPanelUptime">
+        <span x-text="'Up ' + logPanelUptime"></span>
+      </span>
+    </div>
+
+    <div class="log-panel-toolbar">
+      <select x-model="logLevelFilter" title="Filter by level">
+        <option value="error">Errors only</option>
+        <option value="warn">Warnings+</option>
+        <option value="info">Info+</option>
+        <option value="debug">Debug (all)</option>
+      </select>
+      <span class="log-entry-count" x-text="filteredLogEntries.length + ' entries'"></span>
+      <span class="log-toolbar-spacer"></span>
+      <button class="btn btn-sm" @click="copyLogEntries()" title="Copy to clipboard">Copy</button>
+      <button class="btn btn-sm" @click="downloadLogEntries()" title="Download as .log file">Download</button>
+      <button class="btn btn-sm" @click="clearLogEntries()" title="Clear all logs">Clear</button>
+    </div>
+
+    <div class="log-panel-list">
+      <div class="log-panel-empty" x-show="filteredLogEntries.length === 0">
+        No log entries.
       </div>
-
-      <p class="validation-error" x-show="connectionLogError" x-text="connectionLogError"></p>
-
-      <div x-show="connectionLogLoading" class="settings-loading">Loading...</div>
-
-      <div class="connlog-empty" x-show="!connectionLogLoading && connectionLogEvents.length === 0 && !connectionLogError">
-        No connection events yet.
-      </div>
-
-      <div class="connlog-list" x-show="connectionLogEvents.length > 0">
-        <template x-for="(evt, idx) in connectionLogEvents" :key="idx">
-          <div class="connlog-event">
-            <span class="connlog-icon" :style="'color:' + connLogEventColor(evt.type)"
-                  x-text="connLogEventIcon(evt.type)"></span>
-            <div class="connlog-body">
-              <div class="connlog-header">
-                <span class="connlog-type" :style="'color:' + connLogEventColor(evt.type)"
-                      x-text="connLogEventLabel(evt.type)"></span>
-                <span class="connlog-universe badge" x-text="evt.universeId"></span>
-                <span class="connlog-time" x-text="connLogRelativeTime(evt.timestamp)"
-                      :title="evt.timestamp"></span>
-              </div>
-              <div class="connlog-details" x-show="evt.details && (evt.details.error || evt.details.attempt || evt.details.downtimeMs !== undefined)">
-                <span x-show="evt.details.error" x-text="evt.details.error" class="connlog-detail-error"></span>
-                <span x-show="evt.details.suggestion" x-text="evt.details.suggestion" class="connlog-detail-suggestion"></span>
-                <span x-show="evt.details.attempt" x-text="'Attempt #' + evt.details.attempt"></span>
-                <span x-show="evt.details.downtimeMs !== undefined"
-                      x-text="'Downtime: ' + (evt.details.downtimeMs >= 1000 ? (evt.details.downtimeMs / 1000).toFixed(1) + 's' : evt.details.downtimeMs + 'ms')"></span>
-              </div>
-            </div>
-          </div>
-        </template>
-      </div>
-
-      <button class="modal-close" @click="closeConnectionLog()">&times;</button>
+      <template x-for="(entry, idx) in filteredLogEntries" :key="idx">
+        <div class="log-entry">
+          <span class="log-level-badge" :style="'color:' + logLevelColor(entry.level)"
+                x-text="logLevelIcon(entry.level)"></span>
+          <span class="log-entry-time" x-text="logRelativeTime(entry.timestamp)" :title="entry.timestamp"></span>
+          <span class="log-entry-source" x-text="logSourceLabel(entry.source)"></span>
+          <span class="log-entry-message" x-text="entry.message"></span>
+        </div>
+      </template>
     </div>
   </div>
 

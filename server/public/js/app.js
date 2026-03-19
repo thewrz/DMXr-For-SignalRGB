@@ -118,6 +118,7 @@ function dmxrApp() {
     dmxrChannelRemap(),
     dmxrGroups(),
     dmxrConnectionLog(),
+    dmxrLogPanel(),
     dmxrSelection(),
     dmxrMovement(),
     dmxrOnboarding(),

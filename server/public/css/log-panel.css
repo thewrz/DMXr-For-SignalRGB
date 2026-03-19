@@ -1,0 +1,221 @@
+/* ── Log Panel ── */
+
+.btn-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  position: relative;
+}
+
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.dot-ok { background: var(--success); }
+.dot-warn { background: var(--warning); }
+.dot-error { background: var(--danger); }
+
+.unread-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+  line-height: 1;
+}
+
+.log-panel-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 89;
+}
+
+.log-panel {
+  position: fixed;
+  top: 52px;
+  right: 0;
+  width: 500px;
+  max-width: 100vw;
+  max-height: 70vh;
+  z-index: 90;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 0 8px;
+  box-shadow: -4px 4px 24px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.log-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.log-panel-header h3 {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.log-panel-close {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 0 0.25rem;
+  line-height: 1;
+}
+
+.log-panel-close:hover {
+  color: var(--text);
+}
+
+/* Status summary row */
+.log-panel-status {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.4rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.log-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  background: var(--surface2);
+}
+
+.log-status-badge .status-dot {
+  width: 6px;
+  height: 6px;
+}
+
+/* Toolbar */
+.log-panel-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.log-panel-toolbar select {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font-size: 0.75rem;
+  padding: 0.2rem 0.4rem;
+}
+
+.log-panel-toolbar .btn {
+  font-size: 0.7rem;
+  padding: 0.2rem 0.5rem;
+}
+
+.log-toolbar-spacer {
+  flex: 1;
+}
+
+.log-entry-count {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+}
+
+/* Log list */
+.log-panel-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.25rem 0;
+}
+
+.log-panel-empty {
+  text-align: center;
+  color: var(--text-dim);
+  padding: 2rem 1rem;
+  font-size: 0.85rem;
+}
+
+.log-entry {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  padding: 0.3rem 0.75rem;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.log-entry:hover {
+  background: var(--surface2);
+}
+
+.log-level-badge {
+  display: inline-block;
+  width: 1rem;
+  text-align: center;
+  flex-shrink: 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.log-entry-time {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-width: 3.5rem;
+}
+
+.log-entry-source {
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 0.05rem 0.3rem;
+  border-radius: 3px;
+  background: var(--surface2);
+  color: var(--text-dim);
+  text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.log-entry-message {
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+  color: var(--text);
+}
+
+/* Slide transition */
+.log-slide-enter { transition: opacity 0.15s ease, transform 0.15s ease; }
+.log-slide-enter-start { opacity: 0; transform: translateY(-8px); }
+.log-slide-enter-end { opacity: 1; transform: translateY(0); }
+.log-slide-leave { transition: opacity 0.1s ease, transform 0.1s ease; }
+.log-slide-leave-start { opacity: 1; transform: translateY(0); }
+.log-slide-leave-end { opacity: 0; transform: translateY(-8px); }

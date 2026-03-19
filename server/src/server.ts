@@ -91,6 +91,8 @@ export async function buildServer(
     logger: {
       level: deps.config.logLevel,
     },
+    // Explicit 1 MiB body limit (Fastify default) — prevents unbounded POST payloads
+    bodyLimit: 1_048_576,
   });
 
   await app.register(rateLimit, {
@@ -98,6 +100,9 @@ export async function buildServer(
     timeWindow: "1 minute",
   });
 
+  // CORS: Allow private/LAN IP ranges by default. DMXr is a LAN-only service — the
+  // SignalRGB plugin, web UI, and mDNS discovery all operate on the local network.
+  // Custom origins can be set via CORS_ORIGIN env var (comma-separated).
   const corsOrigins = deps.config.corsOrigin
     ? deps.config.corsOrigin.split(",").map((o) => o.trim())
     : [
@@ -112,6 +117,10 @@ export async function buildServer(
     origin: corsOrigins,
   });
 
+  // CSP: unsafe-eval and unsafe-inline are required because the Alpine.js frontend
+  // uses new Function() for x-data expressions. Removing these would require switching
+  // to @alpinejs/csp build, which adds a build step to the currently build-free frontend.
+  // Since DMXr runs on a private LAN, the XSS risk surface is minimal.
   await app.register(helmet, {
     contentSecurityPolicy: {
       directives: {

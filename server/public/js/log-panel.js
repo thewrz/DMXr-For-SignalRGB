@@ -7,6 +7,8 @@ function dmxrLogPanel() {
     logPanelEntries: [],
     logLevelFilter: "info",
     _logStreamSource: null,
+    _logFlushTimer: null,
+    _healthPollTimer: null,
     logPanelLastOpenedAt: null,
     logPanelUdpActive: false,
     logPanelUptime: "",
@@ -54,6 +56,7 @@ function dmxrLogPanel() {
         this.logPanelLastOpenedAt = new Date().toISOString();
         this.fetchLogHistory();
         this.fetchLogPanelHealth();
+        this.startHealthPoll();
         this.initLogStream();
       } else {
         this.disconnectLogStream();
@@ -63,6 +66,21 @@ function dmxrLogPanel() {
     closeLogPanel() {
       this.logPanelOpen = false;
       this.disconnectLogStream();
+    },
+
+    startHealthPoll() {
+      this.stopHealthPoll();
+      var self = this;
+      this._healthPollTimer = setInterval(function () {
+        self.fetchLogPanelHealth();
+      }, 5000);
+    },
+
+    stopHealthPoll() {
+      if (this._healthPollTimer) {
+        clearInterval(this._healthPollTimer);
+        this._healthPollTimer = null;
+      }
     },
 
     async fetchLogPanelHealth() {
@@ -98,40 +116,32 @@ function dmxrLogPanel() {
       this.disconnectLogStream();
       var self = this;
       var pending = [];
-      var flushTimer = null;
 
       function flushPending() {
-        flushTimer = null;
+        self._logFlushTimer = null;
         if (pending.length === 0) return;
-        // Splice batch into the array in one shot to minimize Alpine reactivity cycles
         var batch = pending;
         pending = [];
-        for (var i = batch.length - 1; i >= 0; i--) {
-          self.logPanelEntries.unshift(batch[i]);
-        }
-        // Trim excess in one pass
-        if (self.logPanelEntries.length > MAX_ENTRIES) {
-          self.logPanelEntries.splice(MAX_ENTRIES);
-        }
+        // Atomic array replacement — single Alpine reactivity trigger
+        self.logPanelEntries = batch.reverse().concat(self.logPanelEntries).slice(0, MAX_ENTRIES);
       }
 
       var src = new EventSource("/api/logs/stream");
       src.onmessage = function (e) {
         var entry = JSON.parse(e.data);
         pending.push(entry);
-        // Flush at most every 250ms to avoid hammering the DOM
-        if (flushTimer === null) {
-          flushTimer = setTimeout(flushPending, 250);
+        if (self._logFlushTimer === null) {
+          self._logFlushTimer = setTimeout(flushPending, 250);
         }
       };
       src.onerror = function () {
         // SSE auto-reconnects
       };
       this._logStreamSource = src;
-      this._logFlushTimer = flushTimer;
     },
 
     disconnectLogStream() {
+      this.stopHealthPoll();
       if (this._logFlushTimer) {
         clearTimeout(this._logFlushTimer);
         this._logFlushTimer = null;

@@ -104,7 +104,9 @@ export function createUdpColorServer(deps: UdpColorServerDeps): UdpColorServer {
 
           // Handle ping flag — echo the packet back
           if (packet.flags & FLAG_PING) {
-            pipeLog("debug", `UDP PING from ${rinfo.address}:${rinfo.port} seq=${packet.sequence}`);
+            if (shouldSample("udp:ping")) {
+              pipeLog("debug", `UDP PING from ${rinfo.address}:${rinfo.port} seq=${packet.sequence}`);
+            }
             const reply = encodeColorPacket({
               ...packet,
               flags: packet.flags & ~FLAG_PING,

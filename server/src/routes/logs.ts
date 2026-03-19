@@ -99,9 +99,14 @@ export function registerLogRoutes(
         return;
       }
 
-      // Debug/info entries are batched; drop excess debug entries under load.
+      // Under back-pressure: drop debug entries first, then cap info too.
       if (pending.length >= STREAM_BATCH_LIMIT) {
         if (entry.level === "debug") {
+          droppedCount++;
+          return;
+        }
+        // Info entries also capped at 2x limit to prevent unbounded growth.
+        if (pending.length >= STREAM_BATCH_LIMIT * 2) {
           droppedCount++;
           return;
         }

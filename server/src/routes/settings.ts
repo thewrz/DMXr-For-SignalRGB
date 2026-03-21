@@ -32,6 +32,7 @@ interface ScanPortsResponse {
 const RESTART_FIELDS: ReadonlySet<keyof PersistedSettings> = new Set([
   "dmxDriver",
   "dmxDevicePath",
+  "driverOptions",
   "port",
   "host",
 ]);

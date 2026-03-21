@@ -1,11 +1,22 @@
 import type { FastifyInstance } from "fastify";
 import type { UniverseRegistry } from "../dmx/universe-registry.js";
 import type { FixtureStore } from "../fixtures/fixture-store.js";
+import type { DriverOptions } from "../types/protocol.js";
 
 interface UniverseRouteDeps {
   readonly registry: UniverseRegistry;
   readonly fixtureStore: FixtureStore;
 }
+
+const driverOptionsSchema = {
+  type: "object" as const,
+  properties: {
+    universe: { type: "number" as const },
+    port: { type: "number" as const },
+    sourceName: { type: "string" as const },
+    priority: { type: "number" as const },
+  },
+};
 
 const createSchema = {
   body: {
@@ -16,6 +27,7 @@ const createSchema = {
       devicePath: { type: "string" as const, minLength: 1 },
       driverType: { type: "string" as const, minLength: 1 },
       serialNumber: { type: "string" as const },
+      driverOptions: driverOptionsSchema,
     },
   },
 };
@@ -28,6 +40,7 @@ const updateSchema = {
       devicePath: { type: "string" as const, minLength: 1 },
       driverType: { type: "string" as const, minLength: 1 },
       serialNumber: { type: "string" as const },
+      driverOptions: driverOptionsSchema,
     },
   },
 };
@@ -48,7 +61,7 @@ export function registerUniverseRoutes(
     return universe;
   });
 
-  app.post<{ Body: { name: string; devicePath: string; driverType: string; serialNumber?: string } }>(
+  app.post<{ Body: { name: string; devicePath: string; driverType: string; serialNumber?: string; driverOptions?: DriverOptions } }>(
     "/universes",
     { schema: createSchema },
     async (req, reply) => {
@@ -66,7 +79,7 @@ export function registerUniverseRoutes(
     },
   );
 
-  app.patch<{ Params: { id: string }; Body: { name?: string; devicePath?: string; driverType?: string; serialNumber?: string } }>(
+  app.patch<{ Params: { id: string }; Body: { name?: string; devicePath?: string; driverType?: string; serialNumber?: string; driverOptions?: DriverOptions } }>(
     "/universes/:id",
     { schema: updateSchema },
     async (req, reply) => {

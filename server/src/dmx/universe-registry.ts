@@ -91,6 +91,7 @@ export function createUniverseRegistry(filePath: string): UniverseRegistry {
         devicePath: request.devicePath,
         driverType: request.driverType,
         ...(request.serialNumber ? { serialNumber: request.serialNumber } : {}),
+        ...(request.driverOptions ? { driverOptions: request.driverOptions } : {}),
       };
 
       universes = [...universes, universe];
@@ -127,6 +128,7 @@ export function createUniverseRegistry(filePath: string): UniverseRegistry {
         ...(changes.devicePath !== undefined ? { devicePath: changes.devicePath } : {}),
         ...(changes.driverType !== undefined ? { driverType: changes.driverType } : {}),
         ...(changes.serialNumber !== undefined ? { serialNumber: changes.serialNumber } : {}),
+        ...(changes.driverOptions !== undefined ? { driverOptions: changes.driverOptions } : {}),
       };
 
       universes = universes.map((u, i) => (i === index ? updated : u));

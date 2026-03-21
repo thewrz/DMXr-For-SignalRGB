@@ -141,4 +141,40 @@ describe("loadConfig", () => {
 
     expect(() => loadConfig()).toThrow("Invalid DMX_DRIVER");
   });
+
+  it("accepts artnet as a valid driver", () => {
+    process.env["DMX_DRIVER"] = "artnet";
+
+    const config = loadConfig();
+
+    expect(config.dmxDriver).toBe("artnet");
+  });
+
+  it("accepts sacn as a valid driver", () => {
+    process.env["DMX_DRIVER"] = "sacn";
+
+    const config = loadConfig();
+
+    expect(config.dmxDriver).toBe("sacn");
+  });
+
+  it("includes driverOptions from persisted settings", () => {
+    delete process.env["DMX_DRIVER"];
+
+    const config = loadConfig({
+      dmxDriver: "artnet",
+      dmxDevicePath: "192.168.1.100",
+      driverOptions: { universe: 2, port: 1 },
+    });
+
+    expect(config.driverOptions).toEqual({ universe: 2, port: 1 });
+  });
+
+  it("driverOptions is undefined when not provided", () => {
+    delete process.env["DMX_DRIVER"];
+
+    const config = loadConfig({ dmxDriver: "null" });
+
+    expect(config.driverOptions).toBeUndefined();
+  });
 });

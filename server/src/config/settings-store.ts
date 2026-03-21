@@ -13,6 +13,12 @@ export interface PersistedSettings {
   readonly serverId: string;
   readonly serverName: string;
   readonly onboardingCompleted: boolean;
+  readonly driverOptions?: {
+    readonly universe?: number;
+    readonly port?: number;
+    readonly sourceName?: string;
+    readonly priority?: number;
+  };
 }
 
 const DEFAULTS: PersistedSettings = {
@@ -50,6 +56,7 @@ function isValidSettings(data: unknown): data is Partial<PersistedSettings> {
   if ("serverId" in record && typeof record["serverId"] !== "string") return false;
   if ("serverName" in record && typeof record["serverName"] !== "string") return false;
   if ("onboardingCompleted" in record && typeof record["onboardingCompleted"] !== "boolean") return false;
+  if ("driverOptions" in record && record["driverOptions"] !== undefined && typeof record["driverOptions"] !== "object") return false;
 
   return true;
 }

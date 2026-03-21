@@ -15,6 +15,12 @@ function dmxrSettings() {
     settingsMdns: true,
     settingsSetupCompleted: false,
 
+    // Network driver options (ArtNet / sACN)
+    settingsDriverUniverse: 0,
+    settingsDriverPort: 0,
+    settingsDriverSourceName: "DMXr",
+    settingsDriverPriority: 100,
+
     // Available ports
     availablePorts: [],
     portsScanning: false,
@@ -47,6 +53,11 @@ function dmxrSettings() {
         this.settingsHost = s.host;
         this.settingsMdns = s.mdnsEnabled;
         this.settingsSetupCompleted = s.setupCompleted;
+        var opts = s.driverOptions || {};
+        this.settingsDriverUniverse = opts.universe ?? 0;
+        this.settingsDriverPort = opts.port ?? 0;
+        this.settingsDriverSourceName = opts.sourceName || "DMXr";
+        this.settingsDriverPriority = opts.priority ?? 100;
         this.availablePorts = data.availablePorts || [];
         this.serverVersion = data.serverVersion || "";
         this.requiresRestart = false;
@@ -72,6 +83,12 @@ function dmxrSettings() {
             udpPort: this.settingsUdpPort,
             host: this.settingsHost,
             mdnsEnabled: this.settingsMdns,
+            driverOptions: this.isNetworkDriver(this.settingsDriver) ? {
+              universe: this.settingsDriverUniverse,
+              port: this.settingsDriverPort,
+              sourceName: this.settingsDriverSourceName,
+              priority: this.settingsDriverPriority,
+            } : undefined,
           }),
         });
         if (!res.ok) {
@@ -159,6 +176,14 @@ function dmxrSettings() {
 
     closeSettings() {
       this.showSettings = false;
+    },
+
+    isNetworkDriver(driver) {
+      return driver === "artnet" || driver === "sacn";
+    },
+
+    isSerialDriver(driver) {
+      return driver === "enttec-usb-dmx-pro" || driver === "enttec-open-usb-dmx";
     },
 
     getPortLabel(port) {

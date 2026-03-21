@@ -957,20 +957,51 @@
           <option value="null">None (test mode)</option>
           <option value="enttec-usb-dmx-pro">ENTTEC USB DMX Pro</option>
           <option value="enttec-open-usb-dmx">Open DMX USB (FTDI-based adapters)</option>
+          <option value="artnet">Art-Net (network)</option>
+          <option value="sacn">sACN / E1.31 (network)</option>
         </select>
 
-        <label>COM Port</label>
-        <div class="port-row">
-          <select x-model="settingsDevicePath">
-            <option value="auto">Auto-detect</option>
-            <template x-for="port in availablePorts" :key="port.path">
-              <option :value="port.path" x-text="getPortLabel(port)"></option>
-            </template>
-          </select>
-          <button class="btn btn-sm" @click="scanPorts()" :disabled="portsScanning">
-            <span x-text="portsScanning ? 'Scanning...' : 'Scan'"></span>
-          </button>
-        </div>
+        <!-- Serial driver: COM port selection -->
+        <template x-if="isSerialDriver(settingsDriver)">
+          <div>
+            <label>COM Port</label>
+            <div class="port-row">
+              <select x-model="settingsDevicePath">
+                <option value="auto">Auto-detect</option>
+                <template x-for="port in availablePorts" :key="port.path">
+                  <option :value="port.path" x-text="getPortLabel(port)"></option>
+                </template>
+              </select>
+              <button class="btn btn-sm" @click="scanPorts()" :disabled="portsScanning">
+                <span x-text="portsScanning ? 'Scanning...' : 'Scan'"></span>
+              </button>
+            </div>
+          </div>
+        </template>
+
+        <!-- ArtNet: target IP + universe -->
+        <template x-if="settingsDriver === 'artnet'">
+          <div>
+            <label>Target IP</label>
+            <input type="text" x-model="settingsDevicePath" placeholder="255.255.255.255 (broadcast)">
+            <label>Art-Net Universe</label>
+            <input type="number" x-model.number="settingsDriverUniverse" min="0" max="32767">
+            <label>Art-Net Port <span class="settings-hint">(0–3, protocol port number)</span></label>
+            <input type="number" x-model.number="settingsDriverPort" min="0" max="3">
+          </div>
+        </template>
+
+        <!-- sACN: universe + priority + source name -->
+        <template x-if="settingsDriver === 'sacn'">
+          <div>
+            <label>sACN Universe</label>
+            <input type="number" x-model.number="settingsDriverUniverse" min="1" max="63999">
+            <label>Priority <span class="settings-hint">(0–200, default 100)</span></label>
+            <input type="number" x-model.number="settingsDriverPriority" min="0" max="200">
+            <label>Source Name</label>
+            <input type="text" x-model="settingsDriverSourceName" placeholder="DMXr">
+          </div>
+        </template>
 
         <label>HTTP Port</label>
         <input type="number" x-model.number="settingsPort" min="1024" max="65535">
@@ -1302,24 +1333,47 @@
           <option value="null">None (test mode — no DMX output)</option>
           <option value="enttec-usb-dmx-pro">ENTTEC USB DMX Pro</option>
           <option value="enttec-open-usb-dmx">Open DMX USB (FTDI-based adapters)</option>
+          <option value="artnet">Art-Net (network)</option>
+          <option value="sacn">sACN / E1.31 (network)</option>
         </select>
 
-        <label>COM Port</label>
-        <div class="port-row">
-          <select x-model="wizardDevicePath">
-            <option value="auto">Auto-detect</option>
-            <template x-for="port in wizardPorts" :key="port.path">
-              <option :value="port.path" x-text="getWizardPortLabel(port)"></option>
-            </template>
-          </select>
-          <button class="btn btn-sm" @click="wizardScanPorts()" :disabled="wizardScanning">
-            <span x-text="wizardScanning ? 'Scanning...' : 'Scan Ports'"></span>
-          </button>
-        </div>
+        <!-- Serial driver: COM port -->
+        <template x-if="isSerialDriver(wizardDriver)">
+          <div>
+            <label>COM Port</label>
+            <div class="port-row">
+              <select x-model="wizardDevicePath">
+                <option value="auto">Auto-detect</option>
+                <template x-for="port in wizardPorts" :key="port.path">
+                  <option :value="port.path" x-text="getWizardPortLabel(port)"></option>
+                </template>
+              </select>
+              <button class="btn btn-sm" @click="wizardScanPorts()" :disabled="wizardScanning">
+                <span x-text="wizardScanning ? 'Scanning...' : 'Scan Ports'"></span>
+              </button>
+            </div>
+            <div class="wizard-hint" x-show="wizardPorts.length === 0">
+              No serial ports detected. If your adapter is plugged in, click "Scan Ports".
+            </div>
+          </div>
+        </template>
 
-        <div class="wizard-hint" x-show="wizardPorts.length === 0">
-          No serial ports detected. If your adapter is plugged in, click "Scan Ports".
-        </div>
+        <!-- ArtNet: target IP -->
+        <template x-if="wizardDriver === 'artnet'">
+          <div>
+            <label>Target IP</label>
+            <input type="text" x-model="wizardDevicePath" placeholder="255.255.255.255 (broadcast)">
+          </div>
+        </template>
+
+        <!-- sACN: no extra config needed for wizard -->
+        <template x-if="wizardDriver === 'sacn'">
+          <div>
+            <div class="wizard-hint">
+              sACN uses multicast — no target address needed. Configure universe and priority in Settings after setup.
+            </div>
+          </div>
+        </template>
 
         <p class="validation-error" x-show="wizardError" x-text="wizardError"></p>
 
@@ -1335,7 +1389,7 @@
         <div class="wizard-summary">
           <div class="summary-row">
             <span class="summary-label">DMX Driver:</span>
-            <span x-text="wizardDriver === 'null' ? 'None (test mode)' : 'ENTTEC USB DMX Pro'"></span>
+            <span x-text="({null: 'None (test mode)', 'enttec-usb-dmx-pro': 'ENTTEC USB DMX Pro', 'enttec-open-usb-dmx': 'Open DMX USB', artnet: 'Art-Net', sacn: 'sACN / E1.31'})[wizardDriver] || wizardDriver"></span>
           </div>
           <div class="summary-row">
             <span class="summary-label">COM Port:</span>

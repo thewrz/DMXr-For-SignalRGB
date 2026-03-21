@@ -16,9 +16,21 @@ export interface ServerConfig {
   readonly userFixturesPath: string;
   readonly corsOrigin?: string;
   readonly apiKey?: string;
+  readonly driverOptions?: {
+    readonly universe?: number;
+    readonly port?: number;
+    readonly sourceName?: string;
+    readonly priority?: number;
+  };
 }
 
-const VALID_DRIVERS = ["null", "enttec-usb-dmx-pro", "enttec-open-usb-dmx"];
+const VALID_DRIVERS = [
+  "null",
+  "enttec-usb-dmx-pro",
+  "enttec-open-usb-dmx",
+  "artnet",
+  "sacn",
+];
 
 export function loadConfig(
   persisted?: Partial<PersistedSettings>,
@@ -84,6 +96,7 @@ export function loadConfig(
     localDbPath: resolveLocalDbPath(),
     corsOrigin: process.env["CORS_ORIGIN"] || undefined,
     apiKey: process.env["API_KEY"] || undefined,
+    driverOptions: base.driverOptions,
   };
 }
 

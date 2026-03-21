@@ -141,6 +141,80 @@ export async function createDmxConnection(
     };
   }
 
+  // ArtNet — UDP unicast/broadcast, connectionless.
+  // No onDisconnect: UDP is fire-and-forget. If the network path fails,
+  // packets simply don't arrive; when it recovers, the next update() resumes.
+  if (config.dmxDriver === "artnet") {
+    const { ArtnetDriver } = (await import(
+      "dmx-ts/dist/src/drivers/artnet.js"
+    )) as unknown as {
+      ArtnetDriver: new (
+        host: string,
+        options?: {
+          universe?: number;
+          port?: number;
+          net?: number;
+          subnet?: number;
+          subuni?: number;
+        },
+      ) => unknown;
+    };
+    const driver = new ArtnetDriver(
+      config.dmxDevicePath || "255.255.255.255",
+      {
+        universe: config.driverOptions?.universe ?? 0,
+        port: config.driverOptions?.port ?? 0,
+      },
+    );
+    // DMX.addUniverse calls driver.init() which creates the dmxnet sender
+    await dmx.addUniverse(UNIVERSE_NAME, driver);
+
+    return {
+      universe: {
+        update: (channels) => dmx.update(UNIVERSE_NAME, channels),
+        updateAll: (value) => dmx.updateAll(UNIVERSE_NAME, value),
+      },
+      driver: "artnet",
+      close: () => dmx.close(),
+    };
+  }
+
+  // sACN (E1.31) — multicast UDP, connectionless.
+  // SACNDriver converts 0–255 → 0–100% internally — transparent to callers.
+  if (config.dmxDriver === "sacn") {
+    const { SACNDriver } = (await import(
+      "dmx-ts/dist/src/drivers/sacn.js"
+    )) as unknown as {
+      SACNDriver: new (
+        universe: number,
+        options?: {
+          sourceName?: string;
+          priority?: number;
+          reuseAddr?: boolean;
+          ip?: string;
+        },
+      ) => unknown;
+    };
+    const driver = new SACNDriver(
+      config.driverOptions?.universe ?? 1,
+      {
+        sourceName: config.driverOptions?.sourceName ?? "DMXr",
+        priority: config.driverOptions?.priority ?? 100,
+      },
+    );
+    // SACNDriver.init() is a no-op — sender created in constructor
+    await dmx.addUniverse(UNIVERSE_NAME, driver);
+
+    return {
+      universe: {
+        update: (channels) => dmx.update(UNIVERSE_NAME, channels),
+        updateAll: (value) => dmx.updateAll(UNIVERSE_NAME, value),
+      },
+      driver: "sacn",
+      close: () => dmx.close(),
+    };
+  }
+
   if (config.dmxDriver === "null") {
     const { NullDriver } = (await import(
       "dmx-ts/dist/src/drivers/null.js"

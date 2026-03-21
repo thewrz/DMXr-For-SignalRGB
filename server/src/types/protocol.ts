@@ -3,6 +3,14 @@ import type { MovementConfig } from "../fixtures/movement-types.js";
 /** Default universe ID for backward compatibility */
 export const DEFAULT_UNIVERSE_ID = "default";
 
+/** Network driver options for ArtNet and sACN */
+export interface DriverOptions {
+  readonly universe?: number;
+  readonly port?: number;
+  readonly sourceName?: string;
+  readonly priority?: number;
+}
+
 /** Configuration for a single DMX universe */
 export interface UniverseConfig {
   readonly id: string;
@@ -10,6 +18,7 @@ export interface UniverseConfig {
   readonly devicePath: string;
   readonly driverType: string;
   readonly serialNumber?: string;
+  readonly driverOptions?: DriverOptions;
 }
 
 /** Request to create a new universe */
@@ -18,6 +27,7 @@ export interface AddUniverseRequest {
   readonly devicePath: string;
   readonly driverType: string;
   readonly serialNumber?: string;
+  readonly driverOptions?: DriverOptions;
 }
 
 /** Request to update an existing universe */
@@ -26,6 +36,7 @@ export interface UpdateUniverseRequest {
   readonly devicePath?: string;
   readonly driverType?: string;
   readonly serialNumber?: string;
+  readonly driverOptions?: DriverOptions;
 }
 
 /** Channel number (1-512) mapped to value (0-255) */

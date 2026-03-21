@@ -36,6 +36,7 @@ export async function createMultiUniverseStack(
         ...config,
         dmxDriver: uniConfig.driverType,
         dmxDevicePath: uniConfig.devicePath,
+        driverOptions: uniConfig.driverOptions,
       };
       return createResilientConnection({
         config: uniServerConfig,

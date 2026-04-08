@@ -30,7 +30,7 @@
   "devDependencies": {
     "@playwright/test": "^1.58.2",
     "@types/better-sqlite3": "^7.6.13",
-    "@types/node": "^25.4.0",
+    "@types/node": "^25.5.2",
     "@types/pngjs": "^6.0.5",
     "@vitest/coverage-v8": "^4.1.1",
     "pixelmatch": "^7.1.0",

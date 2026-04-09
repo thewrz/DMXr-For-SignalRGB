@@ -134,6 +134,50 @@ describe("settings routes", () => {
       expect(reloaded.serverName).toBe("Studio A");
     });
 
+    it("AUTH-C3: rejects unknown top-level keys", async () => {
+      const res = await app.inject({
+        method: "PATCH",
+        url: "/settings",
+        payload: { foo: "bar" },
+      });
+      expect(res.statusCode).toBe(400);
+    });
+
+    it("AUTH-C3: rejects wrong-type values", async () => {
+      const res = await app.inject({
+        method: "PATCH",
+        url: "/settings",
+        payload: { port: "evil" },
+      });
+      expect(res.statusCode).toBe(400);
+    });
+
+    it("AUTH-C3: rejects attempts to set serverId", async () => {
+      const res = await app.inject({
+        method: "PATCH",
+        url: "/settings",
+        payload: { serverId: "attacker-chosen" },
+      });
+      expect(res.statusCode).toBe(400);
+    });
+
+    it("AUTH-C3: rejects __proto__ key", async () => {
+      const res = await app.inject({
+        method: "PATCH",
+        url: "/settings",
+        headers: { "content-type": "application/json" },
+        payload: '{"port": 8080, "__proto__": {"polluted": true}}',
+      });
+      // Either 400 from schema or 200 with the proto key stripped. Either
+      // way, global Object prototype must not be polluted.
+      expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+      if (res.statusCode === 200) {
+        // If accepted, confirm the extra key didn't leak into settings.
+        const body = res.json();
+        expect(body.settings.port).toBe(8080);
+      }
+    });
+
     it("triggers mDNS republish when serverName changes", async () => {
       const republishMock = vi.fn();
       const mockAdvertiser = { unpublishAll: vi.fn(), republish: republishMock };

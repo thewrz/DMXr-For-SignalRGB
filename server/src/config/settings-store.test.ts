@@ -192,6 +192,53 @@ describe("createSettingsStore", () => {
       expect(a).not.toBe(b);
     });
   });
+
+  describe("AUTH-C3 update input validation", () => {
+    beforeEach(async () => {
+      await store.load();
+    });
+
+    it("strips unknown keys from partial (prototype-pollution defense)", async () => {
+      // Cast through unknown because the type forbids extra keys, but at
+      // runtime a malicious PATCH body can carry them.
+      await store.update({
+        port: 9001,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        foo: "bar",
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        __proto__: { polluted: true },
+      } as unknown as Partial<PersistedSettings>);
+
+      const current = store.get();
+      expect(current.port).toBe(9001);
+      expect((current as unknown as Record<string, unknown>).foo).toBeUndefined();
+      // Proto pollution check
+      expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+    });
+
+    it("rejects wrong-type values by throwing", async () => {
+      await expect(
+        store.update({
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          port: "evil" as any,
+        }),
+      ).rejects.toThrow();
+    });
+
+    it("ignores attempts to change serverId (read-only)", async () => {
+      const before = store.get().serverId;
+      await store.update({ serverId: "attacker-chosen-id" });
+      const after = store.get().serverId;
+      expect(after).toBe(before);
+    });
+
+    it("accepts valid partial updates", async () => {
+      await store.update({ port: 8090, serverName: "Studio B" });
+      const current = store.get();
+      expect(current.port).toBe(8090);
+      expect(current.serverName).toBe("Studio B");
+    });
+  });
 });
 
 describe("getDefaults", () => {

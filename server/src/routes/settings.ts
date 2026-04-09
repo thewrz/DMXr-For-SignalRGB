@@ -1,6 +1,9 @@
 import type { FastifyInstance } from "fastify";
 import type { SettingsStore } from "../config/settings-store.js";
-import type { PersistedSettings } from "../config/settings-store.js";
+import {
+  UPDATABLE_SETTINGS_KEYS,
+  type PersistedSettings,
+} from "../config/settings-store.js";
 import type { MdnsAdvertiser } from "../mdns/advertiser.js";
 import {
   listSerialPorts,
@@ -37,6 +40,7 @@ const RESTART_FIELDS: ReadonlySet<keyof PersistedSettings> = new Set([
   "host",
 ]);
 
+
 export function registerSettingsRoutes(
   app: FastifyInstance,
   deps: SettingsDeps,
@@ -55,23 +59,53 @@ export function registerSettingsRoutes(
     },
   );
 
-  app.patch("/settings", async (request, reply) => {
-    const body = request.body as Partial<PersistedSettings> | null;
-    if (!body || typeof body !== "object") {
-      return reply.status(400).send({ error: "Request body required" });
-    }
+  app.patch(
+    "/settings",
+    // AUTH-C3: intentionally NO Fastify schema here. Fastify's default
+    // Ajv config uses `removeAdditional: true`, which would silently strip
+    // unknown keys instead of returning 400. We want explicit rejection
+    // (clear feedback to callers, clear signal to attackers). Type
+    // validation is enforced inside `settingsStore.update()` via
+    // `isValidSettings`.
+    async (request, reply) => {
+      const rawBody = request.body as Record<string, unknown> | null;
+      if (!rawBody || typeof rawBody !== "object" || Array.isArray(rawBody)) {
+        return reply.status(400).send({ error: "Request body required" });
+      }
 
-    const settings = await deps.settingsStore.update(body);
-    const changedKeys = Object.keys(body) as (keyof PersistedSettings)[];
-    const requiresRestart = changedKeys.some((k) => RESTART_FIELDS.has(k));
+      // AUTH-C3: reject any key not in the allowlist (serverId,
+      // __proto__, constructor, attacker-supplied garbage). Use
+      // hasOwnProperty iteration to avoid prototype walk.
+      for (const key of Object.keys(rawBody)) {
+        if (!UPDATABLE_SETTINGS_KEYS.has(key as keyof PersistedSettings)) {
+          return reply.status(400).send({
+            error: `Unknown or read-only key: ${key}`,
+          });
+        }
+      }
 
-    if ("serverName" in body) {
-      deps.getMdnsAdvertiser?.()?.republish({ serverName: settings.serverName });
-    }
+      const body = rawBody as Partial<PersistedSettings>;
 
-    const response: PatchSettingsResponse = { settings, requiresRestart };
-    return response;
-  });
+      try {
+        const settings = await deps.settingsStore.update(body);
+        const changedKeys = Object.keys(body) as (keyof PersistedSettings)[];
+        const requiresRestart = changedKeys.some((k) => RESTART_FIELDS.has(k));
+
+        if ("serverName" in body) {
+          deps.getMdnsAdvertiser?.()?.republish({
+            serverName: settings.serverName,
+          });
+        }
+
+        const response: PatchSettingsResponse = { settings, requiresRestart };
+        return response;
+      } catch (err) {
+        return reply.status(400).send({
+          error: err instanceof Error ? err.message : "Invalid settings update",
+        });
+      }
+    },
+  );
 
   app.post(
     "/settings/scan-ports",

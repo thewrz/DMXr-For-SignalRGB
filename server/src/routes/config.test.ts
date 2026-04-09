@@ -178,7 +178,7 @@ describe("config routes", () => {
           serverName: "Other Server",
           mdnsEnabled: false,
           port: 9999,
-          host: "127.0.0.1",
+          host: "192.168.1.100",
         },
       };
 
@@ -209,7 +209,7 @@ describe("config routes", () => {
 
       // Machine-specific settings should NOT be overwritten
       expect(settings.port).not.toBe(9999);
-      expect(settings.host).not.toBe("127.0.0.1");
+      expect(settings.host).not.toBe("192.168.1.100");
     });
 
     it("preserves per-fixture settings like overrides", async () => {

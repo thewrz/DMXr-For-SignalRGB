@@ -75,7 +75,7 @@ describe("createSettingsStore", () => {
 
       expect(settings.dmxDriver).toBe("enttec-usb-dmx-pro");
       expect(settings.port).toBe(9090);
-      expect(settings.host).toBe("0.0.0.0");
+      expect(settings.host).toBe("127.0.0.1");
       expect(settings.mdnsEnabled).toBe(true);
       expect(settings.setupCompleted).toBe(false);
       expect(settings.serverId).toMatch(/^[0-9a-f]{8}-/);
@@ -248,7 +248,7 @@ describe("getDefaults", () => {
     expect(defaults.dmxDriver).toBe("null");
     expect(defaults.dmxDevicePath).toBe("auto");
     expect(defaults.port).toBe(8080);
-    expect(defaults.host).toBe("0.0.0.0");
+    expect(defaults.host).toBe("127.0.0.1");
     expect(defaults.mdnsEnabled).toBe(true);
     expect(defaults.setupCompleted).toBe(false);
     expect(defaults.serverId).toBe("");

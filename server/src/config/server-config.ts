@@ -24,13 +24,13 @@ export interface ServerConfig {
   };
 }
 
-const VALID_DRIVERS = [
+export const VALID_DRIVERS = [
   "null",
   "enttec-usb-dmx-pro",
   "enttec-open-usb-dmx",
   "artnet",
   "sacn",
-];
+] as const;
 
 export function loadConfig(
   persisted?: Partial<PersistedSettings>,
@@ -51,7 +51,7 @@ export function loadConfig(
   const dmxDriver =
     process.env["DMX_DRIVER"] ?? base.dmxDriver ?? "null";
 
-  if (!VALID_DRIVERS.includes(dmxDriver)) {
+  if (!(VALID_DRIVERS as readonly string[]).includes(dmxDriver)) {
     throw new Error(
       `Invalid DMX_DRIVER: "${dmxDriver}". Must be one of: ${VALID_DRIVERS.join(", ")}`,
     );

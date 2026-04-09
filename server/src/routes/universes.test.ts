@@ -106,6 +106,75 @@ describe("universe routes", () => {
       });
       expect(res.statusCode).toBe(409);
     });
+
+    describe("AUTH-C4 strict schema", () => {
+      it("rejects unknown keys", async () => {
+        const res = await app.inject({
+          method: "POST",
+          url: "/universes",
+          payload: {
+            name: "Good",
+            devicePath: "/dev/ttyUSB0",
+            driverType: "null",
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            extra: "evil" as any,
+          },
+        });
+        expect(res.statusCode).toBe(400);
+      });
+
+      it("rejects invalid driverType", async () => {
+        const res = await app.inject({
+          method: "POST",
+          url: "/universes",
+          payload: {
+            name: "Bad Driver",
+            devicePath: "/dev/ttyUSB0",
+            driverType: "bogus",
+          },
+        });
+        expect(res.statusCode).toBe(400);
+      });
+
+      it("rejects oversized name", async () => {
+        const res = await app.inject({
+          method: "POST",
+          url: "/universes",
+          payload: {
+            name: "x".repeat(1000),
+            devicePath: "/dev/ttyUSB0",
+            driverType: "null",
+          },
+        });
+        expect(res.statusCode).toBe(400);
+      });
+
+      it("rejects oversized devicePath", async () => {
+        const res = await app.inject({
+          method: "POST",
+          url: "/universes",
+          payload: {
+            name: "OK",
+            devicePath: "/dev/" + "x".repeat(1000),
+            driverType: "null",
+          },
+        });
+        expect(res.statusCode).toBe(400);
+      });
+
+      it("accepts a well-formed body", async () => {
+        const res = await app.inject({
+          method: "POST",
+          url: "/universes",
+          payload: {
+            name: "Valid",
+            devicePath: "/dev/ttyUSB0",
+            driverType: "enttec-usb-dmx-pro",
+          },
+        });
+        expect(res.statusCode).toBe(201);
+      });
+    });
   });
 
   describe("PATCH /universes/:id", () => {

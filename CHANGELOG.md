@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-04-08
+
+### Security
+- `basic-ftp` bumped via `npm audit fix` ([GHSA-chqc-8p9q-pq6q](https://github.com/advisories/GHSA-chqc-8p9q-pq6q) — high, FTP command injection via CRLF; transitive dev dep from puppeteer)
+- `brace-expansion` bumped via `npm audit fix` ([GHSA-f886-m6hf-6m8v](https://github.com/advisories/GHSA-f886-m6hf-6m8v) — moderate, ReDoS)
+- `vite` bumped transitively via `vitest` 4.1.3 ([GHSA-4w7w-66w2-5vf9](https://github.com/advisories/GHSA-4w7w-66w2-5vf9), [GHSA-v2wj-q39q-566r](https://github.com/advisories/GHSA-v2wj-q39q-566r), [GHSA-p9ff-h696-f583](https://github.com/advisories/GHSA-p9ff-h696-f583))
+
+### Changed
+- `@fastify/static` 9.0.0 → 9.1.0 (includes upstream `sendFile` option-override fix)
+- `vitest` 4.1.1 → 4.1.3
+- `@vitest/coverage-v8` 4.1.1 → 4.1.3
+- `@playwright/test` 1.58.2 → 1.59.1 (dev)
+- `@types/node` 25.5.0 → 25.5.2 (dev)
+
 ## [1.3.0] - 2026-03-12
 
 ### Added

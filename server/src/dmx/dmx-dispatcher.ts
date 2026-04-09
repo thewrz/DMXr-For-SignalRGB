@@ -10,7 +10,11 @@ import type { MultiUniverseCoordinator } from "./multi-universe-coordinator.js";
  */
 export interface DmxDispatcher {
   readonly applyFixtureUpdate: (universeId: string | undefined, payload: FixtureUpdatePayload) => number;
-  readonly applyRawUpdate: (universeId: string | undefined, channels: Record<number, number>) => DmxWriteResult;
+  readonly applyRawUpdate: (
+    universeId: string | undefined,
+    channels: Record<number, number>,
+    opts?: { bypassBlackout?: boolean },
+  ) => DmxWriteResult;
   readonly blackout: (universeId?: string) => DmxWriteResult;
   readonly whiteout: (universeId?: string) => DmxWriteResult;
   readonly resumeNormal: (universeId?: string) => DmxWriteResult;
@@ -34,11 +38,11 @@ export function createDmxDispatcher(
       return manager.applyFixtureUpdate(payload);
     },
 
-    applyRawUpdate(universeId, channels) {
+    applyRawUpdate(universeId, channels, opts) {
       if (coordinator && universeId) {
-        return coordinator.applyRawUpdate(universeId, channels);
+        return coordinator.applyRawUpdate(universeId, channels, opts);
       }
-      return manager.applyRawUpdate(channels);
+      return manager.applyRawUpdate(channels, opts);
     },
 
     blackout(universeId?) {

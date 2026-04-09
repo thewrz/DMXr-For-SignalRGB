@@ -94,9 +94,9 @@ export function registerFixtureTestRoutes(
       for (const addr of addresses) {
         zeros[addr] = 0;
       }
-      deps.manager.applyRawUpdate(zeros);
+      deps.manager.applyRawUpdate(zeros, { bypassBlackout: true });
     } else {
-      deps.manager.applyRawUpdate(snapshot);
+      deps.manager.applyRawUpdate(snapshot, { bypassBlackout: true });
     }
 
     holdSnapshots.delete(fixture.id);
@@ -133,7 +133,7 @@ export function registerFixtureTestRoutes(
       if (action === "flash") {
         const snapshot = deps.manager.getChannelSnapshot(start, count);
         const flashValues = buildFlashValues(fixture, snapshot, channelOffset);
-        const dmxResult = deps.manager.applyRawUpdate(flashValues);
+        const dmxResult = deps.manager.applyRawUpdate(flashValues, { bypassBlackout: true });
 
         request.log.info(
           {
@@ -167,7 +167,7 @@ export function registerFixtureTestRoutes(
 
         const flashValues = buildFlashValues(fixture, snapshot, channelOffset);
         const addresses = getFixtureAddresses(fixture);
-        const dmxResult = deps.manager.applyRawUpdate(flashValues);
+        const dmxResult = deps.manager.applyRawUpdate(flashValues, { bypassBlackout: true });
         deps.manager.lockChannels(addresses);
 
         request.log.info(
@@ -199,7 +199,7 @@ export function registerFixtureTestRoutes(
 
         const flashValues = buildFlashValues(fixture, snapshot, channelOffset);
         const addresses = getFixtureAddresses(fixture);
-        const dmxResult = deps.manager.applyRawUpdate(flashValues);
+        const dmxResult = deps.manager.applyRawUpdate(flashValues, { bypassBlackout: true });
         deps.manager.lockChannels(addresses);
 
         request.log.info(

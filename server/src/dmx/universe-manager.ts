@@ -1,6 +1,7 @@
 import type { DmxUniverse } from "./driver-factory.js";
 import type { ChannelMap, FixtureUpdatePayload } from "../types/protocol.js";
 import { pipeLog, shouldSample } from "../logging/pipeline-logger.js";
+import { clampMotor } from "../fixtures/motor-guard.js";
 
 export type ControlMode = "normal" | "blackout" | "whiteout";
 
@@ -41,7 +42,10 @@ export interface UniverseManager {
   readonly getActiveChannelCount: () => number;
   readonly getChannelSnapshot: (start: number, count: number) => Record<number, number>;
   readonly getFullSnapshot: () => Record<number, number>;
-  readonly applyRawUpdate: (channels: Record<number, number>) => DmxWriteResult;
+  readonly applyRawUpdate: (
+    channels: Record<number, number>,
+    opts?: { bypassBlackout?: boolean },
+  ) => DmxWriteResult;
   readonly getDmxSendStatus: () => DmxSendStatus;
   /** Register safe center positions for motor channels (Pan/Tilt/etc).
    *  These are restored immediately after blackout/whiteout to prevent
@@ -321,8 +325,48 @@ export function createUniverseManager(
       return snapshot;
     },
 
-    applyRawUpdate(channels: Record<number, number>): DmxWriteResult {
-      for (const [ch, val] of Object.entries(channels)) {
+    applyRawUpdate(
+      channels: Record<number, number>,
+      opts: { bypassBlackout?: boolean } = {},
+    ): DmxWriteResult {
+      // DMX-C2: honor blackout state unless explicitly bypassed (e.g., bootstrap restore).
+      if (!opts.bypassBlackout && blackoutActive) {
+        pipeLog("debug", "applyRawUpdate BLOCKED (blackout active)");
+        return { ok: true };
+      }
+
+      // DMX-C2: validate + clamp through the same pipeline as applyFixtureUpdate.
+      // This closes the bypass that previously allowed out-of-range values,
+      // fractional addresses, and NaN keys to reach the serial bus.
+      const validated = buildDmxUpdate(channels);
+      if (validated === null) {
+        return { ok: true };
+      }
+
+      // DMX-C2: apply motor guard to addresses in safePositions. Motor
+      // channels (Pan, Tilt, Focus, Zoom, etc.) are clamped to 2-253 to
+      // prevent mechanical damage at end stops.
+      for (const key of Object.keys(validated)) {
+        const addr = Number(key);
+        if (safePositions.has(addr)) {
+          validated[addr] = clampMotor(validated[addr]);
+        }
+      }
+
+      // DMX-C2: respect locked channels (flash takes priority).
+      if (lockedChannels.size > 0) {
+        for (const key of Object.keys(validated)) {
+          if (lockedChannels.has(Number(key))) {
+            delete validated[Number(key)];
+          }
+        }
+        if (Object.keys(validated).length === 0) {
+          return { ok: true };
+        }
+      }
+
+      // Track active channels
+      for (const [ch, val] of Object.entries(validated)) {
         const chNum = Number(ch);
         if (val > 0) {
           activeChannels.set(chNum, val);
@@ -330,11 +374,12 @@ export function createUniverseManager(
           activeChannels.delete(chNum);
         }
       }
-      const count = Object.keys(channels).length;
-      const result = safeSend(`raw-update ${count}ch`, () => universe.update(channels));
+
+      const count = Object.keys(validated).length;
+      const result = safeSend(`raw-update ${count}ch`, () => universe.update(validated));
       if (shouldSample("rawUpdate")) {
-        const addrs = Object.keys(channels).map(Number).sort((a, b) => a - b);
-        const snapshot = addrs.map((a) => `${a}:${channels[Number(a)]}`).join(" ");
+        const addrs = Object.keys(validated).map(Number).sort((a, b) => a - b);
+        const snapshot = addrs.map((a) => `${a}:${validated[a]}`).join(" ");
         pipeLog("verbose", `RAW UPDATE: ${count}ch → ${snapshot}`);
       }
       return result;

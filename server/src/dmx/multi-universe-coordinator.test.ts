@@ -209,7 +209,7 @@ describe("createMultiUniverseCoordinator", () => {
       const channels = { 1: 200, 2: 100 };
       coordinator.applyRawUpdate("uni-a", channels);
 
-      expect(managerA.applyRawUpdate).toHaveBeenCalledWith(channels);
+      expect(managerA.applyRawUpdate).toHaveBeenCalledWith(channels, undefined);
       expect(managerB.applyRawUpdate).not.toHaveBeenCalled();
       expect(defaultManager.applyRawUpdate).not.toHaveBeenCalled();
     });

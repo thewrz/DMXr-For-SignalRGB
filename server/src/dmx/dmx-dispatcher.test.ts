@@ -81,7 +81,7 @@ describe("DmxDispatcher (no coordinator)", () => {
 
     d.applyRawUpdate(undefined, { 1: 100 });
 
-    expect(mgr.applyRawUpdate).toHaveBeenCalledWith({ 1: 100 });
+    expect(mgr.applyRawUpdate).toHaveBeenCalledWith({ 1: 100 }, undefined);
   });
 
   it("delegates getChannelSnapshot to manager", () => {
@@ -157,7 +157,7 @@ describe("DmxDispatcher (no coordinator)", () => {
     // No coordinator present — should not throw
     d.applyRawUpdate(undefined, { 10: 200 });
 
-    expect(mgr.applyRawUpdate).toHaveBeenCalledWith({ 10: 200 });
+    expect(mgr.applyRawUpdate).toHaveBeenCalledWith({ 10: 200 }, undefined);
   });
 });
 
@@ -259,7 +259,7 @@ describe("DmxDispatcher (with coordinator)", () => {
 
     d.applyRawUpdate("uni-1", { 5: 200 });
 
-    expect(coord.applyRawUpdate).toHaveBeenCalledWith("uni-1", { 5: 200 });
+    expect(coord.applyRawUpdate).toHaveBeenCalledWith("uni-1", { 5: 200 }, undefined);
     expect(mgr.applyRawUpdate).not.toHaveBeenCalled();
   });
 

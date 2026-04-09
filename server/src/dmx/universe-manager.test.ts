@@ -186,14 +186,24 @@ describe("createUniverseManager", () => {
       expect(mock.updateAllCalls).toEqual([0]);
     });
 
-    it("allows applyRawUpdate during blackout", () => {
+    it("DMX-C2: applyRawUpdate honors blackout by default", () => {
       manager.blackout();
       mock.updateCalls.length = 0;
 
-      manager.applyRawUpdate({ 1: 255, 2: 128 });
+      const result = manager.applyRawUpdate({ 1: 255, 2: 128 });
+
+      // Should NOT write to hardware during blackout
+      expect(mock.updateCalls).toHaveLength(0);
+      expect(result.ok).toBe(true);
+    });
+
+    it("DMX-C2: applyRawUpdate allows bypass with bypassBlackout", () => {
+      manager.blackout();
+      mock.updateCalls.length = 0;
+
+      manager.applyRawUpdate({ 1: 255, 2: 128 }, { bypassBlackout: true });
 
       expect(mock.updateCalls).toHaveLength(1);
-      expect(mock.updateCalls[0]).toEqual({ 1: 255, 2: 128 });
     });
   });
 
@@ -542,6 +552,75 @@ describe("createUniverseManager", () => {
       manager.blackout();
       manager.whiteout();
       expect(manager.getControlMode()).toBe("whiteout");
+    });
+  });
+
+  describe("DMX-C2: applyRawUpdate validation + motor-guard", () => {
+    it("filters out invalid channel addresses (>512)", () => {
+      manager.applyRawUpdate({ 999: 128 });
+      // Invalid address should be stripped — either no write or 0 valid channels
+      if (mock.updateCalls.length > 0) {
+        expect(mock.updateCalls[0]).not.toHaveProperty("999");
+      }
+    });
+
+    it("filters out non-integer keys (fractional addresses)", () => {
+      manager.applyRawUpdate({ 1.5: 128 });
+      if (mock.updateCalls.length > 0) {
+        expect(mock.updateCalls[0]).not.toHaveProperty("1.5");
+      }
+    });
+
+    it("clamps values above 255", () => {
+      manager.applyRawUpdate({ 10: 300 });
+      expect(mock.updateCalls).toHaveLength(1);
+      expect(mock.updateCalls[0][10]).toBe(255);
+    });
+
+    it("clamps values below 0", () => {
+      manager.applyRawUpdate({ 10: -50 });
+      expect(mock.updateCalls).toHaveLength(1);
+      expect(mock.updateCalls[0][10]).toBe(0);
+    });
+
+    it("applies motor guard to addresses in safePositions", () => {
+      // Register address 10 as a motor channel (via safePositions)
+      manager.registerSafePositions({ 10: 128 });
+      mock.updateCalls.length = 0;
+
+      manager.applyRawUpdate({ 10: 255 });
+
+      expect(mock.updateCalls).toHaveLength(1);
+      // Motor guard should clamp 255 → 253 (buffer=4, max=253)
+      expect(mock.updateCalls[0][10]).toBe(253);
+    });
+
+    it("does not motor-clamp non-motor addresses", () => {
+      manager.registerSafePositions({ 10: 128 });
+      mock.updateCalls.length = 0;
+
+      // Address 5 is NOT in safePositions, so no motor clamp
+      manager.applyRawUpdate({ 5: 255 });
+
+      expect(mock.updateCalls).toHaveLength(1);
+      expect(mock.updateCalls[0][5]).toBe(255);
+    });
+
+    it("respects locked channels", () => {
+      manager.lockChannels([5]);
+
+      manager.applyRawUpdate({ 5: 255, 6: 128 });
+
+      expect(mock.updateCalls).toHaveLength(1);
+      // Channel 5 should be filtered out; only channel 6 written
+      expect(mock.updateCalls[0]).not.toHaveProperty("5");
+      expect(mock.updateCalls[0][6]).toBe(128);
+    });
+
+    it("returns ok with no write when all channels are invalid", () => {
+      const result = manager.applyRawUpdate({ 999: 128, 0: 64 });
+      expect(result.ok).toBe(true);
+      expect(mock.updateCalls).toHaveLength(0);
     });
   });
 });

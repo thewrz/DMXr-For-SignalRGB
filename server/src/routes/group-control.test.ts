@@ -119,11 +119,13 @@ describe("Group control routes", () => {
       expect(dispatcher.applyRawUpdate).toHaveBeenCalledWith(
         "default",
         { 1: 0, 2: 0, 3: 0 },
+        { bypassBlackout: true },
       );
       // Second fixture: channels 10, 11, 12 zeroed
       expect(dispatcher.applyRawUpdate).toHaveBeenCalledWith(
         "default",
         { 10: 0, 11: 0, 12: 0 },
+        { bypassBlackout: true },
       );
 
       // Channels locked to prevent SignalRGB overwrite (per-fixture with universeId)
@@ -345,6 +347,7 @@ describe("Group control routes", () => {
       expect(dispatcher.applyRawUpdate).toHaveBeenCalledWith(
         "universe-2",
         expect.any(Object),
+        { bypassBlackout: true },
       );
 
       await uniApp.close();

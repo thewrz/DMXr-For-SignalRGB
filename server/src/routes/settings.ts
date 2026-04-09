@@ -83,15 +83,38 @@ export function registerSettingsRoutes(
     },
   );
 
-  app.post("/settings/restart", async (_request, reply) => {
-    reply.send({ restarting: true });
+  app.post(
+    "/settings/restart",
+    {
+      // AUTH-C2: at most 2 restarts per hour to prevent remote reboot loops.
+      // The global rate limit (600/min) is far too permissive for an
+      // endpoint that terminates the process.
+      config: { rateLimit: { max: 2, timeWindow: "1 hour" } },
+    },
+    async (request, reply) => {
+      // AUTH-C2: require an explicit confirmation header so a CSRF-triggered
+      // fetch from a browser cannot restart the server. The header value is
+      // not a secret — it's a simple anti-CSRF deterrent paired with the
+      // fail-closed auth middleware.
+      const confirm = request.headers["x-restart-confirm"];
+      if (confirm !== "yes") {
+        return reply.status(400).send({
+          error:
+            "Restart requires the header `x-restart-confirm: yes` to confirm intent.",
+        });
+      }
 
-    setTimeout(() => {
-      // Exit with non-zero code so service managers (systemd Restart=on-failure,
-      // NSSM) will restart the process. Exit code 0 is treated as intentional
-      // shutdown and will NOT trigger a restart.
-      process.stderr.write("[DMXr] Restarting server (requested via settings UI)\n");
-      process.exit(1);
-    }, 500);
-  });
+      reply.send({ restarting: true });
+
+      setTimeout(() => {
+        // Exit with non-zero code so service managers (systemd Restart=on-failure,
+        // NSSM) will restart the process. Exit code 0 is treated as intentional
+        // shutdown and will NOT trigger a restart.
+        process.stderr.write(
+          "[DMXr] Restarting server (requested via settings UI)\n",
+        );
+        process.exit(1);
+      }, 500);
+    },
+  );
 }

@@ -174,7 +174,27 @@ describe("settings routes", () => {
   });
 
   describe("POST /settings/restart", () => {
-    it("returns restarting response and exits with non-zero code", async () => {
+    it("returns 400 when x-restart-confirm header is missing (AUTH-C2)", async () => {
+      const res = await app.inject({
+        method: "POST",
+        url: "/settings/restart",
+      });
+
+      expect(res.statusCode).toBe(400);
+      expect(res.json().error).toMatch(/confirm/i);
+    });
+
+    it("returns 400 when x-restart-confirm header has wrong value (AUTH-C2)", async () => {
+      const res = await app.inject({
+        method: "POST",
+        url: "/settings/restart",
+        headers: { "x-restart-confirm": "no" },
+      });
+
+      expect(res.statusCode).toBe(400);
+    });
+
+    it("returns 200 and exits with non-zero code when confirmed", async () => {
       vi.useFakeTimers();
       const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
       const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
@@ -182,6 +202,7 @@ describe("settings routes", () => {
       const res = await app.inject({
         method: "POST",
         url: "/settings/restart",
+        headers: { "x-restart-confirm": "yes" },
       });
 
       expect(res.statusCode).toBe(200);

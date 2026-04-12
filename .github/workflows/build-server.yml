@@ -58,14 +58,26 @@ jobs:
 
       # --- Download portable Node.js binary ---
 
+      # SUPPLY-C2: all binary downloads are checksum-verified before inclusion
+      # in the release bundle. Node.js checksums come from the official
+      # SHASUMS256.txt; NSSM uses a hard-pinned hash (no upstream SHASUMS).
+
       - name: Download portable Node.js (Windows)
         if: matrix.node_platform == 'win'
         shell: pwsh
         run: |
           $nodeVersion = node -e "console.log(process.version)"
-          $url = "https://nodejs.org/dist/$nodeVersion/node-$nodeVersion-win-x64.zip"
+          $shaUrl = "https://nodejs.org/dist/$nodeVersion/SHASUMS256.txt"
+          $zipName = "node-$nodeVersion-win-x64.zip"
+          $url = "https://nodejs.org/dist/$nodeVersion/$zipName"
           Write-Host "Downloading $url"
           Invoke-WebRequest -Uri $url -OutFile node-portable.zip
+          Write-Host "Verifying checksum against $shaUrl"
+          Invoke-WebRequest -Uri $shaUrl -OutFile SHASUMS256.txt
+          $expected = (Get-Content SHASUMS256.txt | Select-String $zipName).ToString().Split(" ")[0]
+          $actual = (Get-FileHash node-portable.zip -Algorithm SHA256).Hash.ToLower()
+          if ($actual -ne $expected) { throw "SHA256 mismatch: expected $expected, got $actual" }
+          Write-Host "Checksum verified: $actual"
           Expand-Archive -Path node-portable.zip -DestinationPath node-extracted
           Copy-Item "node-extracted/node-$nodeVersion-win-x64/node.exe" -Destination node.exe
 
@@ -73,21 +85,35 @@ jobs:
         if: matrix.node_platform == 'linux'
         run: |
           NODE_VERSION=$(node -e "console.log(process.version)")
-          URL="https://nodejs.org/dist/$NODE_VERSION/node-$NODE_VERSION-linux-${{ matrix.node_arch }}.tar.xz"
+          ARCHIVE="node-$NODE_VERSION-linux-${{ matrix.node_arch }}.tar.xz"
+          URL="https://nodejs.org/dist/$NODE_VERSION/$ARCHIVE"
+          SHA_URL="https://nodejs.org/dist/$NODE_VERSION/SHASUMS256.txt"
           echo "Downloading $URL"
           curl -fsSL "$URL" -o node-portable.tar.xz
+          echo "Verifying checksum against $SHA_URL"
+          curl -fsSL "$SHA_URL" -o SHASUMS256.txt
+          grep "$ARCHIVE" SHASUMS256.txt | sha256sum -c -
           tar xf node-portable.tar.xz
           cp "node-$NODE_VERSION-linux-${{ matrix.node_arch }}/bin/node" node
 
       # --- Download NSSM (Windows only) ---
+      # SUPPLY-C2: NSSM has no upstream SHASUMS; hash is hard-pinned here.
+      # Update this hash when bumping the NSSM version.
 
       - name: Download NSSM
         if: matrix.node_platform == 'win'
         shell: pwsh
+        env:
+          NSSM_EXPECTED_SHA256: "dd15b0bd3541f954220b8c0622a40294b919dfd0e6635859e733f153ba34bceb"
         run: |
           $url = "https://github.com/ONLYOFFICE/nssm/releases/download/v2.24.1/nssm_x64.zip"
           Write-Host "Downloading NSSM from $url"
           Invoke-WebRequest -Uri $url -OutFile nssm.zip
+          $actual = (Get-FileHash nssm.zip -Algorithm SHA256).Hash.ToLower()
+          if ($actual -ne $env:NSSM_EXPECTED_SHA256) {
+            throw "NSSM SHA256 mismatch: expected $($env:NSSM_EXPECTED_SHA256), got $actual"
+          }
+          Write-Host "NSSM checksum verified: $actual"
           Expand-Archive -Path nssm.zip -DestinationPath nssm-extracted
           $nssm = Get-ChildItem -Path nssm-extracted -Filter nssm.exe -Recurse | Select-Object -First 1
           Copy-Item $nssm.FullName -Destination nssm.exe

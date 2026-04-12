@@ -19,7 +19,7 @@ describe("loadConfig", () => {
     const config = loadConfig();
 
     expect(config.port).toBe(8080);
-    expect(config.host).toBe("0.0.0.0");
+    expect(config.host).toBe("127.0.0.1");
     expect(config.dmxDriver).toBe("null");
     expect(config.dmxDevicePath).toBe("auto");
     expect(config.logLevel).toBe("info");

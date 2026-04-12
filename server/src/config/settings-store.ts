@@ -26,7 +26,7 @@ const DEFAULTS: PersistedSettings = {
   dmxDevicePath: "auto",
   port: 8080,
   udpPort: 0,
-  host: "0.0.0.0",
+  host: "127.0.0.1",
   mdnsEnabled: true,
   setupCompleted: false,
   serverId: "",
@@ -39,6 +39,23 @@ export interface SettingsStore {
   readonly update: (partial: Partial<PersistedSettings>) => Promise<PersistedSettings>;
   readonly get: () => PersistedSettings;
 }
+
+// AUTH-C3: keys a client is allowed to patch. `serverId` is deliberately
+// omitted — it is auto-generated on first load and must not be
+// externally mutable.
+export const UPDATABLE_SETTINGS_KEYS: ReadonlySet<keyof PersistedSettings> =
+  new Set<keyof PersistedSettings>([
+    "dmxDriver",
+    "dmxDevicePath",
+    "port",
+    "udpPort",
+    "host",
+    "mdnsEnabled",
+    "setupCompleted",
+    "serverName",
+    "onboardingCompleted",
+    "driverOptions",
+  ]);
 
 function isValidSettings(data: unknown): data is Partial<PersistedSettings> {
   if (typeof data !== "object" || data === null || Array.isArray(data)) {
@@ -95,7 +112,22 @@ export function createSettingsStore(filePath: string): SettingsStore {
     },
 
     async update(partial: Partial<PersistedSettings>): Promise<PersistedSettings> {
-      current = { ...current, ...partial };
+      // AUTH-C3: strip unknown keys and reject wrong-type values before
+      // merging. Only the allowlist keys are honored — serverId,
+      // __proto__, constructor, and any attacker-supplied key are dropped.
+      const filtered: Partial<PersistedSettings> = {};
+      if (partial && typeof partial === "object" && !Array.isArray(partial)) {
+        for (const key of UPDATABLE_SETTINGS_KEYS) {
+          if (Object.prototype.hasOwnProperty.call(partial, key)) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (filtered as any)[key] = (partial as any)[key];
+          }
+        }
+      }
+      if (!isValidSettings(filtered)) {
+        throw new Error("Invalid settings update: type validation failed");
+      }
+      current = { ...current, ...filtered };
       await save(current);
       return { ...current };
     },

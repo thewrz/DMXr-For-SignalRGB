@@ -134,6 +134,50 @@ describe("settings routes", () => {
       expect(reloaded.serverName).toBe("Studio A");
     });
 
+    it("AUTH-C3: rejects unknown top-level keys", async () => {
+      const res = await app.inject({
+        method: "PATCH",
+        url: "/settings",
+        payload: { foo: "bar" },
+      });
+      expect(res.statusCode).toBe(400);
+    });
+
+    it("AUTH-C3: rejects wrong-type values", async () => {
+      const res = await app.inject({
+        method: "PATCH",
+        url: "/settings",
+        payload: { port: "evil" },
+      });
+      expect(res.statusCode).toBe(400);
+    });
+
+    it("AUTH-C3: rejects attempts to set serverId", async () => {
+      const res = await app.inject({
+        method: "PATCH",
+        url: "/settings",
+        payload: { serverId: "attacker-chosen" },
+      });
+      expect(res.statusCode).toBe(400);
+    });
+
+    it("AUTH-C3: rejects __proto__ key", async () => {
+      const res = await app.inject({
+        method: "PATCH",
+        url: "/settings",
+        headers: { "content-type": "application/json" },
+        payload: '{"port": 8080, "__proto__": {"polluted": true}}',
+      });
+      // Either 400 from schema or 200 with the proto key stripped. Either
+      // way, global Object prototype must not be polluted.
+      expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+      if (res.statusCode === 200) {
+        // If accepted, confirm the extra key didn't leak into settings.
+        const body = res.json();
+        expect(body.settings.port).toBe(8080);
+      }
+    });
+
     it("triggers mDNS republish when serverName changes", async () => {
       const republishMock = vi.fn();
       const mockAdvertiser = { unpublishAll: vi.fn(), republish: republishMock };
@@ -174,7 +218,27 @@ describe("settings routes", () => {
   });
 
   describe("POST /settings/restart", () => {
-    it("returns restarting response and exits with non-zero code", async () => {
+    it("returns 400 when x-restart-confirm header is missing (AUTH-C2)", async () => {
+      const res = await app.inject({
+        method: "POST",
+        url: "/settings/restart",
+      });
+
+      expect(res.statusCode).toBe(400);
+      expect(res.json().error).toMatch(/confirm/i);
+    });
+
+    it("returns 400 when x-restart-confirm header has wrong value (AUTH-C2)", async () => {
+      const res = await app.inject({
+        method: "POST",
+        url: "/settings/restart",
+        headers: { "x-restart-confirm": "no" },
+      });
+
+      expect(res.statusCode).toBe(400);
+    });
+
+    it("returns 200 and exits with non-zero code when confirmed", async () => {
       vi.useFakeTimers();
       const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
       const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
@@ -182,6 +246,7 @@ describe("settings routes", () => {
       const res = await app.inject({
         method: "POST",
         url: "/settings/restart",
+        headers: { "x-restart-confirm": "yes" },
       });
 
       expect(res.statusCode).toBe(200);

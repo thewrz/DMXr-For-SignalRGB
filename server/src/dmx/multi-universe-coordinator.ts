@@ -17,7 +17,7 @@ export interface MultiUniverseCoordinator {
   readonly registerSafePositions: (universeId: string, channels: Record<number, number>) => void;
   readonly lockChannels: (universeId: string, addresses: readonly number[]) => void;
   readonly unlockChannels: (universeId: string, addresses: readonly number[]) => void;
-  readonly applyRawUpdate: (universeId: string, channels: Record<number, number>) => DmxWriteResult;
+  readonly applyRawUpdate: (universeId: string, channels: Record<number, number>, opts?: { bypassBlackout?: boolean }) => DmxWriteResult;
   readonly getDmxSendStatus: (universeId: string) => DmxSendStatus | undefined;
   readonly getControlMode: (universeId: string) => ControlMode;
 }
@@ -96,8 +96,8 @@ export function createMultiUniverseCoordinator(
       resolve(universeId)?.unlockChannels(addresses);
     },
 
-    applyRawUpdate(universeId: string, channels: Record<number, number>): DmxWriteResult {
-      return resolve(universeId)?.applyRawUpdate(channels) ?? { ok: true };
+    applyRawUpdate(universeId: string, channels: Record<number, number>, opts?: { bypassBlackout?: boolean }): DmxWriteResult {
+      return resolve(universeId)?.applyRawUpdate(channels, opts) ?? { ok: true };
     },
 
     getDmxSendStatus(universeId: string): DmxSendStatus | undefined {

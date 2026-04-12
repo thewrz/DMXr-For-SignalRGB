@@ -68,7 +68,7 @@ export function registerFixtureResetRoutes(
         activeTimers.delete(`reset:${fixture.id}`);
       }
 
-      deps.manager.applyRawUpdate({ [dmxAddr]: resetValue });
+      deps.manager.applyRawUpdate({ [dmxAddr]: resetValue }, { bypassBlackout: true });
 
       pipeLog("info",
         `RESET "${fixture.name}": DMX${dmxAddr} (${resetChannel.name}) → ${resetValue}, ` +
@@ -76,7 +76,7 @@ export function registerFixtureResetRoutes(
       );
 
       const timer = setTimeout(() => {
-        deps.manager.applyRawUpdate({ [dmxAddr]: 0 });
+        deps.manager.applyRawUpdate({ [dmxAddr]: 0 }, { bypassBlackout: true });
         activeTimers.delete(`reset:${fixture.id}`);
         pipeLog("info", `RESET "${fixture.name}": DMX${dmxAddr} restored to 0`);
       }, holdMs);

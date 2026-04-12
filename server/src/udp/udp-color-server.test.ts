@@ -199,3 +199,65 @@ describe("UdpColorServer", () => {
     await server.close(); // should not throw
   });
 });
+
+describe("UdpColorServer source filter (DMX-C1)", () => {
+  let store: FixtureStore;
+  let universe: ReturnType<typeof createMockUniverse>;
+  let filteredServer: UdpColorServer;
+
+  afterEach(async () => {
+    await filteredServer?.close();
+  });
+
+  it("drops packets from disallowed source IPs", async () => {
+    universe = createMockUniverse();
+    const manager = createUniverseManager(universe);
+    store = createTestFixtureStore();
+    addRgbFixture(store, "Fixture1", 1);
+
+    // Create server with allow list that excludes 127.0.0.1 (localhost)
+    filteredServer = createUdpColorServer({
+      fixtureStore: store,
+      manager,
+      allowedSources: ["10.0.0.0/8"], // only 10.x.x.x allowed
+    });
+    const port = await filteredServer.start(0);
+
+    // Send a valid color packet from localhost (127.0.0.1)
+    const packet = makePacket({
+      fixtures: [{ index: 0, r: 255, g: 128, b: 64, brightness: 255 }],
+    });
+    await sendUdpPacket(port, encodeColorPacket(packet));
+    await waitMs(50);
+
+    // Packet should be dropped — not processed, not counted as processed
+    const stats = filteredServer.getStats();
+    expect(stats.packetsReceived).toBe(1);
+    expect(stats.packetsProcessed).toBe(0);
+    expect(universe.updateCalls.length).toBe(0);
+  });
+
+  it("accepts packets from allowed source IPs (default RFC1918 + loopback)", async () => {
+    universe = createMockUniverse();
+    const manager = createUniverseManager(universe);
+    store = createTestFixtureStore();
+    addRgbFixture(store, "Fixture1", 1);
+
+    // Default allow list includes 127.0.0.0/8
+    filteredServer = createUdpColorServer({
+      fixtureStore: store,
+      manager,
+      allowedSources: ["127.0.0.0/8", "192.168.0.0/16"],
+    });
+    const port = await filteredServer.start(0);
+
+    const packet = makePacket({
+      fixtures: [{ index: 0, r: 255, g: 128, b: 64, brightness: 255 }],
+    });
+    await sendUdpPacket(port, encodeColorPacket(packet));
+    await waitMs(50);
+
+    expect(filteredServer.getStats().packetsProcessed).toBe(1);
+    expect(universe.updateCalls.length).toBeGreaterThan(0);
+  });
+});

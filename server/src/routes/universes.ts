@@ -2,31 +2,53 @@ import type { FastifyInstance } from "fastify";
 import type { UniverseRegistry } from "../dmx/universe-registry.js";
 import type { FixtureStore } from "../fixtures/fixture-store.js";
 import type { DriverOptions } from "../types/protocol.js";
+import { VALID_DRIVERS } from "../config/server-config.js";
 
 interface UniverseRouteDeps {
   readonly registry: UniverseRegistry;
   readonly fixtureStore: FixtureStore;
 }
 
+// AUTH-C4: allowed top-level keys for POST /universes body. Used in both
+// the Fastify schema and the handler-level unknown-key check (Fastify's
+// default Ajv `removeAdditional: true` would silently strip extras; we
+// want explicit 400).
+const ALLOWED_CREATE_KEYS: ReadonlySet<string> = new Set([
+  "name",
+  "devicePath",
+  "driverType",
+  "serialNumber",
+  "driverOptions",
+]);
+
 const driverOptionsSchema = {
   type: "object" as const,
+  additionalProperties: false,
   properties: {
-    universe: { type: "number" as const },
-    port: { type: "number" as const },
-    sourceName: { type: "string" as const },
-    priority: { type: "number" as const },
+    universe: { type: "integer" as const, minimum: 0, maximum: 65535 },
+    port: { type: "integer" as const, minimum: 0, maximum: 65535 },
+    sourceName: { type: "string" as const, maxLength: 128 },
+    priority: { type: "integer" as const, minimum: 0, maximum: 200 },
   },
 };
 
+// AUTH-C4: strict schema with enum on driverType and bounded string lengths.
 const createSchema = {
   body: {
     type: "object" as const,
     required: ["name", "devicePath", "driverType"],
     properties: {
-      name: { type: "string" as const, minLength: 1 },
-      devicePath: { type: "string" as const, minLength: 1 },
-      driverType: { type: "string" as const, minLength: 1 },
-      serialNumber: { type: "string" as const },
+      name: { type: "string" as const, minLength: 1, maxLength: 128 },
+      devicePath: {
+        type: "string" as const,
+        minLength: 1,
+        maxLength: 256,
+      },
+      driverType: {
+        type: "string" as const,
+        enum: [...VALID_DRIVERS],
+      },
+      serialNumber: { type: "string" as const, maxLength: 128 },
       driverOptions: driverOptionsSchema,
     },
   },
@@ -36,10 +58,17 @@ const updateSchema = {
   body: {
     type: "object" as const,
     properties: {
-      name: { type: "string" as const, minLength: 1 },
-      devicePath: { type: "string" as const, minLength: 1 },
-      driverType: { type: "string" as const, minLength: 1 },
-      serialNumber: { type: "string" as const },
+      name: { type: "string" as const, minLength: 1, maxLength: 128 },
+      devicePath: {
+        type: "string" as const,
+        minLength: 1,
+        maxLength: 256,
+      },
+      driverType: {
+        type: "string" as const,
+        enum: [...VALID_DRIVERS],
+      },
+      serialNumber: { type: "string" as const, maxLength: 128 },
       driverOptions: driverOptionsSchema,
     },
   },
@@ -65,6 +94,20 @@ export function registerUniverseRoutes(
     "/universes",
     { schema: createSchema },
     async (req, reply) => {
+      // AUTH-C4: reject unknown top-level keys explicitly. Fastify's
+      // default Ajv `removeAdditional: true` would silently strip extras;
+      // we want a clear 400 for caller feedback.
+      const rawBody = req.body as Record<string, unknown> | null;
+      if (rawBody && typeof rawBody === "object") {
+        for (const key of Object.keys(rawBody)) {
+          if (!ALLOWED_CREATE_KEYS.has(key)) {
+            return reply.status(400).send({
+              error: `Unknown key: ${key}`,
+            });
+          }
+        }
+      }
+
       try {
         const universe = deps.registry.add(req.body);
         await deps.registry.save();

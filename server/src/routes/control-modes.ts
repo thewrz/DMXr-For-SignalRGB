@@ -51,7 +51,11 @@ export function registerControlModeRoutes(
     }
     for (const [uid, updates] of byUniverse) {
       totalChannelsSet += Object.keys(updates).length;
-      deps.dispatcher.applyRawUpdate(uid, updates);
+      // DMX-C2: the whiteout overlay runs after dispatcher.whiteout() which
+      // sets blackoutActive=true. The overlay is intentional — it corrects
+      // non-color channels (pan center, strobe open, dimmer full) that
+      // should not blindly be 255. Bypass the new blackout guard.
+      deps.dispatcher.applyRawUpdate(uid, updates, { bypassBlackout: true });
     }
 
     request.log.info(

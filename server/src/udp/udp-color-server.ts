@@ -7,6 +7,16 @@ import type { MultiUniverseCoordinator } from "../dmx/multi-universe-coordinator
 import type { LatencyTracker } from "../metrics/latency-tracker.js";
 import type { MovementEngine } from "../fixtures/movement-interpolator.js";
 import { pipeLog, shouldSample } from "../logging/pipeline-logger.js";
+import { matchCidr } from "../utils/cidr.js";
+
+// DMX-C1: default allowed source CIDRs — loopback + RFC1918 private ranges.
+// Packets from any other source IP are silently dropped before parsing.
+export const DEFAULT_ALLOWED_SOURCES: readonly string[] = [
+  "127.0.0.0/8",
+  "10.0.0.0/8",
+  "172.16.0.0/12",
+  "192.168.0.0/16",
+];
 
 export interface UdpColorServerDeps {
   readonly fixtureStore: FixtureStore;
@@ -14,6 +24,7 @@ export interface UdpColorServerDeps {
   readonly coordinator?: MultiUniverseCoordinator;
   readonly latencyTracker?: LatencyTracker;
   readonly movementEngine?: MovementEngine;
+  readonly allowedSources?: readonly string[];
   readonly logger?: {
     readonly info: (msg: string) => void;
     readonly warn: (msg: string) => void;
@@ -37,6 +48,7 @@ export interface UdpColorServer {
 }
 
 export function createUdpColorServer(deps: UdpColorServerDeps): UdpColorServer {
+  const allowedSources = deps.allowedSources ?? DEFAULT_ALLOWED_SOURCES;
   let socket: Socket | null = null;
   let boundPort = 0;
   let packetsReceived = 0;
@@ -58,6 +70,17 @@ export function createUdpColorServer(deps: UdpColorServerDeps): UdpColorServer {
 
         sock.on("message", (msg, rinfo) => {
           packetsReceived++;
+
+          // DMX-C1: drop packets from disallowed source IPs before parsing.
+          // This is the primary defense against unauthenticated UDP injection
+          // from untrusted LAN peers when the server is bound to 0.0.0.0.
+          if (allowedSources.length > 0 && !matchCidr(rinfo.address, allowedSources)) {
+            if (shouldSample("udp:source-denied")) {
+              pipeLog("warn", `UDP packet dropped from disallowed source ${rinfo.address}:${rinfo.port}`);
+            }
+            return;
+          }
+
           const receiveTime = performance.now();
 
           const packet = parseColorPacket(msg);

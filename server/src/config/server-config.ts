@@ -24,13 +24,13 @@ export interface ServerConfig {
   };
 }
 
-const VALID_DRIVERS = [
+export const VALID_DRIVERS = [
   "null",
   "enttec-usb-dmx-pro",
   "enttec-open-usb-dmx",
   "artnet",
   "sacn",
-];
+] as const;
 
 export function loadConfig(
   persisted?: Partial<PersistedSettings>,
@@ -51,7 +51,7 @@ export function loadConfig(
   const dmxDriver =
     process.env["DMX_DRIVER"] ?? base.dmxDriver ?? "null";
 
-  if (!VALID_DRIVERS.includes(dmxDriver)) {
+  if (!(VALID_DRIVERS as readonly string[]).includes(dmxDriver)) {
     throw new Error(
       `Invalid DMX_DRIVER: "${dmxDriver}". Must be one of: ${VALID_DRIVERS.join(", ")}`,
     );
@@ -80,7 +80,9 @@ export function loadConfig(
   return {
     port: rawPort,
     udpPort: Number.isFinite(rawUdpPort) && rawUdpPort >= 0 ? rawUdpPort : 0,
-    host: process.env["HOST"] ?? base.host ?? "0.0.0.0",
+    // DMX-C1: default to loopback. Use HOST=0.0.0.0 or settings.host to
+    // bind to all interfaces (requires API_KEY or explicit INSECURE_NO_AUTH=1).
+    host: process.env["HOST"] ?? base.host ?? "127.0.0.1",
     dmxDriver,
     dmxDevicePath:
       process.env["DMX_DEVICE_PATH"] ?? base.dmxDevicePath ?? "auto",

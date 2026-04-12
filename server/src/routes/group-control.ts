@@ -89,7 +89,7 @@ export function registerGroupControlRoutes(
       for (const fixture of fixtures) {
         const universeId = fixture.universeId ?? DEFAULT_UNIVERSE_ID;
         const zeros = buildZeroChannels(fixture);
-        lastDmxResult = deps.dispatcher.applyRawUpdate(universeId, zeros);
+        lastDmxResult = deps.dispatcher.applyRawUpdate(universeId, zeros, { bypassBlackout: true });
       }
 
       // Lock channels so incoming color frames don't overwrite
@@ -126,7 +126,7 @@ export function registerGroupControlRoutes(
       for (const fixture of fixtures) {
         const universeId = fixture.universeId ?? DEFAULT_UNIVERSE_ID;
         const channels = mapColor(fixture, 255, 255, 255, 1.0);
-        lastDmxResult = deps.dispatcher.applyRawUpdate(universeId, channels);
+        lastDmxResult = deps.dispatcher.applyRawUpdate(universeId, channels, { bypassBlackout: true });
       }
 
       // Lock channels so incoming color frames don't overwrite
@@ -170,7 +170,7 @@ export function registerGroupControlRoutes(
         snapshots.push({ universeId, channels: snapshot });
 
         const whiteChannels = mapColor(fixture, 255, 255, 255, 1.0);
-        lastDmxResult = deps.dispatcher.applyRawUpdate(universeId, whiteChannels);
+        lastDmxResult = deps.dispatcher.applyRawUpdate(universeId, whiteChannels, { bypassBlackout: true });
       }
 
       // Lock during flash so SignalRGB doesn't overwrite mid-flash
@@ -186,7 +186,7 @@ export function registerGroupControlRoutes(
       const timer = setTimeout(() => {
         unlockGroup(group.id);
         for (const { universeId, channels } of snapshots) {
-          deps.dispatcher.applyRawUpdate(universeId, channels);
+          deps.dispatcher.applyRawUpdate(universeId, channels, { bypassBlackout: true });
         }
         activeTimers.delete(group.id);
       }, durationMs);
@@ -225,7 +225,7 @@ export function registerGroupControlRoutes(
       for (const fixture of fixtures) {
         const universeId = fixture.universeId ?? DEFAULT_UNIVERSE_ID;
         const defaults = getFixtureDefaults(fixture);
-        lastDmxResult = deps.dispatcher.applyRawUpdate(universeId, defaults);
+        lastDmxResult = deps.dispatcher.applyRawUpdate(universeId, defaults, { bypassBlackout: true });
       }
 
       request.log.info(

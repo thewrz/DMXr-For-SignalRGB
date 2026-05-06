@@ -113,7 +113,9 @@ export function registerFixtureTestRoutes(
         return reply.status(404).send({ error: "Fixture not found" });
       }
 
-      const { action, durationMs = 500, channelOffset } = request.body;
+      const rawDuration = request.body.durationMs ?? 500;
+      const durationMs = Math.max(100, Math.min(5000, rawDuration));
+      const { action, channelOffset } = request.body;
       const start = fixture.dmxStartAddress;
       const count = fixture.channelCount;
 

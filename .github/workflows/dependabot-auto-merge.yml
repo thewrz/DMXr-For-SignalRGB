@@ -19,58 +19,52 @@ jobs:
     steps:
       # Pinned to commit SHA — floating tags are unsafe on pull_request_target
       # with write permissions (supply chain attack surface). v2 = 21025c7
-      - uses: dependabot/fetch-metadata@21025c705c08248db411dc16f3619e6b5f9ea21a
+      - uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98
         id: meta
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      # patch + minor: always auto-merge — backward-compatible by semver contract
+      # patch + minor: queue auto-merge — backward-compatible by semver contract
+      # Approval from code owner (@thewrz) still required; org policy blocks GITHUB_TOKEN
+      # from approving PRs (can_approve_pull_request_reviews=false at org level).
       # Excludes github-actions (handled by dedicated step below to avoid duplicate calls)
       - name: Auto-merge patch and minor updates
         if: |
           (steps.meta.outputs.update-type == 'version-update:semver-patch' ||
            steps.meta.outputs.update-type == 'version-update:semver-minor') &&
           steps.meta.outputs.package-ecosystem != 'github-actions'
-        run: |
-          gh pr review --approve "$PR_URL" -b "Automated: patch/minor dependency update"
-          gh pr merge --auto --squash "$PR_URL"
+        run: gh pr merge --auto --squash "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # major dev deps: auto-merge — no production runtime impact
+      # major dev deps: queue auto-merge — no production runtime impact
       # Excludes github-actions (handled by dedicated step below to avoid duplicate calls)
       - name: Auto-merge major dev dependency updates
         if: |
           steps.meta.outputs.update-type == 'version-update:semver-major' &&
           steps.meta.outputs.dependency-type == 'direct:development' &&
           steps.meta.outputs.package-ecosystem != 'github-actions'
-        run: |
-          gh pr review --approve "$PR_URL" -b "Automated: major dev dependency update"
-          gh pr merge --auto --squash "$PR_URL"
+        run: gh pr merge --auto --squash "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # Docker image updates: auto-merge — Docker build smoke test gates these
+      # Docker image updates: queue auto-merge — Docker build smoke test gates these
       - name: Auto-merge Docker image updates
         if: |
           steps.meta.outputs.update-type == 'docker-tag-update' ||
           steps.meta.outputs.update-type == 'docker-digest-update'
-        run: |
-          gh pr review --approve "$PR_URL" -b "Automated: Docker image update"
-          gh pr merge --auto --squash "$PR_URL"
+        run: gh pr merge --auto --squash "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # GitHub Actions updates: auto-merge — CI workflow changes, no runtime impact
+      # GitHub Actions updates: queue auto-merge — CI workflow changes, no runtime impact
       # Handles all semver tiers for actions (patch/minor/major all safe to auto-merge)
       - name: Auto-merge GitHub Actions updates
         if: steps.meta.outputs.package-ecosystem == 'github-actions'
-        run: |
-          gh pr review --approve "$PR_URL" -b "Automated: GitHub Actions update"
-          gh pr merge --auto --squash "$PR_URL"
+        run: gh pr merge --auto --squash "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
